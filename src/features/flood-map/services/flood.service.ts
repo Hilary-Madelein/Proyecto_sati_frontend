@@ -1,7 +1,14 @@
 import "server-only";
 import { satiGet, SatiApiError } from "@/lib/api/sati-api";
 import { EVENTS_WINDOW_DAYS } from "../constants";
-import type { EventsFeed, FloodMapData, HazardEvent, RainForecastAvailability, RiverAlertsSnapshot } from "../types";
+import type {
+  EventsFeed,
+  FloodMapData,
+  HazardEvent,
+  ObservedRainAvailability,
+  RainForecastAvailability,
+  RiverAlertsSnapshot,
+} from "../types";
 import { MOCK_FLOOD_LAYERS } from "./mock-data";
 
 /*
@@ -21,8 +28,13 @@ interface ApiEventsPage {
 }
 
 export async function getFloodMapData(): Promise<FloodMapData> {
-  const [eventsFeed, rain, riverAlerts] = await Promise.all([getEventsFeed(), getRainAvailability(), getRiverAlerts()]);
-  return { ...MOCK_FLOOD_LAYERS, eventsFeed, rain, riverAlerts };
+  const [eventsFeed, rain, observedRain, riverAlerts] = await Promise.all([
+    getEventsFeed(),
+    getRainAvailability(),
+    getObservedRainAvailability(),
+    getRiverAlerts(),
+  ]);
+  return { ...MOCK_FLOOD_LAYERS, eventsFeed, rain, observedRain, riverAlerts };
 }
 
 /** Eventos abiertos de los últimos días. Si el backend falla, devuelve el error en vez de lanzar. */
@@ -41,6 +53,15 @@ async function getEventsFeed(): Promise<EventsFeed> {
 async function getRainAvailability(): Promise<RainForecastAvailability | null> {
   try {
     return await satiGet<RainForecastAvailability>("/rain-forecast", undefined, 30_000);
+  } catch {
+    return null;
+  }
+}
+
+/** Lluvia observada por satélite: última hora con datos de cada producto y ventanas disponibles. */
+async function getObservedRainAvailability(): Promise<ObservedRainAvailability | null> {
+  try {
+    return await satiGet<ObservedRainAvailability>("/observed-rain", undefined, 30_000);
   } catch {
     return null;
   }

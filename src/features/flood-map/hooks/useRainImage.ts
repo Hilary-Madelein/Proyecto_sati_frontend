@@ -2,32 +2,34 @@
 
 import { useEffect, useState } from "react";
 import { satiClientGet } from "@/lib/api/sati-client";
-import type { AccumulatedRain, RainForecastHours } from "../types";
+import type { RainImage } from "../types";
 
-interface State {
+interface State<T> {
   key: string;
-  data: AccumulatedRain | null;
+  data: T | null;
   error: string | null;
 }
 
 /**
- * Pide al backend la lluvia pronosticada acumulada de `hours` horas de la
- * corrida `run` (null = capa apagada o sin datos). Ignora respuestas viejas.
+ * Pide al backend una imagen de lluvia (pronóstico de un día o acumulado observado) y la
+ * devuelve lista para el mapa. `path` = null apaga la capa. `version` cambia
+ * cuando hay datos nuevos (corrida del modelo o última hora del satélite) y
+ * fuerza a pedirlo otra vez. Ignora respuestas de pedidos anteriores.
  */
-export function useAccumulatedRain(hours: RainForecastHours | null, run: string | null) {
-  const [state, setState] = useState<State | null>(null);
-  const key = hours && run ? `${run}:${hours}` : null;
+export function useRainImage<T extends RainImage>(path: string | null, version: string | null) {
+  const [state, setState] = useState<State<T> | null>(null);
+  const key = path && version ? `${path}@${version}` : null;
 
   useEffect(() => {
-    if (!key || !hours) return;
+    if (!key || !path) return;
     const controller = new AbortController();
-    satiClientGet<AccumulatedRain>(`/rain-forecast/accumulated/${hours}`, undefined, controller.signal)
+    satiClientGet<T>(path, undefined, controller.signal)
       .then((data) => setState({ key, data, error: null }))
       .catch((error: Error) => {
         if (error.name !== "AbortError") setState({ key, data: null, error: error.message });
       });
     return () => controller.abort();
-    // `key` resume horas y corrida.
+    // `key` resume ruta y versión.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 

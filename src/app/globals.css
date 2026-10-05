@@ -4,7 +4,7 @@
   --color-brand-950: #0b1d30;
   --color-brand-900: #14273d;
 
-  --color-ec-yellow: #ffdd00;
+  --color-ec-yellow: #FFD51E;
   --color-ec-blue: #034ea2;
   --color-ec-red: #ed1c24;
 }
@@ -73,6 +73,22 @@ html .leaflet-control-attribution {
   background: rgb(255 255 255 / 0.8);
   backdrop-filter: blur(6px);
   font-size: 10px;
+}
+
+/* Popup de eventos: el contenido maneja sus propios márgenes (ver EventPopupContent.tsx). */
+html .event-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  overflow: hidden;
+}
+
+html .event-popup .leaflet-popup-content {
+  margin: 0;
+  min-width: 0;
+}
+
+html .event-popup a.leaflet-popup-close-button {
+  top: 12px;
+  right: 8px;
 }
 
 /* Marcadores con forma propia (ver map-symbols.ts). */

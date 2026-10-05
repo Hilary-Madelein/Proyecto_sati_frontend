@@ -1,26 +1,27 @@
 "use client";
 
 import { ImageOverlay } from "react-leaflet";
-import { RAIN_FORECAST_OPACITY } from "../../constants";
-import type { AccumulatedRain } from "../../types";
+import type { RainImage } from "../../types";
 
 interface AccumulatedRainLayerProps {
-  rain: AccumulatedRain;
+  rain: RainImage;
+  opacity: number;
   attribution: string;
   onLoadingChange: (loading: boolean) => void;
 }
 
 /**
- * Lluvia pronosticada acumulada: una sola imagen calculada por el backend
- * (suma de días del WRF, ya proyectada a Web Mercator) sobre el Ecuador.
+ * Lluvia acumulada (pronosticada u observada): una sola imagen calculada por
+ * el backend (suma de días del WRF o de horas del satélite, ya proyectada a
+ * Web Mercator) sobre el Ecuador.
  */
-export function AccumulatedRainLayer({ rain, attribution, onLoadingChange }: AccumulatedRainLayerProps) {
+export function AccumulatedRainLayer({ rain, opacity, attribution, onLoadingChange }: AccumulatedRainLayerProps) {
   return (
     <ImageOverlay
       key={rain.imagePath}
       url={`/api/sati${rain.imagePath}`}
       bounds={rain.bounds}
-      opacity={RAIN_FORECAST_OPACITY}
+      opacity={opacity}
       attribution={attribution}
       eventHandlers={{
         add: () => onLoadingChange(true),

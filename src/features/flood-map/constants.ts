@@ -9,8 +9,8 @@ import type {
   LatLngBounds,
   LayerVisibility,
   ObservedRainProduct,
-  ObservedRainWindow,
-  RainForecastHours,
+  ForecastDay,
+  RainWindowHours,
 } from "./types";
 
 // ── Mapa ────────────────────────────────────────────────────────────────
@@ -43,29 +43,37 @@ export const MAP_PANES = {
   fluvial: { name: "fluvial", zIndex: 390 },
 } as const;
 
-// ── Lluvia pronosticada acumulada (WRF) ─────────────────────────────────
-/** 24 h = día 1 de la corrida; 48 h = días 1-2; 72 h = días 1-3 (suma calculada por el backend). */
-export const RAIN_FORECAST_PERIODS: readonly { value: `${RainForecastHours}`; label: string }[] = [
+// ── Lluvia pronosticada (WRF), día por día ──────────────────────────────
+/** Días que se pueden elegir; cada uno muestra solo su lluvia (no la suma con los anteriores). */
+export const FORECAST_DAYS: readonly ForecastDay[] = [1, 2, 3];
+
+/**
+ * Cómo se nombra cada día: la opción dice hasta qué hora llega ("48h") y el
+ * título aclara que es solo ese tramo de 24 h, no el acumulado.
+ */
+export const FORECAST_DAY_LABELS: Record<ForecastDay, { option: string; range: string }> = {
+  1: { option: "24h", range: "las primeras 24 h" },
+  2: { option: "48h", range: "entre las 24 y 48 h" },
+  3: { option: "72h", range: "entre las 48 y 72 h" },
+};
+export const DEFAULT_FORECAST_DAY: ForecastDay = 1;
+
+/** Capa del backend cuya paleta usa la imagen de lluvia acumulada (para la leyenda). */
+export const RAIN_FORECAST_LEGEND_LAYER = "wrf-precipitation-daily";
+export const RAIN_FORECAST_OPACITY = 0.7;
+
+// ── Lluvia observada por satélite ───────────────────────────────────────
+// Productos, nombres y disponibilidad llegan del backend (GET /observed-rain).
+
+/** Capa del backend cuya paleta usa la imagen de lluvia observada (para la leyenda). */
+/** Ventanas de lluvia observada: lo que cayó en las últimas 24, 48 o 72 h (acumulado). */
+export const OBSERVED_RAIN_WINDOWS: readonly { value: `${RainWindowHours}`; label: string }[] = [
   { value: "24", label: "24h" },
   { value: "48", label: "48h" },
   { value: "72", label: "72h" },
 ];
 
-export const DEFAULT_RAIN_FORECAST_HOURS: RainForecastHours = 24;
-export const RAIN_FORECAST_OPACITY = 0.7;
-
-// ── Lluvia observada por satélite ───────────────────────────────────────
-export const OBSERVED_RAIN_PRODUCTS: readonly { value: ObservedRainProduct; label: string; attribution: string }[] = [
-  { value: "imerg", label: "IMERG", attribution: "Lluvia observada: NASA GPM IMERG · INAMHI" },
-  { value: "persiann", label: "PERSIANN", attribution: "Lluvia observada: CHRS PERSIANN-PDIR-Now · INAMHI" },
-];
-
-export const OBSERVED_RAIN_WINDOWS: readonly { value: ObservedRainWindow; label: string }[] = [
-  { value: "24h", label: "24h" },
-  { value: "48h", label: "48h" },
-  { value: "72h", label: "72h" },
-];
-
+export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product}-24h`;
 export const OBSERVED_RAIN_OPACITY = 0.7;
 
 // ── Inundaciones ────────────────────────────────────────────────────────

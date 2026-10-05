@@ -12,11 +12,14 @@ import {
   DATA_REFRESH_MS,
   DEFAULT_EVENT_FILTERS,
   DEFAULT_LAYER_VISIBILITY,
-  DEFAULT_RAIN_FORECAST_HOURS,
+  DEFAULT_FORECAST_DAY,
+  FORECAST_DAY_LABELS,
   EVENTS_WINDOW_DAYS,
-  OBSERVED_RAIN_PRODUCTS,
+  observedRainLegendLayer,
+  RAIN_FORECAST_LEGEND_LAYER,
 } from "../constants";
-import { useAccumulatedRain } from "../hooks/useAccumulatedRain";
+import { useRainImage } from "../hooks/useRainImage";
+import { useRainLegends } from "../hooks/useRainLegends";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -24,12 +27,16 @@ import type {
   FloodLayerId,
   FloodMapData,
   LayerVisibility,
+  DailyRainForecast,
+  ForecastDay,
+  ObservedAccumulatedRain,
+  ObservedRainAvailability,
   ObservedRainProduct,
-  ObservedRainWindow,
   RainForecastAvailability,
-  RainForecastHours,
+  RainWindowHours,
   SelectedRiver,
 } from "../types";
+import { RainLegend } from "./map/RainLegend";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { FloodLayersSection } from "./panels/FloodLayersSection";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
@@ -53,15 +60,15 @@ type PanelId = "layers" | "events";
 
 export function FloodMonitor({ data }: { data: FloodMapData }) {
   const router = useRouter();
-  // Lluvia pronosticada acumulada (WRF)
-  const [forecastHours, setForecastHours] = useState<RainForecastHours>(() => initialForecastHours(data.rain));
+  // Lluvia pronosticada (WRF), un día a la vez
+  const [forecastDay, setForecastDay] = useState<ForecastDay>(() => initialForecastDay(data.rain));
   // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
   // Lluvia observada (satélite)
   const [showObservedRain, setShowObservedRain] = useState(false);
-  const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>("imerg");
-  const [observedWindow, setObservedWindow] = useState<ObservedRainWindow>("24h");
+  const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
+  const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
   const [observedRainLoading, setObservedRainLoading] = useState(false);
   // Caudales (GEOGLOWS)
   const [alertDayIndex, setAlertDayIndex] = useState(0);
@@ -84,16 +91,33 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
   const filteredEvents = useMemo(() => filterEvents(events, eventFilters, fetchedAt), [events, eventFilters, fetchedAt]);
   const criticalCount = events.filter((event) => event.severity === "critical").length;
-  const forecastAvailable = data.rain?.periods.some((period) => period.hours === forecastHours && period.available) ?? false;
-  const accumulated = useAccumulatedRain(showRain && forecastAvailable ? forecastHours : null, data.rain?.run ?? null);
-  const rainForecast = accumulated.data ? { data: accumulated.data, attribution: data.rain?.attribution ?? "" } : null;
-  const observedRain = showObservedRain
-    ? {
-        layerId: `${observedProduct}-${observedWindow}`,
-        attribution: OBSERVED_RAIN_PRODUCTS.find((option) => option.value === observedProduct)?.attribution ?? "",
-      }
-    : null;
+  const forecastAvailable = data.rain?.days.some((item) => item.day === forecastDay && item.available) ?? false;
+  const forecast = useRainImage<DailyRainForecast>(
+    showRain && forecastAvailable ? `/rain-forecast/days/${forecastDay}` : null,
+    data.rain?.run ?? null,
+  );
+  const rainForecast = forecast.data ? { data: forecast.data, attribution: data.rain?.attribution ?? "" } : null;
+
+  // Lluvia observada: el backend suma las horas del satélite hasta la última disponible.
+  const observedStatus = data.observedRain?.products.find((product) => product.key === observedProduct);
+  const observedAvailable = observedStatus?.windows.some((item) => item.hours === observedHours && item.available) ?? false;
+  const observed = useRainImage<ObservedAccumulatedRain>(
+    showObservedRain && observedAvailable ? `/observed-rain/${observedProduct}/accumulated/${observedHours}` : null,
+    // La última hora con datos: cuando llega una nueva, se vuelve a pedir el acumulado.
+    observedStatus?.latest ?? null,
+  );
+  const observedRain = observed.data ? { data: observed.data, attribution: observedStatus?.attribution ?? "" } : null;
   const selectedRiverId = riverTarget?.kind === "river" ? riverTarget.river.riverId : null;
+
+  // Leyenda de lluvia: aparece cuando hay alguna capa de lluvia visible en el mapa.
+  const rainSources = [
+    rainForecast && { layerId: RAIN_FORECAST_LEGEND_LAYER, label: `Pronóstico ${FORECAST_DAY_LABELS[forecastDay].range}` },
+    observedRain && {
+      layerId: observedRainLegendLayer(observedProduct),
+      label: `Satélite ${observedStatus?.name ?? ""} ${observedHours} h`,
+    },
+  ].filter((source) => source !== null);
+  const rainLegends = useRainLegends(rainSources.map((source) => source.layerId));
 
   // Vuelve a pedir los datos al servidor cada cierto tiempo, sin recargar la página.
   useEffect(() => {
@@ -147,6 +171,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         focusRequest={focusRequest}
         onSelectEvent={selectEvent}
       />
+      <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
 
       <ResponsivePanel
         title="Capas del mapa"
@@ -164,22 +189,25 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         <div className="space-y-5">
           <RainForecastSection
             rain={data.rain}
-            hours={forecastHours}
-            onHoursChange={setForecastHours}
+            day={forecastDay}
+            onDayChange={setForecastDay}
             visible={showRain}
             onVisibleChange={setShowRain}
-            accumulated={accumulated.data}
-            error={accumulated.error}
-            isLoading={accumulated.isLoading || rainLoading}
+            forecast={forecast.data}
+            error={forecast.error}
+            isLoading={forecast.isLoading || rainLoading}
           />
           <ObservedRainSection
+            availability={data.observedRain}
             visible={showObservedRain}
             onVisibleChange={setShowObservedRain}
             product={observedProduct}
             onProductChange={setObservedProduct}
-            timeWindow={observedWindow}
-            onTimeWindowChange={setObservedWindow}
-            isLoading={observedRainLoading}
+            hours={observedHours}
+            onHoursChange={setObservedHours}
+            accumulated={observed.data}
+            error={observed.error}
+            isLoading={observed.isLoading || observedRainLoading}
           />
           <FloodLayersSection
             data={data}
@@ -307,8 +335,14 @@ function CountBadge({ count }: { count: number }) {
   );
 }
 
-/** 24 h si está disponible; si no, el primer periodo que lo esté. */
-function initialForecastHours(rain: RainForecastAvailability | null): RainForecastHours {
-  const available = rain?.periods.filter((period) => period.available).map((period) => period.hours) ?? [];
-  return available.includes(DEFAULT_RAIN_FORECAST_HOURS) ? DEFAULT_RAIN_FORECAST_HOURS : (available[0] ?? DEFAULT_RAIN_FORECAST_HOURS);
+/** El día 1 si está disponible; si no, el primer día que lo esté. */
+function initialForecastDay(rain: RainForecastAvailability | null): ForecastDay {
+  const available = rain?.days.filter((item) => item.available).map((item) => item.day) ?? [];
+  return available.includes(DEFAULT_FORECAST_DAY) ? DEFAULT_FORECAST_DAY : (available[0] ?? DEFAULT_FORECAST_DAY);
+}
+
+/** El primer producto satelital con datos recientes (el backend los ordena por preferencia: PERSIANN primero). */
+function initialObservedProduct(observed: ObservedRainAvailability | null): ObservedRainProduct {
+  const products = observed?.products ?? [];
+  return (products.find((product) => !product.isStale) ?? products[0])?.key ?? "persiann";
 }

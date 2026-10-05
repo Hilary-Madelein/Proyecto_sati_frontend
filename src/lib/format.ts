@@ -17,6 +17,19 @@ export function formatDateTime(iso: string) {
   return `${day} ${month}, ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 
+/**
+ * Tiempo transcurrido, p. ej. "hace 3 h" o "hace 6 días". Depende del reloj:
+ * usar solo en componentes que se pintan en el navegador (p. ej. el mapa).
+ */
+export function formatTimeAgo(iso: string, now = Date.now()) {
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (minutes < 60) return minutes <= 1 ? "hace un momento" : `hace ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "hace 1 día" : `hace ${days} días`;
+}
+
 /** Día y mes en hora de Ecuador, p. ej. "1 oct". */
 export function formatDayMonth(iso: string) {
   const date = new Date(new Date(iso).getTime() + ECUADOR_UTC_OFFSET_MS);

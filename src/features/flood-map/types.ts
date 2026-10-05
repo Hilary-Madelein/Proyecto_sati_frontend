@@ -3,32 +3,83 @@ export type LatLngBounds = [southWest: LatLng, northEast: LatLng];
 
 // ── Lluvia pronosticada acumulada (modelo WRF del INAMHI) ───────────────
 /** Horas acumuladas desde el inicio de la corrida: 24 h = día 1, 48 h = días 1-2, 72 h = días 1-3. */
-export type RainForecastHours = 24 | 48 | 72;
+/** Día del pronóstico: 1 = primeras 24 h de la corrida, 2 = las siguientes… */
+export type ForecastDay = 1 | 2 | 3;
+/** Ventanas de lluvia observada (acumulada hacia atrás), en horas. */
+export type RainWindowHours = 24 | 48 | 72;
 
 export interface RainForecastAvailability {
   /** Inicio de la corrida del modelo (ISO 8601). */
   run: string | null;
   isStale: boolean;
   attribution: string;
-  periods: Array<{ hours: RainForecastHours; available: boolean; from: string | null; to: string | null }>;
+  /** Cada día con sus propias 24 h (no acumuladas). */
+  days: Array<{ day: ForecastDay; available: boolean; from: string | null; to: string | null }>;
 }
 
-/** Acumulado calculado por el backend, listo para superponer en el mapa. */
-export interface AccumulatedRain {
-  run: string;
-  hours: RainForecastHours;
-  from: string;
-  to: string;
+/** Imagen de lluvia calculada por el backend, lista para superponer en el mapa. */
+export interface RainImage {
   /** [[sur, oeste], [norte, este]] */
   bounds: [[number, number], [number, number]];
-  maxMm: number;
   /** Ruta de la imagen PNG relativa a la API del backend. */
   imagePath: string;
 }
 
+/** Lluvia pronosticada de UN día, calculada por el backend, lista para el mapa. */
+export interface DailyRainForecast extends RainImage {
+  run: string;
+  day: ForecastDay;
+  from: string;
+  to: string;
+  maxMm: number;
+}
+
+/** Escala de colores de una capa de lluvia (GET /layers/:id/legend). */
+export interface RainLegend {
+  id: string;
+  unit: string;
+  entries: { value: number; color: string }[];
+}
+
 // ── Lluvia observada por satélite ───────────────────────────────────────
-export type ObservedRainProduct = "imerg" | "persiann";
-export type ObservedRainWindow = "24h" | "48h" | "72h";
+/** Hoy solo PERSIANN: el INAMHI dejó de publicar IMERG (marzo de 2026). */
+export type ObservedRainProduct = "persiann";
+
+export interface ObservedRainWindowStatus {
+  hours: RainWindowHours;
+  available: boolean;
+  /** Primera y última hora con datos de la ventana (ISO 8601). */
+  from: string | null;
+  to: string | null;
+  /** Horas sin dato dentro de la ventana. */
+  missingHours: number;
+}
+
+export interface ObservedRainProductStatus {
+  key: ObservedRainProduct;
+  name: string;
+  attribution: string;
+  /** Última hora con datos (ISO 8601). */
+  latest: string | null;
+  /** El producto no tiene datos recientes (p. ej. el INAMHI dejó de publicarlo). */
+  isStale: boolean;
+  windows: ObservedRainWindowStatus[];
+}
+
+/** GET /observed-rain: productos en orden de preferencia. */
+export interface ObservedRainAvailability {
+  products: ObservedRainProductStatus[];
+}
+
+/** Lluvia observada acumulada hasta la última hora (suma horaria hecha por el backend). */
+export interface ObservedAccumulatedRain extends RainImage {
+  product: ObservedRainProduct;
+  hours: RainWindowHours;
+  from: string;
+  to: string;
+  missingHours: number;
+  maxMm: number;
+}
 
 // ── Inundaciones fluviales (simuladas hasta conectar su fuente) ─────────
 export type FluvialLevel = "extremo" | "peligro" | "advertencia" | "normal" | "sin-datos";
@@ -192,6 +243,8 @@ export interface FloodMapData {
   eventsFeed: EventsFeed;
   /** Null si el backend no pudo informar la lluvia pronosticada. */
   rain: RainForecastAvailability | null;
+  /** Null si el backend no pudo informar la lluvia observada. */
+  observedRain: ObservedRainAvailability | null;
   /** Null si no se pudieron cargar las alertas de ríos. */
   riverAlerts: RiverAlertsSnapshot | null;
 }

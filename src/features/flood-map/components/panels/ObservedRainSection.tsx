@@ -3,31 +3,68 @@ import { CloudRainIcon } from "@/components/ui/icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
-import { OBSERVED_RAIN_PRODUCTS, OBSERVED_RAIN_WINDOWS } from "../../constants";
-import type { ObservedRainProduct, ObservedRainWindow } from "../../types";
-import { LoadingBadge } from "./RainForecastSection";
+import { formatDateTime, formatDayMonth } from "@/lib/format";
+import { OBSERVED_RAIN_WINDOWS } from "../../constants";
+import type {
+  ObservedAccumulatedRain,
+  ObservedRainAvailability,
+  ObservedRainProduct,
+  ObservedRainProductStatus,
+  RainWindowHours,
+} from "../../types";
+import { LoadingBadge, Notice } from "./RainForecastSection";
 import { SectionHeading } from "./SectionHeading";
 
 interface ObservedRainSectionProps {
+  availability: ObservedRainAvailability | null;
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
   product: ObservedRainProduct;
   onProductChange: (product: ObservedRainProduct) => void;
-  timeWindow: ObservedRainWindow;
-  onTimeWindowChange: (timeWindow: ObservedRainWindow) => void;
+  hours: RainWindowHours;
+  onHoursChange: (hours: RainWindowHours) => void;
+  /** Acumulado que se está mostrando (null mientras se calcula o si falló). */
+  accumulated: ObservedAccumulatedRain | null;
+  error: string | null;
   isLoading: boolean;
 }
 
-/** Lluvia que ya cayó, estimada por satélite y acumulada por el INAMHI (no es pronóstico). */
+const staleHint = (status: ObservedRainProductStatus) =>
+  status.latest ? `Sin datos desde el ${formatDayMonth(status.latest)}` : "Sin datos";
+
+/**
+ * Lluvia que ya cayó, estimada por satélite. El backend suma la lluvia de cada
+ * hora hasta la última disponible (no es pronóstico).
+ */
 export function ObservedRainSection({
+  availability,
   visible,
   onVisibleChange,
   product,
   onProductChange,
-  timeWindow,
-  onTimeWindowChange,
+  hours,
+  onHoursChange,
+  accumulated,
+  error,
   isLoading,
 }: ObservedRainSectionProps) {
+  const products = availability?.products ?? [];
+  const status = products.find((item) => item.key === product);
+  const window = status?.windows.find((item) => item.hours === hours);
+  const staleProducts = products.filter((item) => item.isStale);
+  const anyAvailable = products.some((item) => !item.isStale);
+
+  const hourOptions = OBSERVED_RAIN_WINDOWS.map((option) => {
+    const available = status?.windows.find((item) => String(item.hours) === option.value)?.available ?? false;
+    return { ...option, disabled: !available, hint: available ? undefined : "No hay suficientes horas con datos" };
+  });
+  const productOptions = products.map((item) => ({
+    value: item.key,
+    label: item.name,
+    disabled: item.isStale,
+    hint: item.isStale ? staleHint(item) : undefined,
+  }));
+
   return (
     <section>
       <SectionHeading aside={isLoading && visible && <LoadingBadge />}>Lluvia observada</SectionHeading>
@@ -39,9 +76,15 @@ export function ObservedRainSection({
           </IconTile>
           <div className="min-w-0 flex-1">
             <h4 className={cn("text-sm font-semibold", visible ? "text-slate-900" : "text-slate-500")}>
-              Lluvia acumulada (satélite)
+              Lluvia ya caída (satélite)
             </h4>
-            <p className="text-xs text-slate-500">Últimas {timeWindow} · ya ocurrida</p>
+            <p className="text-xs text-slate-500">
+              {window?.from && window.to
+                ? `Últimas ${hours} h, hasta el ${formatDateTime(window.to)}`
+                : anyAvailable
+                  ? `Últimas ${hours} h · sin datos suficientes`
+                  : "Sin datos recientes"}
+            </p>
           </div>
           <Toggle checked={visible} onChange={onVisibleChange} label="Mostrar lluvia observada" />
         </div>
@@ -49,22 +92,46 @@ export function ObservedRainSection({
         {visible && (
           <div className="mt-3 space-y-2">
             <SegmentedControl
-              name="observed-rain-window"
-              label="Ventana de lluvia observada"
-              value={timeWindow}
-              options={OBSERVED_RAIN_WINDOWS}
-              onChange={onTimeWindowChange}
+              name="observed-rain-hours"
+              label="Horas de lluvia observada"
+              value={String(hours) as `${RainWindowHours}`}
+              options={hourOptions}
+              onChange={(value) => onHoursChange(Number(value) as RainWindowHours)}
             />
-            <SegmentedControl
-              name="observed-rain-product"
-              label="Producto satelital"
-              value={product}
-              options={OBSERVED_RAIN_PRODUCTS}
-              onChange={onProductChange}
-            />
-            <p className="text-[11px] text-slate-500">
-              {OBSERVED_RAIN_PRODUCTS.find((option) => option.value === product)?.attribution}
-            </p>
+            {/* El selector solo aparece si hay más de un producto para elegir. */}
+            {productOptions.length > 1 && (
+              <SegmentedControl
+                name="observed-rain-product"
+                label="Producto satelital"
+                value={product}
+                options={productOptions}
+                onChange={onProductChange}
+              />
+            )}
+
+            {!availability && <Notice>No se pudo cargar la lluvia observada.</Notice>}
+            {availability && !anyAvailable && <Notice>Ningún satélite tiene datos recientes.</Notice>}
+            {staleProducts.map((item) => (
+              <Notice key={item.key}>
+                {item.name}: {staleHint(item).toLowerCase()} (el INAMHI no lo está publicando).
+              </Notice>
+            ))}
+            {error && <Notice>{error}</Notice>}
+            {window && window.missingHours > 0 && (
+              <Notice>Faltan {window.missingHours} h de datos en esta ventana: el total puede quedarse corto.</Notice>
+            )}
+
+            {accumulated && !error && (
+              <p className="text-[11px] text-slate-500">
+                Máximo acumulado:{" "}
+                <strong className="font-semibold text-slate-700">{accumulated.maxMm.toLocaleString("es-EC")} mm</strong>
+              </p>
+            )}
+            {status && !status.isStale && (
+              <p className="text-[11px] text-slate-500">
+                Suma de la lluvia de cada hora estimada por satélite · {status.attribution.replace("Lluvia observada: ", "")}
+              </p>
+            )}
           </div>
         )}
       </div>

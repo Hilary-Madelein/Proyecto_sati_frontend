@@ -1,12 +1,11 @@
 "use client";
 
 import L from "leaflet";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Marker, Popup, useMap } from "react-leaflet";
-import { formatDateTime } from "@/lib/format";
 import { SEVERITY_STYLES } from "../../constants";
 import type { EventSeverity, HazardEvent } from "../../types";
-import { SeverityPill } from "../SeverityPill";
+import { EventPopupContent } from "./EventPopupContent";
 
 const iconCache = new Map<string, L.DivIcon>();
 
@@ -67,23 +66,26 @@ function EventMarker({
 }) {
   const map = useMap();
   const markerRef = useRef<L.Marker>(null);
-  const place = [event.canton, event.province].filter(Boolean).join(", ") || "Ubicación sin especificar";
-  const impact = [
-    [event.impact.affected, "afectados"],
-    [event.impact.housesAffected, "viviendas"],
-    [event.impact.evacuated, "evacuados"],
-    [event.impact.deceased, "fallecidos"],
-  ] as const;
-
-  // Al seleccionarlo desde la lista, abre el popup cuando el mapa termina de volar.
+  const popupRef = useRef<L.Popup>(null);
+  // Recalcula tamaño y posición, y mueve el mapa si el popup ya no cabe.
+  const refreshPopup = useCallback(() => popupRef.current?.update(), []);
+  // Al seleccionarlo (en la lista o en el mapa), MapFocus vuela hacia el evento:
+  // al terminar se abre el popup y se reacomoda para que se vea completo.
+  // Se espera el "moveend" que sigue al inicio del vuelo: al empezar, Leaflet
+  // detiene cualquier desplazamiento en curso y lanza un "moveend" anticipado.
   useEffect(() => {
     if (!selected) return;
-    const openPopup = () => markerRef.current?.openPopup();
-    map.once("moveend", openPopup);
+    const openPopup = () => {
+      markerRef.current?.openPopup();
+      refreshPopup();
+    };
+    const waitForArrival = () => map.once("moveend", openPopup);
+    map.once("movestart", waitForArrival);
     return () => {
+      map.off("movestart", waitForArrival);
       map.off("moveend", openPopup);
     };
-  }, [map, selected, focusRequest]);
+  }, [map, selected, focusRequest, refreshPopup]);
 
   return (
     <Marker
@@ -95,29 +97,8 @@ function EventMarker({
       title={event.title}
       eventHandlers={{ click: () => onSelect(event.id) }}
     >
-      <Popup maxWidth={300}>
-        <div className="flex items-center justify-between gap-3 pr-5">
-          <p className="text-[11px] font-medium text-slate-500">
-            {event.hazardTypeLabel}
-            {event.level !== null && ` · Nivel ${event.level}`}
-          </p>
-          <SeverityPill severity={event.severity} />
-        </div>
-        <p className="mt-1 text-sm font-semibold text-slate-900">{event.title}</p>
-        {event.sector && <p className="text-xs text-slate-500">{event.sector}</p>}
-        {event.description && <p className="mt-1 line-clamp-4 text-xs text-slate-600">{event.description}</p>}
-        <div className="mt-2 grid grid-cols-4 gap-1 text-center">
-          {impact.map(([value, label]) => (
-            <div key={label} className="rounded-md bg-slate-50 px-1 py-1">
-              <p className="text-xs font-semibold text-slate-900 tabular-nums">{value.toLocaleString("es-EC")}</p>
-              <p className="text-[10px] text-slate-500">{label}</p>
-            </div>
-          ))}
-        </div>
-        <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-500">
-          {place} · {formatDateTime(event.occurredAt)}
-          {event.code && ` · ${event.code}`}
-        </p>
+      <Popup ref={popupRef} className="event-popup" maxWidth={320} minWidth={240} autoPanPadding={[16, 16]}>
+        <EventPopupContent event={event} onResize={refreshPopup} />
       </Popup>
     </Marker>
   );

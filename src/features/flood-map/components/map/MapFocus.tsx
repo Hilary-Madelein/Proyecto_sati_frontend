@@ -11,12 +11,23 @@ interface MapFocusProps {
   request: number;
 }
 
-/** Centra el mapa con animación en el objetivo cada vez que llega una solicitud. */
+/** Píxeles máximos que el objetivo queda bajo el centro del mapa. */
+const MAX_OFFSET_PX = 200;
+
+/**
+ * Vuela con animación hacia el objetivo cada vez que llega una solicitud. El
+ * popup del evento se abre hacia arriba, así que el objetivo queda un poco bajo
+ * el centro para que el popup quepa completo (también en celulares).
+ */
 export function MapFocus({ target, request }: MapFocusProps) {
   const map = useMap();
 
   useEffect(() => {
-    if (target) map.flyTo(target, Math.max(map.getZoom(), MAP_CONFIG.focusZoom), { duration: 1.2 });
+    if (!target) return;
+    const zoom = Math.max(map.getZoom(), MAP_CONFIG.focusZoom);
+    const offsetY = Math.min(map.getSize().y * 0.25, MAX_OFFSET_PX);
+    const center = map.unproject(map.project(target, zoom).subtract([0, offsetY]), zoom);
+    map.flyTo(center, zoom, { duration: 1.2 });
   }, [map, target, request]);
 
   return null;
