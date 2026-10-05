@@ -2,32 +2,34 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { FloatingButton } from "@/components/ui/FloatingButton";
 import { IconTile } from "@/components/ui/IconTile";
-import { AlertTriangleIcon, LayersIcon } from "@/components/ui/icons";
+import { CircleDotIcon, LayersIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import {
   DATA_REFRESH_MS,
-  DEFAULT_FORECAST_DAY,
+  DEFAULT_EVENT_FILTERS,
   DEFAULT_LAYER_VISIBILITY,
+  DEFAULT_RAIN_FORECAST_HOURS,
   EVENTS_WINDOW_DAYS,
-  FORECAST_DAYS,
   OBSERVED_RAIN_PRODUCTS,
 } from "../constants";
+import { useAccumulatedRain } from "../hooks/useAccumulatedRain";
+import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
+  EventFilters,
   FloodLayerId,
   FloodMapData,
-  ForecastDay,
   LayerVisibility,
   ObservedRainProduct,
   ObservedRainWindow,
-  RainAvailability,
+  RainForecastAvailability,
+  RainForecastHours,
   SelectedRiver,
 } from "../types";
-import { rainTimeForDay } from "../utils";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { FloodLayersSection } from "./panels/FloodLayersSection";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
@@ -51,9 +53,10 @@ type PanelId = "layers" | "events";
 
 export function FloodMonitor({ data }: { data: FloodMapData }) {
   const router = useRouter();
-  // Lluvia pronosticada (WRF)
-  const [forecastDay, setForecastDay] = useState<ForecastDay>(() => initialForecastDay(data.rain));
-  const [showRain, setShowRain] = useState(true);
+  // Lluvia pronosticada acumulada (WRF)
+  const [forecastHours, setForecastHours] = useState<RainForecastHours>(() => initialForecastHours(data.rain));
+  // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
+  const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
   // Lluvia observada (satélite)
   const [showObservedRain, setShowObservedRain] = useState(false);
@@ -75,11 +78,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   });
   const [mobileSheet, setMobileSheet] = useState<PanelId | null>(null);
   const [eventsExpanded, setEventsExpanded] = useState(false);
+  const [eventFilters, setEventFilters] = useState<EventFilters>(DEFAULT_EVENT_FILTERS);
 
   const { events, fetchedAt, error: eventsError } = data.eventsFeed;
+  // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
+  const filteredEvents = useMemo(() => filterEvents(events, eventFilters, fetchedAt), [events, eventFilters, fetchedAt]);
   const criticalCount = events.filter((event) => event.severity === "critical").length;
-  const rainTime = showRain ? rainTimeForDay(data.rain, forecastDay) : null;
-  const rainForecast = rainTime && data.rain?.run ? { time: rainTime, run: data.rain.run } : null;
+  const forecastAvailable = data.rain?.periods.some((period) => period.hours === forecastHours && period.available) ?? false;
+  const accumulated = useAccumulatedRain(showRain && forecastAvailable ? forecastHours : null, data.rain?.run ?? null);
+  const rainForecast = accumulated.data ? { data: accumulated.data, attribution: data.rain?.attribution ?? "" } : null;
   const observedRain = showObservedRain
     ? {
         layerId: `${observedProduct}-${observedWindow}`,
@@ -126,6 +133,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     <div className="relative size-full overflow-hidden">
       <FloodMap
         data={data}
+        visibleEvents={filteredEvents}
         layers={layers}
         rainForecast={rainForecast}
         observedRain={observedRain}
@@ -156,11 +164,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         <div className="space-y-5">
           <RainForecastSection
             rain={data.rain}
-            day={forecastDay}
-            onDayChange={setForecastDay}
+            hours={forecastHours}
+            onHoursChange={setForecastHours}
             visible={showRain}
             onVisibleChange={setShowRain}
-            isLoading={rainLoading}
+            accumulated={accumulated.data}
+            error={accumulated.error}
+            isLoading={accumulated.isLoading || rainLoading}
           />
           <ObservedRainSection
             visible={showObservedRain}
@@ -194,10 +204,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         onClose={() => closePanel("events")}
         desktopClassName="lg:bottom-6 lg:left-4 lg:right-auto lg:w-90 lg:max-h-[calc(100%-11rem)]"
         desktopFooter={
-          events.length > 1 && (
+          events.length > 0 && (
             <EventsExpandButton
               expanded={eventsExpanded}
-              total={events.length}
+              total={filteredEvents.length}
               onToggle={() => setEventsExpanded((value) => !value)}
             />
           )
@@ -205,6 +215,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       >
         <CriticalEventsPanel
           events={events}
+          filteredEvents={filteredEvents}
+          filters={eventFilters}
+          onFiltersChange={setEventFilters}
+          fetchedAt={fetchedAt}
           error={eventsError}
           selectedId={selectedEventId}
           onSelect={selectEvent}
@@ -228,7 +242,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       )}
       {!desktopPanels.events && (
         <FloatingButton className="absolute bottom-6 left-4 hidden lg:flex" onClick={() => openDesktopPanel("events")}>
-          <AlertTriangleIcon className="size-4 text-red-600" />
+          <CircleDotIcon className="size-4 text-red-600" />
           Eventos críticos
           <CountBadge count={criticalCount} />
         </FloatingButton>
@@ -246,8 +260,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           </MobileBarButton>
           <span aria-hidden="true" className="my-1.5 w-px bg-slate-200" />
           <MobileBarButton onClick={() => openMobileSheet("events")}>
-            <AlertTriangleIcon className="size-4 text-red-600" />
-            Alertas
+            <CircleDotIcon className="size-4 text-red-600" />
+            Eventos
             <CountBadge count={criticalCount} />
           </MobileBarButton>
         </nav>
@@ -274,7 +288,7 @@ function PulsingAlertIcon() {
       aria-hidden="true"
       className="relative grid size-9 shrink-0 place-items-center rounded-xl bg-red-600 text-white shadow-sm shadow-red-600/30"
     >
-      <AlertTriangleIcon className="size-4.5" />
+      <CircleDotIcon className="size-4.5" />
       <span className="absolute -top-1 -right-1 flex size-3">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75 motion-reduce:animate-none" />
         <span className="relative inline-flex size-3 rounded-full border-2 border-white bg-red-500" />
@@ -293,8 +307,8 @@ function CountBadge({ count }: { count: number }) {
   );
 }
 
-/** El día 1 si tiene datos; si no, el primero que sí los tenga. */
-function initialForecastDay(rain: RainAvailability | null): ForecastDay {
-  if (rainTimeForDay(rain, DEFAULT_FORECAST_DAY)) return DEFAULT_FORECAST_DAY;
-  return FORECAST_DAYS.find((day) => rainTimeForDay(rain, day)) ?? DEFAULT_FORECAST_DAY;
+/** 24 h si está disponible; si no, el primer periodo que lo esté. */
+function initialForecastHours(rain: RainForecastAvailability | null): RainForecastHours {
+  const available = rain?.periods.filter((period) => period.available).map((period) => period.hours) ?? [];
+  return available.includes(DEFAULT_RAIN_FORECAST_HOURS) ? DEFAULT_RAIN_FORECAST_HOURS : (available[0] ?? DEFAULT_RAIN_FORECAST_HOURS);
 }

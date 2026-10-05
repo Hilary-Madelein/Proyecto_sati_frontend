@@ -4,10 +4,12 @@ import "leaflet/dist/leaflet.css";
 import type { FitBoundsOptions } from "leaflet";
 import { useState } from "react";
 import { MapContainer, Pane, TileLayer } from "react-leaflet";
-import { MAP_CONFIG, MAP_PANES, OBSERVED_RAIN_OPACITY, RAIN_LAYER } from "../../constants";
-import type { FloodMapData, LayerVisibility, SelectedRiver } from "../../types";
+import { MAP_CONFIG, MAP_PANES, OBSERVED_RAIN_OPACITY } from "../../constants";
+import type { AccumulatedRain, FloodMapData, HazardEvent, LayerVisibility, SelectedRiver } from "../../types";
+import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import { FlashFloodLayer } from "./FlashFloodLayer";
+import { FluvialStationsLayer } from "./FluvialStationsLayer";
 import { HistoricalFloodLayer } from "./HistoricalFloodLayer";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
@@ -18,9 +20,11 @@ import { RiverNetworkLayer } from "./RiverNetworkLayer";
 
 export interface FloodMapProps {
   data: FloodMapData;
+  /** Eventos que pasan los filtros del panel (los que se dibujan). */
+  visibleEvents: HazardEvent[];
   layers: LayerVisibility;
-  /** Paso de tiempo y corrida de la lluvia pronosticada; null = sin capa. */
-  rainForecast: { time: string; run: string } | null;
+  /** Lluvia pronosticada acumulada (imagen del backend); null = sin capa. */
+  rainForecast: { data: AccumulatedRain; attribution: string } | null;
   /** Capa de lluvia observada (id del backend) con su atribución; null = sin capa. */
   observedRain: { layerId: string; attribution: string } | null;
   onRainLoadingChange: (loading: boolean) => void;
@@ -43,6 +47,7 @@ export interface FloodMapProps {
  */
 export default function FloodMap({
   data,
+  visibleEvents,
   layers,
   rainForecast,
   observedRain,
@@ -85,11 +90,9 @@ export default function FloodMap({
       )}
       {rainForecast && (
         <Pane name={MAP_PANES.rain.name} style={{ zIndex: MAP_PANES.rain.zIndex }}>
-          <ProxyWmsLayer
-            layerId={RAIN_LAYER.id}
-            dimensions={{ time: rainForecast.time, dim_initd: rainForecast.run }}
-            opacity={RAIN_LAYER.opacity}
-            attribution={RAIN_LAYER.attribution}
+          <AccumulatedRainLayer
+            rain={rainForecast.data}
+            attribution={rainForecast.attribution}
             onLoadingChange={onRainLoadingChange}
           />
         </Pane>
@@ -102,6 +105,11 @@ export default function FloodMap({
       {layers.flash && (
         <Pane name={MAP_PANES.flash.name} style={{ zIndex: MAP_PANES.flash.zIndex }}>
           <FlashFloodLayer zones={data.flashFloodZones} />
+        </Pane>
+      )}
+      {layers.fluvial && (
+        <Pane name={MAP_PANES.fluvial.name} style={{ zIndex: MAP_PANES.fluvial.zIndex }}>
+          <FluvialStationsLayer stations={data.fluvialStations} />
         </Pane>
       )}
       {layers.riverNetwork && (
@@ -122,7 +130,7 @@ export default function FloodMap({
         />
       )}
       <CriticalEventsLayer
-        events={data.eventsFeed.events}
+        events={visibleEvents}
         selectedId={selectedEventId}
         focusRequest={focusRequest}
         onSelect={onSelectEvent}

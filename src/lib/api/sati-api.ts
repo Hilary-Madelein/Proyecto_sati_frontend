@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Cliente del backend SATI.EC para componentes de servidor. En el navegador se
  * usa la ruta relativa `/api/sati/...`, que Next reenvía al backend (ver
- * `rewrites` en next.config.ts), así el cliente nunca necesita la URL interna.
+ * src/app/api/sati/[...path]/route.ts), así el cliente nunca necesita la URL interna.
  */
 const DEFAULT_TIMEOUT_MS = 8_000;
 

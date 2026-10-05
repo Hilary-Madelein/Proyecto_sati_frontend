@@ -3,32 +3,37 @@ import { IconTile } from "@/components/ui/IconTile";
 import { AlertTriangleIcon, CloudRainIcon } from "@/components/ui/icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Toggle } from "@/components/ui/Toggle";
-import { formatDateTime, formatDayMonth } from "@/lib/format";
-import { FORECAST_DAYS } from "../../constants";
-import type { ForecastDay, RainAvailability } from "../../types";
-import { rainTimeForDay } from "../../utils";
+import { formatDateTime } from "@/lib/format";
+import { RAIN_FORECAST_PERIODS } from "../../constants";
+import type { AccumulatedRain, RainForecastAvailability, RainForecastHours } from "../../types";
 import { SectionHeading } from "./SectionHeading";
 
 interface RainForecastSectionProps {
-  rain: RainAvailability | null;
-  day: ForecastDay;
-  onDayChange: (day: ForecastDay) => void;
+  rain: RainForecastAvailability | null;
+  hours: RainForecastHours;
+  onHoursChange: (hours: RainForecastHours) => void;
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
-  /** Las teselas de la capa se están descargando. */
+  /** Acumulado que se está mostrando (null mientras se calcula o si falló). */
+  accumulated: AccumulatedRain | null;
+  error: string | null;
   isLoading: boolean;
 }
 
-export function RainForecastSection({ rain, day, onDayChange, visible, onVisibleChange, isLoading }: RainForecastSectionProps) {
-  const time = rainTimeForDay(rain, day);
-  const options = FORECAST_DAYS.map((value) => {
-    const optionTime = rainTimeForDay(rain, value);
-    return {
-      value: String(value) as `${ForecastDay}`,
-      label: optionTime ? `Día ${value} · ${formatDayMonth(optionTime)}` : `Día ${value}`,
-      disabled: !optionTime,
-      hint: optionTime ? undefined : "La corrida actual del modelo no llega a ese día",
-    };
+export function RainForecastSection({
+  rain,
+  hours,
+  onHoursChange,
+  visible,
+  onVisibleChange,
+  accumulated,
+  error,
+  isLoading,
+}: RainForecastSectionProps) {
+  const period = rain?.periods.find((item) => item.hours === hours);
+  const options = RAIN_FORECAST_PERIODS.map((option) => {
+    const available = rain?.periods.find((item) => String(item.hours) === option.value)?.available ?? false;
+    return { ...option, disabled: !available, hint: available ? undefined : "La corrida actual del modelo no llega a ese periodo" };
   });
 
   return (
@@ -41,9 +46,11 @@ export function RainForecastSection({ rain, day, onDayChange, visible, onVisible
             <CloudRainIcon className="size-5" />
           </IconTile>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold text-slate-900">Lluvia pronosticada (WRF)</h4>
+            <h4 className="text-sm font-semibold text-slate-900">Lluvia acumulada en {hours} h</h4>
             <p className="text-xs text-slate-500">
-              {time ? `24 h hasta el ${formatDateTime(time)}` : "Sin datos para este día"}
+              {period?.from && period.to
+                ? `Del ${formatDateTime(period.from)} al ${formatDateTime(period.to)}`
+                : "Sin datos para este periodo"}
             </p>
           </div>
           <Toggle checked={visible} onChange={onVisibleChange} label="Mostrar lluvia pronosticada" />
@@ -51,14 +58,20 @@ export function RainForecastSection({ rain, day, onDayChange, visible, onVisible
 
         <div className="mt-3">
           <SegmentedControl
-            name="rain-forecast-day"
-            label="Día de pronóstico de lluvia"
-            value={String(day) as `${ForecastDay}`}
+            name="rain-forecast-hours"
+            label="Horas de lluvia acumulada"
+            value={String(hours) as `${RainForecastHours}`}
             options={options}
-            onChange={(value) => onDayChange(Number(value) as ForecastDay)}
+            onChange={(value) => onHoursChange(Number(value) as RainForecastHours)}
           />
         </div>
 
+        {visible && error && <Notice>{error}</Notice>}
+        {visible && accumulated && !error && (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Máximo acumulado: <strong className="font-semibold text-slate-700">{accumulated.maxMm.toLocaleString("es-EC")} mm</strong>
+          </p>
+        )}
         <RainStatus rain={rain} />
       </div>
     </section>
@@ -74,7 +87,7 @@ export function LoadingBadge() {
   );
 }
 
-function RainStatus({ rain }: { rain: RainAvailability | null }) {
+function RainStatus({ rain }: { rain: RainForecastAvailability | null }) {
   if (!rain) return <Notice>No se pudo cargar el pronóstico del INAMHI.</Notice>;
   if (!rain.run) return <Notice>El INAMHI no publicó una corrida del modelo.</Notice>;
   if (rain.isStale) {
@@ -82,7 +95,7 @@ function RainStatus({ rain }: { rain: RainAvailability | null }) {
   }
   return (
     <p className="mt-2 text-[11px] text-slate-500">
-      Cada día es la lluvia de 24 h del modelo WRF del INAMHI · corrida del {formatDateTime(rain.run)}
+      Suma de la lluvia diaria del modelo WRF del INAMHI · corrida del {formatDateTime(rain.run)}
     </p>
   );
 }

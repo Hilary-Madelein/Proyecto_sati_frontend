@@ -1,11 +1,31 @@
 /**
  * Datos SIMULADOS de las capas que todavía no tienen fuente real
- * (inundaciones repentinas e históricas). Las ubicaciones son reales, pero las
- * zonas son ficticias. Eventos, lluvia y caudales ya vienen del backend.
+ * (inundaciones fluviales, repentinas e históricas). Las ubicaciones son
+ * reales, pero niveles y zonas son ficticios. Eventos, lluvia y la red de ríos
+ * de GEOGLOWS ya vienen del backend.
  */
 import type { FloodMapData } from "../types";
 
-export const MOCK_FLOOD_LAYERS: Pick<FloodMapData, "flashFloodZones" | "historicalZones"> = {
+export const MOCK_FLOOD_LAYERS: Pick<FloodMapData, "fluvialStations" | "flashFloodZones" | "historicalZones"> = {
+  fluvialStations: [
+    { id: "st-01", name: "Babahoyo", river: "Río Babahoyo", province: "Los Ríos", position: [-1.8, -79.53], level: "extremo", flowM3s: 1840 },
+    { id: "st-02", name: "Tena", river: "Río Napo", province: "Napo", position: [-0.99, -77.81], level: "extremo", flowM3s: 2310 },
+    { id: "st-03", name: "La Capilla", river: "Río Guayas", province: "Guayas", position: [-1.7, -79.99], level: "peligro", flowM3s: 1525 },
+    { id: "st-04", name: "Quevedo", river: "Río Quevedo", province: "Los Ríos", position: [-1.02, -79.46], level: "peligro", flowM3s: 980 },
+    { id: "st-05", name: "San Rafael", river: "Río Coca", province: "Napo", position: [-0.1, -77.58], level: "peligro", flowM3s: 1210 },
+    { id: "st-06", name: "Daule", river: "Río Daule", province: "Guayas", position: [-1.86, -79.98], level: "advertencia", flowM3s: 640 },
+    { id: "st-07", name: "Portoviejo", river: "Río Portoviejo", province: "Manabí", position: [-1.05, -80.45], level: "advertencia", flowM3s: 120 },
+    { id: "st-08", name: "Zamora", river: "Río Zamora", province: "Zamora Chinchipe", position: [-4.07, -78.95], level: "advertencia", flowM3s: 410 },
+    { id: "st-09", name: "Lago Agrio", river: "Río Aguarico", province: "Sucumbíos", position: [0.09, -76.88], level: "advertencia", flowM3s: 870 },
+    { id: "st-10", name: "San Mateo", river: "Río Esmeraldas", province: "Esmeraldas", position: [0.9, -79.65], level: "normal", flowM3s: 560 },
+    { id: "st-11", name: "Paute", river: "Río Paute", province: "Azuay", position: [-2.78, -78.76], level: "normal", flowM3s: 95 },
+    { id: "st-12", name: "Baños", river: "Río Pastaza", province: "Tungurahua", position: [-1.4, -78.42], level: "normal", flowM3s: 230 },
+    { id: "st-13", name: "Pasaje", river: "Río Jubones", province: "El Oro", position: [-3.33, -79.81], level: "normal", flowM3s: 75 },
+    { id: "st-14", name: "Lita", river: "Río Mira", province: "Imbabura", position: [0.87, -78.45], level: "normal", flowM3s: 140 },
+    { id: "st-15", name: "Macas", river: "Río Upano", province: "Morona Santiago", position: [-2.31, -78.11], level: "sin-datos", flowM3s: null },
+    { id: "st-16", name: "Catamayo", river: "Río Catamayo", province: "Loja", position: [-3.99, -79.36], level: "sin-datos", flowM3s: null },
+  ],
+
   flashFloodZones: [
     { id: "ff-01", name: "Babahoyo – Samborondón", province: "Los Ríos / Guayas", probability: "probable", bounds: [[-2.05, -79.85], [-1.65, -79.45]] },
     { id: "ff-02", name: "Tena – Archidona", province: "Napo", probability: "muy-probable", bounds: [[-1.12, -77.98], [-0.82, -77.68]] },

@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
-const satiApiUrl = (process.env.SATI_API_URL ?? "http://localhost:6000/api/v1").replace(/\/+$/, "");
-
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [{ source: "/api/sati/:path*", destination: `${satiApiUrl}/:path*` }];
-  },
-};
+// Las llamadas del navegador al backend pasan por src/app/api/sati/[...path]/route.ts,
+// que lee SATI_API_URL (en .env.local) en cada petición.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

@@ -5,6 +5,7 @@ import { Marker, Tooltip } from "react-leaflet";
 import { formatCalendarDate } from "@/lib/format";
 import type { AlertLevel, RiverAlert, RiverAlertsSnapshot, SelectedRiver } from "../../types";
 import { alertLevelForDay, alertLevelStyle } from "../../utils";
+import { triangleSymbolHtml } from "../map-symbols";
 
 const iconCache = new Map<string, L.DivIcon>();
 
@@ -17,7 +18,7 @@ function alertIcon(level: AlertLevel, selected: boolean): L.DivIcon {
     const { color } = alertLevelStyle(level);
     icon = L.divIcon({
       className: "river-alert-marker",
-      html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 22.5 21h-21L12 2.5Z" fill="${color}" stroke="#1f2937" stroke-width="${selected ? 2.2 : 1.4}" stroke-linejoin="round"/><path d="M12 9v5.5" stroke="#1f2937" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.6" r="1.2" fill="#1f2937"/></svg>`,
+      html: triangleSymbolHtml(color, size, selected ? 2.2 : 1.4),
       iconSize: [size, size],
       iconAnchor: [size / 2, size * 0.85],
     });

@@ -1,7 +1,7 @@
 import "server-only";
 import { satiGet, SatiApiError } from "@/lib/api/sati-api";
-import { EVENTS_WINDOW_DAYS, RAIN_LAYER } from "../constants";
-import type { EventsFeed, FloodMapData, HazardEvent, RainAvailability, RiverAlertsSnapshot } from "../types";
+import { EVENTS_WINDOW_DAYS } from "../constants";
+import type { EventsFeed, FloodMapData, HazardEvent, RainForecastAvailability, RiverAlertsSnapshot } from "../types";
 import { MOCK_FLOOD_LAYERS } from "./mock-data";
 
 /*
@@ -37,10 +37,10 @@ async function getEventsFeed(): Promise<EventsFeed> {
   }
 }
 
-async function getRainAvailability(): Promise<RainAvailability | null> {
+/** Corrida vigente del WRF y qué acumulados (24/48/72 h) están disponibles. */
+async function getRainAvailability(): Promise<RainForecastAvailability | null> {
   try {
-    const { run, runTimes, latestTime, isStale } = await satiGet<RainAvailability>(`/layers/${RAIN_LAYER.id}`);
-    return { run, runTimes, latestTime, isStale };
+    return await satiGet<RainForecastAvailability>("/rain-forecast", undefined, 30_000);
   } catch {
     return null;
   }

@@ -75,6 +75,12 @@ html .leaflet-control-attribution {
   font-size: 10px;
 }
 
+/* Marcadores con forma propia (ver map-symbols.ts). */
+.map-symbol-marker {
+  background: transparent;
+  border: none;
+}
+
 /* Alertas por caudal (ver RiverAlertsLayer.tsx). */
 .river-alert-marker {
   background: transparent;

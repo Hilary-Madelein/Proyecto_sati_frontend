@@ -1,6 +1,6 @@
 /**
  * Llamadas al backend SATI.EC desde el navegador. Van a `/api/sati/...`, que
- * Next reenvía al backend (ver `rewrites` en next.config.ts).
+ * Next reenvía al backend (ver src/app/api/sati/[...path]/route.ts).
  */
 export async function satiClientGet<T>(
   path: string,

@@ -1,9 +1,5 @@
-import { RIVER_ALERT_LEVELS, RIVER_NORMAL_COLOR, SEVERITY_STYLES } from "./constants";
-import type { AlertLevel, ForecastDay, HazardEvent, RainAvailability, RiverAlert } from "./types";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-/** Tolerancia al buscar el paso del modelo que corresponde a un día. */
-const TIME_TOLERANCE_MS = 60 * 60 * 1000;
+import { EVENT_PERIODS, RIVER_ALERT_LEVELS, RIVER_NORMAL_COLOR, SEVERITY_STYLES } from "./constants";
+import type { AlertLevel, EventFilters, HazardEvent, RiverAlert } from "./types";
 
 /** Ordena por severidad (crítico primero) y luego por fecha, del más reciente al más antiguo. */
 export function sortEventsBySeverity(events: HazardEvent[]) {
@@ -15,14 +11,25 @@ export function sortEventsBySeverity(events: HazardEvent[]) {
 }
 
 /**
- * Paso de tiempo de la capa diaria del WRF para un día de pronóstico: el día N
- * es la lluvia de las 24 h que terminan N días después del inicio de la corrida.
- * Null si la corrida no llega hasta ese día.
+ * Aplica los filtros de eventos. `now` es la hora de la consulta al backend
+ * (no la del reloj), así el servidor y el navegador filtran exactamente igual.
+ * Con `ignoreSeverity`, sirve para contar cuántos hay de cada severidad.
  */
-export function rainTimeForDay(rain: RainAvailability | null, day: ForecastDay): string | null {
-  if (!rain?.run) return null;
-  const target = Date.parse(rain.run) + day * DAY_MS;
-  return rain.runTimes.find((time) => Math.abs(Date.parse(time) - target) <= TIME_TOLERANCE_MS) ?? null;
+export function filterEvents(
+  events: HazardEvent[],
+  filters: EventFilters,
+  now: string,
+  { ignoreSeverity = false } = {},
+): HazardEvent[] {
+  const hours = EVENT_PERIODS.find((period) => period.value === filters.period)?.hours ?? Infinity;
+  const since = Date.parse(now) - hours * 60 * 60 * 1000;
+  return events.filter(
+    (event) =>
+      Date.parse(event.occurredAt) >= since &&
+      (ignoreSeverity || filters.severities.includes(event.severity)) &&
+      (!filters.province || event.province === filters.province) &&
+      (!filters.hazardType || event.hazardType === filters.hazardType),
+  );
 }
 
 /** Nivel de alerta de un tramo para un día del pronóstico (índice 0 = primer día). */

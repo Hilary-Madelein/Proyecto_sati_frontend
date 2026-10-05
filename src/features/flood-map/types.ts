@@ -1,23 +1,47 @@
 export type LatLng = [lat: number, lng: number];
 export type LatLngBounds = [southWest: LatLng, northEast: LatLng];
 
-// ── Pronóstico de lluvia (modelo WRF del INAMHI) ────────────────────────
-/** Día de pronóstico desde el inicio de la corrida (cada uno es lluvia de 24 h). */
-export type ForecastDay = 1 | 2 | 3;
+// ── Lluvia pronosticada acumulada (modelo WRF del INAMHI) ───────────────
+/** Horas acumuladas desde el inicio de la corrida: 24 h = día 1, 48 h = días 1-2, 72 h = días 1-3. */
+export type RainForecastHours = 24 | 48 | 72;
+
+export interface RainForecastAvailability {
+  /** Inicio de la corrida del modelo (ISO 8601). */
+  run: string | null;
+  isStale: boolean;
+  attribution: string;
+  periods: Array<{ hours: RainForecastHours; available: boolean; from: string | null; to: string | null }>;
+}
+
+/** Acumulado calculado por el backend, listo para superponer en el mapa. */
+export interface AccumulatedRain {
+  run: string;
+  hours: RainForecastHours;
+  from: string;
+  to: string;
+  /** [[sur, oeste], [norte, este]] */
+  bounds: [[number, number], [number, number]];
+  maxMm: number;
+  /** Ruta de la imagen PNG relativa a la API del backend. */
+  imagePath: string;
+}
 
 // ── Lluvia observada por satélite ───────────────────────────────────────
 export type ObservedRainProduct = "imerg" | "persiann";
 export type ObservedRainWindow = "24h" | "48h" | "72h";
 
-/** Disponibilidad de la capa de lluvia diaria, según el backend. */
-export interface RainAvailability {
-  /** Inicio de la corrida del modelo (ISO 8601). */
-  run: string | null;
-  /** Pasos de tiempo de esa corrida (ISO 8601), de más antiguo a más reciente. */
-  runTimes: string[];
-  latestTime: string | null;
-  /** El último paso disponible ya pasó hace más de unas horas. */
-  isStale: boolean;
+// ── Inundaciones fluviales (simuladas hasta conectar su fuente) ─────────
+export type FluvialLevel = "extremo" | "peligro" | "advertencia" | "normal" | "sin-datos";
+
+export interface FluvialStation {
+  id: string;
+  name: string;
+  river: string;
+  province: string;
+  position: LatLng;
+  level: FluvialLevel;
+  /** Caudal en m³/s; null cuando la estación no reporta. */
+  flowM3s: number | null;
 }
 
 // ── Caudales (GEOGLOWS · Hydroviewer del INAMHI) ────────────────────────
@@ -136,6 +160,19 @@ export interface HazardEvent {
   impact: EventImpact;
 }
 
+/** Periodo de los eventos según cuándo ocurrieron. */
+export type EventPeriod = "24h" | "48h" | "7d";
+
+/** Filtros de eventos: se aplican a la lista y a los marcadores del mapa. */
+export interface EventFilters {
+  severities: EventSeverity[];
+  period: EventPeriod;
+  /** null = todas las provincias. */
+  province: string | null;
+  /** null = todos los tipos. */
+  hazardType: HazardType | null;
+}
+
 /** Resultado de pedir los eventos al backend: si falla, la interfaz lo muestra. */
 export interface EventsFeed {
   events: HazardEvent[];
@@ -147,16 +184,17 @@ export interface EventsFeed {
 // ── Agregados ───────────────────────────────────────────────────────────
 export interface FloodMapData {
   // Capas aún sin fuente real: datos simulados.
+  fluvialStations: FluvialStation[];
   flashFloodZones: FlashFloodZone[];
   historicalZones: HistoricalFloodZone[];
 
   // Datos reales del backend.
   eventsFeed: EventsFeed;
-  /** Null si el backend no pudo informar la disponibilidad de la lluvia. */
-  rain: RainAvailability | null;
+  /** Null si el backend no pudo informar la lluvia pronosticada. */
+  rain: RainForecastAvailability | null;
   /** Null si no se pudieron cargar las alertas de ríos. */
   riverAlerts: RiverAlertsSnapshot | null;
 }
 
-export type FloodLayerId = "riverNetwork" | "riverAlerts" | "flash" | "historical";
+export type FloodLayerId = "riverNetwork" | "riverAlerts" | "fluvial" | "flash" | "historical";
 export type LayerVisibility = Record<FloodLayerId, boolean>;

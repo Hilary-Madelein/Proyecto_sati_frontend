@@ -141,3 +141,13 @@ export function MountainIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Punto en el mapa: los eventos ocurridos (SNGR) se dibujan como círculos. */
+export function CircleDotIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+    </Icon>
+  );
+}

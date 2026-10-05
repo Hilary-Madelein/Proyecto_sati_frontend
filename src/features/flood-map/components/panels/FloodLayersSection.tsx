@@ -5,9 +5,10 @@ import { formatCalendarDate } from "@/lib/format";
 import {
   FLASH_FLOOD_ORDER,
   FLASH_FLOOD_PROBABILITIES,
+  FLUVIAL_LEVEL_ORDER,
+  FLUVIAL_LEVELS,
   HISTORICAL_FREQUENCIES,
   HISTORICAL_FREQUENCY_ORDER,
-  RIVER_ALERT_LEVELS,
 } from "../../constants";
 import type { FloodLayerId, FloodMapData, LayerVisibility } from "../../types";
 import { alertLevelForDay } from "../../utils";
@@ -32,13 +33,14 @@ function countBy<T, K extends string>(items: T[], key: (item: T) => K) {
 }
 
 export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange }: FloodLayersSectionProps) {
+  const stationsByLevel = countBy(data.fluvialStations, (station) => station.level);
   const zonesByProbability = countBy(data.flashFloodZones, (zone) => zone.probability);
   const zonesByFrequency = countBy(data.historicalZones, (zone) => zone.frequency);
 
   return (
     <section className="space-y-5">
       <div>
-        <SectionHeading>Caudales de ríos</SectionHeading>
+        <SectionHeading>Caudales de ríos (GEOGLOWS)</SectionHeading>
         <RiversCard
           data={data}
           layers={layers}
@@ -50,9 +52,30 @@ export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex,
 
       <div>
         <SectionHeading aside={<span className="text-[10px] font-medium text-amber-700">Datos simulados</span>}>
-          Otras inundaciones
+          Datos de inundaciones
         </SectionHeading>
         <div className="space-y-2">
+          <LayerCard
+            title="Inundaciones fluviales"
+            meta={`${data.fluvialStations.length} estaciones`}
+            icon={
+              <IconTile className="bg-blue-50 text-blue-600">
+                <WavesIcon className="size-5" />
+              </IconTile>
+            }
+            enabled={layers.fluvial}
+            onToggle={(enabled) => onToggleLayer("fluvial", enabled)}
+          >
+            {FLUVIAL_LEVEL_ORDER.map((level) => (
+              <LegendItem
+                key={level}
+                label={FLUVIAL_LEVELS[level].label}
+                color={FLUVIAL_LEVELS[level].color}
+                count={stationsByLevel(level)}
+              />
+            ))}
+          </LayerCard>
+
           <LayerCard
             title="Inundaciones repentinas"
             meta={`Próximas 24h · ${data.flashFloodZones.length} zonas`}
@@ -107,8 +130,8 @@ export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex,
 
 function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange }: FloodLayersSectionProps) {
   const snapshot = data.riverAlerts;
-  const alertsByLevel = countBy(snapshot?.alerts ?? [], (alert) => String(alertLevelForDay(alert, alertDayIndex)));
-  const dayAlerts = RIVER_ALERT_LEVELS.reduce((total, { level }) => total + alertsByLevel(String(level)), 0);
+  // El detalle por periodo de retorno se ve al hacer clic en un río (panel del río).
+  const dayAlerts = (snapshot?.alerts ?? []).filter((alert) => alertLevelForDay(alert, alertDayIndex) > 0).length;
   const selectedDay = snapshot?.days[alertDayIndex];
 
   return (
@@ -167,11 +190,6 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
                   className="mt-1.5 w-full cursor-pointer accent-blue-600"
                 />
               </label>
-              <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
-                {RIVER_ALERT_LEVELS.map(({ level, label, color }) => (
-                  <LegendItem key={level} label={`Supera ${label}`} color={color} count={alertsByLevel(String(level))} />
-                ))}
-              </ul>
               <p className="mt-2 text-[11px] text-slate-500">
                 Pronóstico del {formatCalendarDate(snapshot.forecastDate)} · {snapshot.source}
               </p>

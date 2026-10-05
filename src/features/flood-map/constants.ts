@@ -1,13 +1,16 @@
 import type {
   AlertLevel,
+  EventFilters,
+  EventPeriod,
   EventSeverity,
   FlashFloodProbability,
-  ForecastDay,
+  FluvialLevel,
   HistoricalFrequency,
   LatLngBounds,
   LayerVisibility,
   ObservedRainProduct,
   ObservedRainWindow,
+  RainForecastHours,
 } from "./types";
 
 // ── Mapa ────────────────────────────────────────────────────────────────
@@ -37,18 +40,19 @@ export const MAP_PANES = {
   historical: { name: "historical", zIndex: 360 },
   flash: { name: "flash", zIndex: 370 },
   rivers: { name: "rivers", zIndex: 380 },
+  fluvial: { name: "fluvial", zIndex: 390 },
 } as const;
 
-// ── Lluvia pronosticada (WRF) ───────────────────────────────────────────
-/** Capa del backend con la lluvia acumulada por día del modelo WRF del INAMHI. */
-export const RAIN_LAYER = {
-  id: "wrf-precipitation-daily",
-  attribution: "Lluvia: INAMHI · modelo WRF",
-  opacity: 0.7,
-} as const;
+// ── Lluvia pronosticada acumulada (WRF) ─────────────────────────────────
+/** 24 h = día 1 de la corrida; 48 h = días 1-2; 72 h = días 1-3 (suma calculada por el backend). */
+export const RAIN_FORECAST_PERIODS: readonly { value: `${RainForecastHours}`; label: string }[] = [
+  { value: "24", label: "24h" },
+  { value: "48", label: "48h" },
+  { value: "72", label: "72h" },
+];
 
-export const FORECAST_DAYS: readonly ForecastDay[] = [1, 2, 3];
-export const DEFAULT_FORECAST_DAY: ForecastDay = 1;
+export const DEFAULT_RAIN_FORECAST_HOURS: RainForecastHours = 24;
+export const RAIN_FORECAST_OPACITY = 0.7;
 
 // ── Lluvia observada por satélite ───────────────────────────────────────
 export const OBSERVED_RAIN_PRODUCTS: readonly { value: ObservedRainProduct; label: string; attribution: string }[] = [
@@ -65,12 +69,25 @@ export const OBSERVED_RAIN_WINDOWS: readonly { value: ObservedRainWindow; label:
 export const OBSERVED_RAIN_OPACITY = 0.7;
 
 // ── Inundaciones ────────────────────────────────────────────────────────
+/** Vista inicial limpia: red de ríos y sus alertas por caudal. El resto se activa desde el panel de capas. */
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   riverNetwork: true,
   riverAlerts: true,
-  flash: true,
+  fluvial: false,
+  flash: false,
   historical: false,
 };
+
+// ── Inundaciones fluviales (simuladas) ──────────────────────────────────
+export const FLUVIAL_LEVELS: Record<FluvialLevel, { label: string; color: string }> = {
+  extremo: { label: "Extremo", color: "#7a0a0a" },
+  peligro: { label: "Peligro", color: "#ee1c1c" },
+  advertencia: { label: "Advertencia", color: "#f5a00b" },
+  normal: { label: "Normal", color: "#2fbf2f" },
+  "sin-datos": { label: "Sin datos", color: "#8c8c8c" },
+};
+
+export const FLUVIAL_LEVEL_ORDER: FluvialLevel[] = ["extremo", "peligro", "advertencia", "normal", "sin-datos"];
 
 // ── Caudales (GEOGLOWS) ─────────────────────────────────────────────────
 /** Capa vectorial de la red de ríos en el backend. */
@@ -161,6 +178,24 @@ export const SEVERITY_ORDER: EventSeverity[] = ["critical", "high", "moderate"];
 
 /** Eventos que se piden al backend: abiertos y ocurridos en los últimos N días. */
 export const EVENTS_WINDOW_DAYS = 7;
+
+/** Hacia atrás desde ahora: los eventos de la SNGR ya ocurrieron (no son pronóstico). */
+export const EVENT_PERIODS: readonly { value: EventPeriod; label: string; hours: number }[] = [
+  { value: "24h", label: "Últimas 24 h", hours: 24 },
+  { value: "48h", label: "Últimas 48 h", hours: 48 },
+  { value: "7d", label: "Últimos 7 días", hours: EVENTS_WINDOW_DAYS * 24 },
+];
+
+/** Por defecto solo lo más grave: los moderados se activan desde su recuadro. */
+export const DEFAULT_EVENT_FILTERS: EventFilters = {
+  severities: ["critical", "high"],
+  period: "7d",
+  province: null,
+  hazardType: null,
+};
+
+/** Eventos que se muestran antes de "Ver más". */
+export const EVENTS_PAGE_SIZE = 10;
 
 /** Cada cuánto se vuelven a pedir los datos con la página abierta. */
 export const DATA_REFRESH_MS = 5 * 60 * 1000;
