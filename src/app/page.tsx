@@ -9,7 +9,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-0 flex-1">
-      <h1 className="sr-only">Sistema de alerta temprana de inundaciones para el ecuador</h1>
+      <h1 className="sr-only">Sistema de alerta temprana de inundaciones para el Ecuador</h1>
       <FloodMonitor data={data} />
     </main>
   );
