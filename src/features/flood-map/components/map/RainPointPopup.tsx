@@ -7,7 +7,7 @@ import { CloudRainIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { formatDateTime, formatSigned } from "@/lib/format";
 import { FORECAST_DAY_LABELS } from "../../constants";
-import type { DailyRainForecast, ObservedAccumulatedRain, RainPointValue, SeaPointValue, SeaTemperatureAnomaly } from "../../types";
+import type { DailyRainForecast, RainPointValue, SeaPointValue, SeaTemperatureAnomaly } from "../../types";
 
 interface PointSource {
   key: string;
@@ -19,7 +19,6 @@ interface PointSource {
 
 interface RainPointPopupProps {
   forecast: { data: DailyRainForecast; attribution: string } | null;
-  observed: { data: ObservedAccumulatedRain; attribution: string } | null;
   sea: SeaTemperatureAnomaly | null;
 }
 
@@ -31,11 +30,11 @@ type Reading =
 
 /**
  * Al hacer clic en el mapa, muestra el valor de cada capa activa en ese punto:
- * lluvia (pronóstico y/o observada) y temperatura del mar. Sin capas activas, no hace nada.
+ * lluvia pronosticada y temperatura del mar. Sin capas activas, no hace nada.
  */
-export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps) {
+export function RainPointPopup({ forecast, sea }: RainPointPopupProps) {
   const [click, setClick] = useState<{ id: number; lat: number; lng: number } | null>(null);
-  const hasLayers = forecast !== null || observed !== null || sea !== null;
+  const hasLayers = forecast !== null || sea !== null;
 
   useMapEvents({
     click: (event) => {
@@ -54,14 +53,6 @@ export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps)
       kind: "rain",
       title: `Lluvia pronosticada ${FORECAST_DAY_LABELS[forecast.data.day].range}`,
       path: `/rain-forecast/days/${forecast.data.day}/value`,
-    });
-  }
-  if (observed) {
-    sources.push({
-      key: "observed",
-      kind: "rain",
-      title: `Lluvia observada, últimas ${observed.data.hours} h`,
-      path: `/observed-rain/${observed.data.product}/accumulated/${observed.data.hours}/value`,
     });
   }
   if (sea) {

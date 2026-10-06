@@ -61,11 +61,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
-  // Lluvia observada (satélite)
-  const [showObservedRain, setShowObservedRain] = useState(true);
-  const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
-  const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
-  const [observedRainLoading, setObservedRainLoading] = useState(false);
   // Anomalía de la temperatura del mar (El Niño)
   const [showSea, setShowSea] = useState(false);
   const [seaLoading, setSeaLoading] = useState(false);
@@ -146,10 +141,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         visibleEvents={filteredEvents}
         layers={layers}
         rainForecast={rainForecast}
-        observedRain={observedRain}
         seaTemperature={showSea ? data.seaTemperature : null}
         onRainLoadingChange={setRainLoading}
-        onObservedRainLoadingChange={setObservedRainLoading}
         onSeaLoadingChange={setSeaLoading}
         alertDayIndex={alertDayIndex}
         selectedRiverId={selectedRiverId}
@@ -189,18 +182,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             onVisibleChange={setShowRain}
             error={forecast.error}
             isLoading={forecast.isLoading || rainLoading}
-          />
-          <ObservedRainSection
-            availability={data.observedRain}
-            visible={showObservedRain}
-            onVisibleChange={setShowObservedRain}
-            product={observedProduct}
-            onProductChange={setObservedProduct}
-            hours={observedHours}
-            onHoursChange={setObservedHours}
-            accumulated={observed.data}
-            error={observed.error}
-            isLoading={observed.isLoading || observedRainLoading}
           />
           <SeaTemperatureSection
             sea={data.seaTemperature}

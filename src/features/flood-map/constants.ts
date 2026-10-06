@@ -34,7 +34,6 @@ export const MAP_CONFIG = {
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */
 export const MAP_PANES = {
   seaTemperature: { name: "seaTemperature", zIndex: 340 },
-  observedRain: { name: "observedRain", zIndex: 345 },
   rain: { name: "rain", zIndex: 350 },
   historical: { name: "historical", zIndex: 360 },
   flash: { name: "flash", zIndex: 370 },
@@ -61,25 +60,11 @@ export const DEFAULT_FORECAST_DAY: ForecastDay = 1;
 export const RAIN_FORECAST_LEGEND_LAYER = "wrf-precipitation-daily";
 export const RAIN_FORECAST_OPACITY = 0.7;
 
-// ── Lluvia observada por satélite ───────────────────────────────────────
-// Productos, nombres y disponibilidad llegan del backend (GET /observed-rain).
-
-/** Capa del backend cuya paleta usa la imagen de lluvia observada (para la leyenda). */
-/** Ventanas de lluvia observada: lo que cayó en las últimas 24, 48 o 72 h (acumulado). */
-export const OBSERVED_RAIN_WINDOWS: readonly { value: `${RainWindowHours}`; label: string }[] = [
-  { value: "24", label: "24h" },
-  { value: "48", label: "48h" },
-  { value: "72", label: "72h" },
-];
-
-export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product}-24h`;
-export const OBSERVED_RAIN_OPACITY = 0.7;
-
 // ── Temperatura del mar ─────────────────────────────────────────────────
 export const SEA_TEMPERATURE_OPACITY = 0.7;
 
 // ── Inundaciones ────────────────────────────────────────────────────────
-/** Vista inicial: alertas por caudal (la red de ríos y la lluvia observada se activan aparte). El resto se activa desde el panel de capas. */
+/** Vista inicial: alertas por caudal (la red de ríos se activa aparte). El resto se activa desde el panel de capas. */
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   riverNetwork: false,
   riverAlerts: true,
