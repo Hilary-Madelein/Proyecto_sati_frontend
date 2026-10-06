@@ -1,6 +1,7 @@
 import { IconTile } from "@/components/ui/IconTile";
 import { AlertTriangleIcon, HistoryIcon, WavesIcon, ZapIcon } from "@/components/ui/icons";
 import { Toggle } from "@/components/ui/Toggle";
+import { cn } from "@/lib/cn";
 import { formatCalendarDate } from "@/lib/format";
 import {
   FLASH_FLOOD_ORDER,
@@ -130,18 +131,24 @@ export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex,
 
 function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange }: FloodLayersSectionProps) {
   const snapshot = data.riverAlerts;
-  // El detalle por periodo de retorno se ve al hacer clic en un río (panel del río).
   const dayAlerts = (snapshot?.alerts ?? []).filter((alert) => alertLevelForDay(alert, alertDayIndex) > 0).length;
   const selectedDay = snapshot?.days[alertDayIndex];
+  const anyVisible = layers.riverNetwork || layers.riverAlerts;
+  const titleClass = (visible: boolean) => cn("text-sm font-semibold", visible ? "text-slate-900" : "text-slate-500");
 
   return (
-    <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+    <div
+      className={cn(
+        "rounded-xl p-3 ring-1 transition-colors",
+        anyVisible ? "bg-white ring-slate-200" : "bg-slate-50/70 ring-slate-200/70",
+      )}
+    >
       <div className="flex items-center gap-3">
         <IconTile className="bg-blue-50 text-blue-600">
           <WavesIcon className="size-5" />
         </IconTile>
         <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-semibold text-slate-900">Red de ríos</h4>
+          <h4 className={titleClass(layers.riverNetwork)}>Red de ríos</h4>
           <p className="text-xs text-slate-500">Haz clic en un río para ver su caudal</p>
         </div>
         <Toggle
@@ -158,10 +165,11 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
             <AlertTriangleIcon className="size-5" />
           </IconTile>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold text-slate-900">Alertas por caudal alto</h4>
+            <h4 className={titleClass(layers.riverAlerts)}>Alertas por caudal alto</h4>
+            {/* Tramo = pedazo de río entre dos confluencias; GEOGLOWS calcula el caudal de cada uno. */}
             <p className="text-xs text-slate-500">
               {snapshot
-                ? `${dayAlerts} tramos el ${selectedDay ? formatCalendarDate(selectedDay) : "—"} · de ${snapshot.totalReaches.toLocaleString("es-EC")}`
+                ? `${dayAlerts.toLocaleString("es-EC")} de ${snapshot.totalReaches.toLocaleString("es-EC")} tramos en alerta el ${selectedDay ? formatCalendarDate(selectedDay) : "—"}`
                 : "Sin datos"}
             </p>
           </div>
