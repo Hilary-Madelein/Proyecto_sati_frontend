@@ -4,13 +4,20 @@ import "leaflet/dist/leaflet.css";
 import type { FitBoundsOptions } from "leaflet";
 import { useState } from "react";
 import { MapContainer, Pane, TileLayer } from "react-leaflet";
-import { MAP_CONFIG, MAP_PANES, OBSERVED_RAIN_OPACITY, RAIN_FORECAST_OPACITY } from "../../constants";
+import {
+  MAP_CONFIG,
+  MAP_PANES,
+  OBSERVED_RAIN_OPACITY,
+  RAIN_FORECAST_OPACITY,
+  SEA_TEMPERATURE_OPACITY,
+} from "../../constants";
 import type {
   DailyRainForecast,
   FloodMapData,
   HazardEvent,
   LayerVisibility,
   ObservedAccumulatedRain,
+  SeaTemperatureAnomaly,
   SelectedRiver,
 } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
@@ -21,6 +28,7 @@ import { HistoricalFloodLayer } from "./HistoricalFloodLayer";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
+import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
 import { RiverNetworkLayer } from "./RiverNetworkLayer";
 
@@ -33,8 +41,11 @@ export interface FloodMapProps {
   rainForecast: { data: DailyRainForecast; attribution: string } | null;
   /** Lluvia observada acumulada hasta la última hora (imagen del backend); null = sin capa. */
   observedRain: { data: ObservedAccumulatedRain; attribution: string } | null;
+  /** Anomalía de la temperatura del mar (imagen del backend); null = sin capa. */
+  seaTemperature: SeaTemperatureAnomaly | null;
   onRainLoadingChange: (loading: boolean) => void;
   onObservedRainLoadingChange: (loading: boolean) => void;
+  onSeaLoadingChange: (loading: boolean) => void;
   /** Día del pronóstico de caudales que muestran las alertas. */
   alertDayIndex: number;
   selectedRiverId: number | null;
@@ -57,8 +68,10 @@ export default function FloodMap({
   layers,
   rainForecast,
   observedRain,
+  seaTemperature,
   onRainLoadingChange,
   onObservedRainLoadingChange,
+  onSeaLoadingChange,
   alertDayIndex,
   selectedRiverId,
   onSelectRiver,
@@ -83,7 +96,18 @@ export default function FloodMap({
     >
       <TileLayer url={MAP_CONFIG.tiles.url} attribution={MAP_CONFIG.tiles.attribution} />
       <MapControls homeOptions={boundsOptions} />
+      <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
+      {seaTemperature && (
+        <Pane name={MAP_PANES.seaTemperature.name} style={{ zIndex: MAP_PANES.seaTemperature.zIndex }}>
+          <AccumulatedRainLayer
+            rain={seaTemperature}
+            opacity={SEA_TEMPERATURE_OPACITY}
+            attribution={seaTemperature.attribution}
+            onLoadingChange={onSeaLoadingChange}
+          />
+        </Pane>
+      )}
       {observedRain && (
         <Pane name={MAP_PANES.observedRain.name} style={{ zIndex: MAP_PANES.observedRain.zIndex }}>
           <AccumulatedRainLayer
@@ -124,7 +148,8 @@ export default function FloodMap({
           <Pane name={MAP_PANES.rivers.name} style={{ zIndex: MAP_PANES.rivers.zIndex }}>
             <RiverNetworkLayer pane={MAP_PANES.rivers.name} />
           </Pane>
-          <MapClickHandler onClick={onRiverLookup} />
+          {/* Con una capa de lluvia o de mar activa, el clic muestra sus valores (ver RainPointPopup) y no el río. */}
+          {!rainForecast && !observedRain && !seaTemperature && <MapClickHandler onClick={onRiverLookup} />}
         </>
       )}
 

@@ -8,6 +8,7 @@ import type {
   ObservedRainAvailability,
   RainForecastAvailability,
   RiverAlertsSnapshot,
+  SeaTemperatureAnomaly,
 } from "../types";
 import { MOCK_FLOOD_LAYERS } from "./mock-data";
 
@@ -28,13 +29,14 @@ interface ApiEventsPage {
 }
 
 export async function getFloodMapData(): Promise<FloodMapData> {
-  const [eventsFeed, rain, observedRain, riverAlerts] = await Promise.all([
+  const [eventsFeed, rain, observedRain, seaTemperature, riverAlerts] = await Promise.all([
     getEventsFeed(),
     getRainAvailability(),
     getObservedRainAvailability(),
+    getSeaTemperature(),
     getRiverAlerts(),
   ]);
-  return { ...MOCK_FLOOD_LAYERS, eventsFeed, rain, observedRain, riverAlerts };
+  return { ...MOCK_FLOOD_LAYERS, eventsFeed, rain, observedRain, seaTemperature, riverAlerts };
 }
 
 /** Eventos abiertos de los últimos días. Si el backend falla, devuelve el error en vez de lanzar. */
@@ -62,6 +64,15 @@ async function getRainAvailability(): Promise<RainForecastAvailability | null> {
 async function getObservedRainAvailability(): Promise<ObservedRainAvailability | null> {
   try {
     return await satiGet<ObservedRainAvailability>("/observed-rain", undefined, 30_000);
+  } catch {
+    return null;
+  }
+}
+
+/** Anomalía de la temperatura del mar (NOAA OISST): día del dato, Niño 1+2, leyenda e imagen. */
+async function getSeaTemperature(): Promise<SeaTemperatureAnomaly | null> {
+  try {
+    return await satiGet<SeaTemperatureAnomaly>("/sea-temperature", undefined, 30_000);
   } catch {
     return null;
   }

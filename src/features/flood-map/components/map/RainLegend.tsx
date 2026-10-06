@@ -24,7 +24,7 @@ export function RainLegend({ legends, sources }: RainLegendProps) {
   return (
     <section
       aria-label="Leyenda de lluvia"
-      className="absolute top-4 left-16 z-1000 w-56 rounded-xl bg-white/90 px-3 py-2.5 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md"
+      className="rounded-xl bg-white/90 px-3 py-2.5 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md"
     >
       <h2 className="text-xs font-semibold text-slate-900">Lluvia ({legends[0].unit})</h2>
       {legends.map((legend) => (

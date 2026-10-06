@@ -37,10 +37,12 @@ import type {
   SelectedRiver,
 } from "../types";
 import { RainLegend } from "./map/RainLegend";
+import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { FloodLayersSection } from "./panels/FloodLayersSection";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
+import { SeaTemperatureSection } from "./panels/SeaTemperatureSection";
 import { RiverPanel } from "./river/RiverPanel";
 
 // Leaflet usa `window`: el mapa se renderiza solo en el navegador.
@@ -66,10 +68,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
   // Lluvia observada (satélite)
-  const [showObservedRain, setShowObservedRain] = useState(false);
+  const [showObservedRain, setShowObservedRain] = useState(true);
   const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
   const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
   const [observedRainLoading, setObservedRainLoading] = useState(false);
+  // Anomalía de la temperatura del mar (El Niño)
+  const [showSea, setShowSea] = useState(false);
+  const [seaLoading, setSeaLoading] = useState(false);
   // Caudales (GEOGLOWS)
   const [alertDayIndex, setAlertDayIndex] = useState(0);
   const [riverTarget, setRiverTarget] = useState<RiverTarget | null>(null);
@@ -161,8 +166,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         layers={layers}
         rainForecast={rainForecast}
         observedRain={observedRain}
+        seaTemperature={showSea ? data.seaTemperature : null}
         onRainLoadingChange={setRainLoading}
         onObservedRainLoadingChange={setObservedRainLoading}
+        onSeaLoadingChange={setSeaLoading}
         alertDayIndex={alertDayIndex}
         selectedRiverId={selectedRiverId}
         onSelectRiver={(river: SelectedRiver) => showRiver({ kind: "river", river })}
@@ -171,7 +178,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         focusRequest={focusRequest}
         onSelectEvent={selectEvent}
       />
-      <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
+      {/* Leyendas de las capas visibles, una debajo de la otra. */}
+      {(rainLegends.length > 0 || (showSea && data.seaTemperature)) && (
+        <div className="absolute top-4 left-16 z-1000 flex w-56 flex-col gap-2">
+          <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
+          {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
+        </div>
+      )}
 
       <ResponsivePanel
         title="Capas del mapa"
@@ -208,6 +221,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             accumulated={observed.data}
             error={observed.error}
             isLoading={observed.isLoading || observedRainLoading}
+          />
+          <SeaTemperatureSection
+            sea={data.seaTemperature}
+            visible={showSea}
+            onVisibleChange={setShowSea}
+            isLoading={seaLoading}
           />
           <FloodLayersSection
             data={data}

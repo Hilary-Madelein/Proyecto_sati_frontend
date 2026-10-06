@@ -35,6 +35,7 @@ export const MAP_CONFIG = {
 
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */
 export const MAP_PANES = {
+  seaTemperature: { name: "seaTemperature", zIndex: 340 },
   observedRain: { name: "observedRain", zIndex: 345 },
   rain: { name: "rain", zIndex: 350 },
   historical: { name: "historical", zIndex: 360 },
@@ -76,10 +77,13 @@ export const OBSERVED_RAIN_WINDOWS: readonly { value: `${RainWindowHours}`; labe
 export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product}-24h`;
 export const OBSERVED_RAIN_OPACITY = 0.7;
 
+// ── Temperatura del mar ─────────────────────────────────────────────────
+export const SEA_TEMPERATURE_OPACITY = 0.7;
+
 // ── Inundaciones ────────────────────────────────────────────────────────
-/** Vista inicial limpia: red de ríos y sus alertas por caudal. El resto se activa desde el panel de capas. */
+/** Vista inicial: alertas por caudal (la red de ríos y la lluvia observada se activan aparte). El resto se activa desde el panel de capas. */
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
-  riverNetwork: true,
+  riverNetwork: false,
   riverAlerts: true,
   fluvial: false,
   flash: false,

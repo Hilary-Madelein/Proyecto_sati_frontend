@@ -81,6 +81,28 @@ export interface ObservedAccumulatedRain extends RainImage {
   maxMm: number;
 }
 
+// ── Temperatura del mar (anomalía, indicador de El Niño) ────────────────
+/** Anomalía de la temperatura superficial del mar frente a Ecuador (GET /sea-temperature). */
+export interface SeaTemperatureAnomaly extends RainImage {
+  /** Día del dato (ISO 8601). */
+  time: string;
+  /** El dato tiene varios días de atraso. */
+  isStale: boolean;
+  attribution: string;
+  /** Anomalía media de la región Niño 1+2 (°C sobre lo normal); null si no hay datos. */
+  nino12Anomaly: number | null;
+  minAnomaly: number;
+  maxAnomaly: number;
+  legend: Omit<RainLegend, "id">;
+}
+
+/** Temperatura y anomalía del mar en un punto (GET /sea-temperature/value); null en tierra. */
+export interface SeaPointValue {
+  time: string;
+  sst: number | null;
+  anomaly: number | null;
+}
+
 // ── Inundaciones fluviales (simuladas hasta conectar su fuente) ─────────
 export type FluvialLevel = "extremo" | "peligro" | "advertencia" | "normal" | "sin-datos";
 
@@ -245,9 +267,18 @@ export interface FloodMapData {
   rain: RainForecastAvailability | null;
   /** Null si el backend no pudo informar la lluvia observada. */
   observedRain: ObservedRainAvailability | null;
+  /** Null si el backend no pudo informar la temperatura del mar. */
+  seaTemperature: SeaTemperatureAnomaly | null;
   /** Null si no se pudieron cargar las alertas de ríos. */
   riverAlerts: RiverAlertsSnapshot | null;
 }
 
 export type FloodLayerId = "riverNetwork" | "riverAlerts" | "fluvial" | "flash" | "historical";
 export type LayerVisibility = Record<FloodLayerId, boolean>;
+
+/** Lluvia de una capa activa en un punto del mapa (GET .../value). `mm` es null fuera del Ecuador o sin dato. */
+export interface RainPointValue {
+  from: string;
+  to: string;
+  mm: number | null;
+}

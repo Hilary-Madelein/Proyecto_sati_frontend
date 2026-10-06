@@ -30,6 +30,12 @@ export function formatTimeAgo(iso: string, now = Date.now()) {
   return days === 1 ? "hace 1 día" : `hace ${days} días`;
 }
 
+/** Diferencia con signo y un decimal, p. ej. "+5,8" o "-0,4". */
+export function formatSigned(value: number) {
+  const text = Math.abs(value).toFixed(1).replace(".", ",");
+  return `${value > 0 ? "+" : value < 0 ? "-" : ""}${text}`;
+}
+
 /** Día y mes en hora de Ecuador, p. ej. "1 oct". */
 export function formatDayMonth(iso: string) {
   const date = new Date(new Date(iso).getTime() + ECUADOR_UTC_OFFSET_MS);
