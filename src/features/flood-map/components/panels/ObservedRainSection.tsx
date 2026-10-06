@@ -76,7 +76,7 @@ export function ObservedRainSection({
           </IconTile>
           <div className="min-w-0 flex-1">
             <h4 className={cn("text-sm font-semibold", visible ? "text-slate-900" : "text-slate-500")}>
-              Lluvia ya caída (satélite)
+              Lluvia registrada
             </h4>
             <p className="text-xs text-slate-500">
               {window?.from && window.to

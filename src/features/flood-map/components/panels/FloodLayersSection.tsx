@@ -1,5 +1,5 @@
 import { IconTile } from "@/components/ui/IconTile";
-import { HistoryIcon, WavesIcon, ZapIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, HistoryIcon, WavesIcon, ZapIcon } from "@/components/ui/icons";
 import { Toggle } from "@/components/ui/Toggle";
 import { formatCalendarDate } from "@/lib/format";
 import {
@@ -40,7 +40,7 @@ export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex,
   return (
     <section className="space-y-5">
       <div>
-        <SectionHeading>Caudales de ríos (GEOGLOWS)</SectionHeading>
+        <SectionHeading>Caudales de ríos</SectionHeading>
         <RiversCard
           data={data}
           layers={layers}
@@ -141,7 +141,7 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
           <WavesIcon className="size-5" />
         </IconTile>
         <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-semibold text-slate-900">Red de ríos (GEOGLOWS)</h4>
+          <h4 className="text-sm font-semibold text-slate-900">Red de ríos</h4>
           <p className="text-xs text-slate-500">Haz clic en un río para ver su caudal</p>
         </div>
         <Toggle
@@ -153,6 +153,10 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
 
       <div className="mt-3 border-t border-slate-100 pt-3">
         <div className="flex items-center gap-3">
+          {/* Triángulo: es la misma forma con que se marcan estas alertas en el mapa. */}
+          <IconTile className="bg-amber-50 text-amber-600">
+            <AlertTriangleIcon className="size-5" />
+          </IconTile>
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold text-slate-900">Alertas por caudal alto</h4>
             <p className="text-xs text-slate-500">

@@ -3,6 +3,7 @@ import { IconTile } from "@/components/ui/IconTile";
 import { AlertTriangleIcon, CloudRainIcon } from "@/components/ui/icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Toggle } from "@/components/ui/Toggle";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { FORECAST_DAY_LABELS, FORECAST_DAYS } from "../../constants";
 import type { DailyRainForecast, ForecastDay, RainForecastAvailability } from "../../types";
@@ -46,13 +47,15 @@ export function RainForecastSection({
     <section>
       <SectionHeading aside={isLoading && visible && <LoadingBadge />}>Pronóstico de lluvia</SectionHeading>
 
-      <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+      <div className={cn("rounded-xl p-3 ring-1 transition-colors", visible ? "bg-white ring-slate-200" : "bg-slate-50/70 ring-slate-200/70")}>
         <div className="flex items-center gap-3">
           <IconTile className="bg-sky-50 text-sky-600">
             <CloudRainIcon className="size-5" />
           </IconTile>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold text-slate-900">Lluvia {FORECAST_DAY_LABELS[day].range}</h4>
+            <h4 className={cn("text-sm font-semibold", visible ? "text-slate-900" : "text-slate-500")}>
+              Lluvia {FORECAST_DAY_LABELS[day].range}
+            </h4>
             <p className="text-xs text-slate-500">
               {period?.from && period.to
                 ? `Del ${formatDateTime(period.from)} al ${formatDateTime(period.to)}`
@@ -62,15 +65,18 @@ export function RainForecastSection({
           <Toggle checked={visible} onChange={onVisibleChange} label="Mostrar lluvia pronosticada" />
         </div>
 
-        <div className="mt-3">
-          <SegmentedControl
-            name="rain-forecast-day"
-            label="Tramo de 24 h del pronóstico"
-            value={String(day) as `${ForecastDay}`}
-            options={options}
-            onChange={(value) => onDayChange(Number(value) as ForecastDay)}
-          />
-        </div>
+        {/* Las opciones solo aparecen con la capa encendida. */}
+        {visible && (
+          <div className="mt-3">
+            <SegmentedControl
+              name="rain-forecast-day"
+              label="Tramo de 24 h del pronóstico"
+              value={String(day) as `${ForecastDay}`}
+              options={options}
+              onChange={(value) => onDayChange(Number(value) as ForecastDay)}
+            />
+          </div>
+        )}
 
         {visible && error && <Notice>{error}</Notice>}
         {visible && forecast && !error && (
@@ -78,7 +84,7 @@ export function RainForecastSection({
             Máximo en esas 24 h: <strong className="font-semibold text-slate-700">{forecast.maxMm.toLocaleString("es-EC")} mm</strong>
           </p>
         )}
-        <RainStatus rain={rain} />
+        {visible && <RainStatus rain={rain} />}
       </div>
     </section>
   );

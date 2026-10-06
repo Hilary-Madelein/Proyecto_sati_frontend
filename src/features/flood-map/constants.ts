@@ -52,7 +52,7 @@ export const FORECAST_DAYS: readonly ForecastDay[] = [1, 2, 3];
  * título aclara que es solo ese tramo de 24 h, no el acumulado.
  */
 export const FORECAST_DAY_LABELS: Record<ForecastDay, { option: string; range: string }> = {
-  1: { option: "24h", range: "las primeras 24 h" },
+  1: { option: "24h", range: "en las primeras 24 h" },
   2: { option: "48h", range: "entre las 24 y 48 h" },
   3: { option: "72h", range: "entre las 48 y 72 h" },
 };
