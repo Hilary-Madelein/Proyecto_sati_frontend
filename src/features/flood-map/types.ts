@@ -39,6 +39,68 @@ export interface RainLegend {
   entries: { value: number; color: string }[];
 }
 
+// ── Lluvia observada por satélite ───────────────────────────────────────
+/** Hoy solo PERSIANN: el INAMHI dejó de publicar IMERG (marzo de 2026). */
+export type ObservedRainProduct = "persiann";
+
+export interface ObservedRainWindowStatus {
+  hours: RainWindowHours;
+  available: boolean;
+  /** Primera y última hora con datos de la ventana (ISO 8601). */
+  from: string | null;
+  to: string | null;
+  /** Horas sin dato dentro de la ventana. */
+  missingHours: number;
+}
+
+export interface ObservedRainProductStatus {
+  key: ObservedRainProduct;
+  name: string;
+  attribution: string;
+  /** Última hora con datos (ISO 8601). */
+  latest: string | null;
+  /** El producto no tiene datos recientes (p. ej. el INAMHI dejó de publicarlo). */
+  isStale: boolean;
+  windows: ObservedRainWindowStatus[];
+}
+
+/** GET /observed-rain: productos en orden de preferencia. */
+export interface ObservedRainAvailability {
+  products: ObservedRainProductStatus[];
+}
+
+/** Lluvia observada acumulada hasta la última hora (suma horaria hecha por el backend). */
+export interface ObservedAccumulatedRain extends RainImage {
+  product: ObservedRainProduct;
+  hours: RainWindowHours;
+  from: string;
+  to: string;
+  missingHours: number;
+  maxMm: number;
+}
+
+// ── Temperatura del mar (anomalía, indicador de El Niño) ────────────────
+/** Anomalía de la temperatura superficial del mar frente a Ecuador (GET /sea-temperature). */
+export interface SeaTemperatureAnomaly extends RainImage {
+  /** Día del dato (ISO 8601). */
+  time: string;
+  /** El dato tiene varios días de atraso. */
+  isStale: boolean;
+  attribution: string;
+  /** Anomalía media de la región Niño 1+2 (°C sobre lo normal); null si no hay datos. */
+  nino12Anomaly: number | null;
+  minAnomaly: number;
+  maxAnomaly: number;
+  legend: Omit<RainLegend, "id">;
+}
+
+/** Temperatura y anomalía del mar en un punto (GET /sea-temperature/value); null en tierra. */
+export interface SeaPointValue {
+  time: string;
+  sst: number | null;
+  anomaly: number | null;
+}
+
 // ── Inundaciones fluviales (simuladas hasta conectar su fuente) ─────────
 export type FluvialLevel = "extremo" | "peligro" | "advertencia" | "normal" | "sin-datos";
 
@@ -201,9 +263,20 @@ export interface FloodMapData {
   eventsFeed: EventsFeed;
   /** Null si el backend no pudo informar la lluvia pronosticada. */
   rain: RainForecastAvailability | null;
+  /** Null si el backend no pudo informar la lluvia observada. */
+  observedRain: ObservedRainAvailability | null;
+  /** Null si el backend no pudo informar la temperatura del mar. */
+  seaTemperature: SeaTemperatureAnomaly | null;
   /** Null si no se pudieron cargar las alertas de ríos. */
   riverAlerts: RiverAlertsSnapshot | null;
 }
 
 export type FloodLayerId = "riverNetwork" | "riverAlerts" | "fluvial" | "flash" | "historical";
 export type LayerVisibility = Record<FloodLayerId, boolean>;
+
+/** Lluvia de una capa activa en un punto del mapa (GET .../value). `mm` es null fuera del Ecuador o sin dato. */
+export interface RainPointValue {
+  from: string;
+  to: string;
+  mm: number | null;
+}
