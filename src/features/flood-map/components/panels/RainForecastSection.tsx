@@ -6,7 +6,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { FORECAST_DAY_LABELS, FORECAST_DAYS } from "../../constants";
-import type { DailyRainForecast, ForecastDay, RainForecastAvailability } from "../../types";
+import type { ForecastDay, RainForecastAvailability } from "../../types";
 import { SectionHeading } from "./SectionHeading";
 
 interface RainForecastSectionProps {
@@ -15,8 +15,6 @@ interface RainForecastSectionProps {
   onDayChange: (day: ForecastDay) => void;
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
-  /** Lluvia del día que se está mostrando (null mientras se calcula o si falló). */
-  forecast: DailyRainForecast | null;
   error: string | null;
   isLoading: boolean;
 }
@@ -28,7 +26,6 @@ export function RainForecastSection({
   onDayChange,
   visible,
   onVisibleChange,
-  forecast,
   error,
   isLoading,
 }: RainForecastSectionProps) {
@@ -79,11 +76,6 @@ export function RainForecastSection({
         )}
 
         {visible && error && <Notice>{error}</Notice>}
-        {visible && forecast && !error && (
-          <p className="mt-2 text-[11px] text-slate-500">
-            Máximo en esas 24 h: <strong className="font-semibold text-slate-700">{forecast.maxMm.toLocaleString("es-EC")} mm</strong>
-          </p>
-        )}
         {visible && <RainStatus rain={rain} />}
       </div>
     </section>

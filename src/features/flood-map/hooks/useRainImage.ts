@@ -11,9 +11,9 @@ interface State<T> {
 }
 
 /**
- * Pide al backend una imagen de lluvia (pronóstico de un día o acumulado observado) y la
+ * Pide al backend la imagen de lluvia pronosticada de un día y la
  * devuelve lista para el mapa. `path` = null apaga la capa. `version` cambia
- * cuando hay datos nuevos (corrida del modelo o última hora del satélite) y
+ * cuando hay una corrida nueva del modelo y
  * fuerza a pedirlo otra vez. Ignora respuestas de pedidos anteriores.
  */
 export function useRainImage<T extends RainImage>(path: string | null, version: string | null) {

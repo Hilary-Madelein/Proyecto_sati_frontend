@@ -4,15 +4,8 @@ import "leaflet/dist/leaflet.css";
 import type { FitBoundsOptions } from "leaflet";
 import { useState } from "react";
 import { MapContainer, Pane, TileLayer } from "react-leaflet";
-import { MAP_CONFIG, MAP_PANES, OBSERVED_RAIN_OPACITY, RAIN_FORECAST_OPACITY } from "../../constants";
-import type {
-  DailyRainForecast,
-  FloodMapData,
-  HazardEvent,
-  LayerVisibility,
-  ObservedAccumulatedRain,
-  SelectedRiver,
-} from "../../types";
+import { MAP_CONFIG, MAP_PANES, RAIN_FORECAST_OPACITY } from "../../constants";
+import type { DailyRainForecast, FloodMapData, HazardEvent, LayerVisibility, SelectedRiver } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import { FlashFloodLayer } from "./FlashFloodLayer";
@@ -31,10 +24,7 @@ export interface FloodMapProps {
   layers: LayerVisibility;
   /** Lluvia pronosticada del día elegido (imagen del backend); null = sin capa. */
   rainForecast: { data: DailyRainForecast; attribution: string } | null;
-  /** Lluvia observada acumulada hasta la última hora (imagen del backend); null = sin capa. */
-  observedRain: { data: ObservedAccumulatedRain; attribution: string } | null;
   onRainLoadingChange: (loading: boolean) => void;
-  onObservedRainLoadingChange: (loading: boolean) => void;
   /** Día del pronóstico de caudales que muestran las alertas. */
   alertDayIndex: number;
   selectedRiverId: number | null;
@@ -56,9 +46,7 @@ export default function FloodMap({
   visibleEvents,
   layers,
   rainForecast,
-  observedRain,
   onRainLoadingChange,
-  onObservedRainLoadingChange,
   alertDayIndex,
   selectedRiverId,
   onSelectRiver,
@@ -84,16 +72,6 @@ export default function FloodMap({
       <TileLayer url={MAP_CONFIG.tiles.url} attribution={MAP_CONFIG.tiles.attribution} />
       <MapControls homeOptions={boundsOptions} />
 
-      {observedRain && (
-        <Pane name={MAP_PANES.observedRain.name} style={{ zIndex: MAP_PANES.observedRain.zIndex }}>
-          <AccumulatedRainLayer
-            rain={observedRain.data}
-            opacity={OBSERVED_RAIN_OPACITY}
-            attribution={observedRain.attribution}
-            onLoadingChange={onObservedRainLoadingChange}
-          />
-        </Pane>
-      )}
       {rainForecast && (
         <Pane name={MAP_PANES.rain.name} style={{ zIndex: MAP_PANES.rain.zIndex }}>
           <AccumulatedRainLayer

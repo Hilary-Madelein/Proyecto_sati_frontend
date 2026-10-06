@@ -5,8 +5,6 @@ export type LatLngBounds = [southWest: LatLng, northEast: LatLng];
 /** Horas acumuladas desde el inicio de la corrida: 24 h = día 1, 48 h = días 1-2, 72 h = días 1-3. */
 /** Día del pronóstico: 1 = primeras 24 h de la corrida, 2 = las siguientes… */
 export type ForecastDay = 1 | 2 | 3;
-/** Ventanas de lluvia observada (acumulada hacia atrás), en horas. */
-export type RainWindowHours = 24 | 48 | 72;
 
 export interface RainForecastAvailability {
   /** Inicio de la corrida del modelo (ISO 8601). */
@@ -39,46 +37,6 @@ export interface RainLegend {
   id: string;
   unit: string;
   entries: { value: number; color: string }[];
-}
-
-// ── Lluvia observada por satélite ───────────────────────────────────────
-/** Hoy solo PERSIANN: el INAMHI dejó de publicar IMERG (marzo de 2026). */
-export type ObservedRainProduct = "persiann";
-
-export interface ObservedRainWindowStatus {
-  hours: RainWindowHours;
-  available: boolean;
-  /** Primera y última hora con datos de la ventana (ISO 8601). */
-  from: string | null;
-  to: string | null;
-  /** Horas sin dato dentro de la ventana. */
-  missingHours: number;
-}
-
-export interface ObservedRainProductStatus {
-  key: ObservedRainProduct;
-  name: string;
-  attribution: string;
-  /** Última hora con datos (ISO 8601). */
-  latest: string | null;
-  /** El producto no tiene datos recientes (p. ej. el INAMHI dejó de publicarlo). */
-  isStale: boolean;
-  windows: ObservedRainWindowStatus[];
-}
-
-/** GET /observed-rain: productos en orden de preferencia. */
-export interface ObservedRainAvailability {
-  products: ObservedRainProductStatus[];
-}
-
-/** Lluvia observada acumulada hasta la última hora (suma horaria hecha por el backend). */
-export interface ObservedAccumulatedRain extends RainImage {
-  product: ObservedRainProduct;
-  hours: RainWindowHours;
-  from: string;
-  to: string;
-  missingHours: number;
-  maxMm: number;
 }
 
 // ── Inundaciones fluviales (simuladas hasta conectar su fuente) ─────────
@@ -243,8 +201,6 @@ export interface FloodMapData {
   eventsFeed: EventsFeed;
   /** Null si el backend no pudo informar la lluvia pronosticada. */
   rain: RainForecastAvailability | null;
-  /** Null si el backend no pudo informar la lluvia observada. */
-  observedRain: ObservedRainAvailability | null;
   /** Null si no se pudieron cargar las alertas de ríos. */
   riverAlerts: RiverAlertsSnapshot | null;
 }

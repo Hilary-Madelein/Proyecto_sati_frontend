@@ -9,7 +9,8 @@ const DEFAULT_TIMEOUT_MS = 8_000;
 
 export class SatiApiError extends Error {}
 
-function baseUrl(): string {
+/** URL del backend (SATI_API_URL), sin "/" final. */
+export function satiApiBaseUrl(): string {
   const url = process.env.SATI_API_URL;
   if (!url) throw new SatiApiError("Falta la variable SATI_API_URL (URL del backend)");
   return url.replace(/\/+$/, "");
@@ -21,7 +22,7 @@ export async function satiGet<T>(
   query?: Record<string, string | number>,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
-  const url = new URL(`${baseUrl()}${path}`);
+  const url = new URL(`${satiApiBaseUrl()}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, String(value));
 
   let response: Response;
