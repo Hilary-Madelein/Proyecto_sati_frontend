@@ -14,7 +14,8 @@ import {
   DEFAULT_LAYER_VISIBILITY,
   DEFAULT_FORECAST_DAY,
   FORECAST_DAY_LABELS,
-  EVENTS_WINDOW_DAYS,
+  EVENT_PERIODS,
+  observedRainLegendLayer,
   RAIN_FORECAST_LEGEND_LAYER,
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
@@ -28,13 +29,18 @@ import type {
   LayerVisibility,
   DailyRainForecast,
   ForecastDay,
+  ObservedAccumulatedRain,
+  ObservedRainAvailability,
+  ObservedRainProduct,
   RainForecastAvailability,
+  RainWindowHours,
   SelectedRiver,
 } from "../types";
 import { RainLegend } from "./map/RainLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { FloodLayersSection } from "./panels/FloodLayersSection";
+import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
 import { SeaTemperatureSection } from "./panels/SeaTemperatureSection";
 import { RiverPanel } from "./river/RiverPanel";
@@ -61,6 +67,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
+  // Lluvia observada (satélite)
+  const [showObservedRain, setShowObservedRain] = useState(true);
+  const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
+  const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
+  const [observedRainLoading, setObservedRainLoading] = useState(false);
   // Anomalía de la temperatura del mar (El Niño)
   const [showSea, setShowSea] = useState(false);
   const [seaLoading, setSeaLoading] = useState(false);
@@ -92,11 +103,24 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   );
   const rainForecast = forecast.data ? { data: forecast.data, attribution: data.rain?.attribution ?? "" } : null;
 
+  // Lluvia observada: el backend suma las horas del satélite hasta la última disponible.
+  const observedStatus = data.observedRain?.products.find((product) => product.key === observedProduct);
+  const observedAvailable = observedStatus?.windows.some((item) => item.hours === observedHours && item.available) ?? false;
+  const observed = useRainImage<ObservedAccumulatedRain>(
+    showObservedRain && observedAvailable ? `/observed-rain/${observedProduct}/accumulated/${observedHours}` : null,
+    // La última hora con datos: cuando llega una nueva, se vuelve a pedir el acumulado.
+    observedStatus?.latest ?? null,
+  );
+  const observedRain = observed.data ? { data: observed.data, attribution: observedStatus?.attribution ?? "" } : null;
   const selectedRiverId = riverTarget?.kind === "river" ? riverTarget.river.riverId : null;
 
   // Leyenda de lluvia: aparece cuando hay alguna capa de lluvia visible en el mapa.
   const rainSources = [
     rainForecast && { layerId: RAIN_FORECAST_LEGEND_LAYER, label: `Pronóstico ${FORECAST_DAY_LABELS[forecastDay].range}` },
+    observedRain && {
+      layerId: observedRainLegendLayer(observedProduct),
+      label: `Satélite ${observedStatus?.name ?? ""} ${observedHours} h`,
+    },
   ].filter((source) => source !== null);
   const rainLegends = useRainLegends(rainSources.map((source) => source.layerId));
 
@@ -141,8 +165,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         visibleEvents={filteredEvents}
         layers={layers}
         rainForecast={rainForecast}
+        observedRain={observedRain}
         seaTemperature={showSea ? data.seaTemperature : null}
         onRainLoadingChange={setRainLoading}
+        onObservedRainLoadingChange={setObservedRainLoading}
         onSeaLoadingChange={setSeaLoading}
         alertDayIndex={alertDayIndex}
         selectedRiverId={selectedRiverId}
@@ -183,6 +209,18 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             error={forecast.error}
             isLoading={forecast.isLoading || rainLoading}
           />
+          <ObservedRainSection
+            availability={data.observedRain}
+            visible={showObservedRain}
+            onVisibleChange={setShowObservedRain}
+            product={observedProduct}
+            onProductChange={setObservedProduct}
+            hours={observedHours}
+            onHoursChange={setObservedHours}
+            accumulated={observed.data}
+            error={observed.error}
+            isLoading={observed.isLoading || observedRainLoading}
+          />
           <FloodLayersSection
             data={data}
             layers={layers}
@@ -204,7 +242,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         subtitle={
           eventsError
             ? "Sin conexión con el servidor de datos"
-            : `SNGR · últimos ${EVENTS_WINDOW_DAYS} días · ${formatDateTime(fetchedAt)}`
+            : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
         }
         icon={<PulsingAlertIcon />}
         mobileOpen={mobileSheet === "events"}
@@ -317,4 +355,10 @@ function CountBadge({ count }: { count: number }) {
 function initialForecastDay(rain: RainForecastAvailability | null): ForecastDay {
   const available = rain?.days.filter((item) => item.available).map((item) => item.day) ?? [];
   return available.includes(DEFAULT_FORECAST_DAY) ? DEFAULT_FORECAST_DAY : (available[0] ?? DEFAULT_FORECAST_DAY);
+}
+
+/** El primer producto satelital con datos recientes (el backend los ordena por preferencia: PERSIANN primero). */
+function initialObservedProduct(observed: ObservedRainAvailability | null): ObservedRainProduct {
+  const products = observed?.products ?? [];
+  return (products.find((product) => !product.isStale) ?? products[0])?.key ?? "persiann";
 }

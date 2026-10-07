@@ -17,7 +17,7 @@ function ticksFor(min: number, max: number) {
   return ticks;
 }
 
-/** Leyenda flotante de la lluvia pronosticada con la paleta oficial. */
+/** Leyenda flotante de la lluvia (pronosticada u observada) con la paleta oficial. */
 export function RainLegend({ legends, sources }: RainLegendProps) {
   if (legends.length === 0) return null;
 

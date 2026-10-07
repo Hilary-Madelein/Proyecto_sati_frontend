@@ -11,7 +11,7 @@ interface AccumulatedRainLayerProps {
 }
 
 /**
- * Lluvia pronosticada: una sola imagen calculada por
+ * Lluvia acumulada (pronosticada u observada): una sola imagen calculada por
  * el backend (suma de días del WRF o de horas del satélite, ya proyectada a
  * Web Mercator) sobre el Ecuador.
  */
