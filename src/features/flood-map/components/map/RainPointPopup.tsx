@@ -31,20 +31,24 @@ type Reading =
 /**
  * Al hacer clic en el mapa, muestra el valor de cada capa activa en ese punto:
  * lluvia pronosticada y temperatura del mar. Sin capas activas, no hace nada.
+ * El popup solo aparece por un clic: cerrarlo lo olvida, y prender, apagar o
+ * cambiar una capa lo cierra en vez de reabrirlo con el punto anterior.
  */
 export function RainPointPopup({ forecast, sea }: RainPointPopupProps) {
-  const [click, setClick] = useState<{ id: number; lat: number; lng: number } | null>(null);
-  const hasLayers = forecast !== null || sea !== null;
+  const [click, setClick] = useState<{ id: number; lat: number; lng: number; layers: string } | null>(null);
+  /** Qué capas están activas: si cambia, el popup del clic anterior ya no corresponde. */
+  const layers = [forecast && `forecast:${forecast.data.day}`, sea && "sea"].filter(Boolean).join("|");
+  // Solo olvida el clic de ese popup: al hacer un clic nuevo, el popup anterior también se cierra.
+  const close = useCallback((id: number) => setClick((current) => (current?.id === id ? null : current)), []);
 
   useMapEvents({
     click: (event) => {
-      if (hasLayers) setClick((previous) => ({ id: (previous?.id ?? 0) + 1, lat: event.latlng.lat, lng: event.latlng.lng }));
+      if (layers) setClick((previous) => ({ id: (previous?.id ?? 0) + 1, lat: event.latlng.lat, lng: event.latlng.lng, layers }));
     },
   });
 
-  // Si se apagan las capas, el popup abierto ya no tiene sentido (y no debe reaparecer al volver a encenderlas).
-  if (!hasLayers && click) setClick(null);
-  if (!click || !hasLayers) return null;
+  if (click && click.layers !== layers) setClick(null);
+  if (!click || click.layers !== layers) return null;
 
   const sources: PointSource[] = [];
   if (forecast) {
@@ -60,10 +64,18 @@ export function RainPointPopup({ forecast, sea }: RainPointPopupProps) {
   }
 
   // `key` reabre el popup (y vuelve a consultar) en cada clic nuevo.
-  return <PointPopupContent key={click.id} lat={click.lat} lng={click.lng} sources={sources} />;
+  return <PointPopupContent key={click.id} lat={click.lat} lng={click.lng} sources={sources} onClose={() => close(click.id)} />;
 }
 
-function PointPopupContent({ lat, lng, sources }: { lat: number; lng: number; sources: PointSource[] }) {
+interface PointPopupContentProps {
+  lat: number;
+  lng: number;
+  sources: PointSource[];
+  /** Se cerró (con la × o al hacer clic en otro lado). */
+  onClose: () => void;
+}
+
+function PointPopupContent({ lat, lng, sources, onClose }: PointPopupContentProps) {
   const popupRef = useRef<LeafletPopup>(null);
   const [readings, setReadings] = useState<Record<string, Reading>>({});
   const refreshPopup = useCallback(() => popupRef.current?.update(), []);
@@ -91,7 +103,7 @@ function PointPopupContent({ lat, lng, sources }: { lat: number; lng: number; so
   useEffect(refreshPopup, [readings, refreshPopup]);
 
   return (
-    <Popup ref={popupRef} position={[lat, lng]} minWidth={220} autoPanPadding={[16, 16]}>
+    <Popup ref={popupRef} position={[lat, lng]} minWidth={220} autoPanPadding={[16, 16]} eventHandlers={{ remove: onClose }}>
       <div className="w-56">
         <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900">
           <CloudRainIcon className="size-4 text-sky-600" />
