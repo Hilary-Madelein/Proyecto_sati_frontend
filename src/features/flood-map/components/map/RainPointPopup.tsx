@@ -32,10 +32,21 @@ type Reading =
 /**
  * Al hacer clic en el mapa, muestra el valor de cada capa activa en ese punto:
  * lluvia (pronóstico y/o observada) y temperatura del mar. Sin capas activas, no hace nada.
+ * El popup solo aparece por un clic: cerrarlo lo olvida, y prender, apagar o
+ * cambiar una capa lo cierra en vez de reabrirlo con el punto anterior.
  */
 export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps) {
-  const [click, setClick] = useState<{ id: number; lat: number; lng: number } | null>(null);
-  const hasLayers = forecast !== null || observed !== null || sea !== null;
+  const [click, setClick] = useState<{ id: number; lat: number; lng: number; layers: string } | null>(null);
+  /** Qué capas están activas: si cambia, el popup del clic anterior ya no corresponde. */
+  const layers = [
+    forecast && `forecast:${forecast.data.day}`,
+    observed && `observed:${observed.data.product}:${observed.data.hours}`,
+    sea && "sea",
+  ]
+    .filter(Boolean)
+    .join("|");
+  // Solo olvida el clic de ese popup: al hacer un clic nuevo, el popup anterior también se cierra.
+  const close = useCallback((id: number) => setClick((current) => (current?.id === id ? null : current)), []);
 
   useMapEvents({
     click: (event) => {

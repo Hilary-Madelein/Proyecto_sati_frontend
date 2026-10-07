@@ -67,8 +67,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
-  // Lluvia observada (satélite)
-  const [showObservedRain, setShowObservedRain] = useState(true);
+  // Lluvia observada (satélite). Apagada al inicio, como la pronosticada.
+  const [showObservedRain, setShowObservedRain] = useState(false);
   const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
   const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
   const [observedRainLoading, setObservedRainLoading] = useState(false);
