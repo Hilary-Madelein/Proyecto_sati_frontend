@@ -118,6 +118,16 @@ export interface RiverForecast {
     p75: Array<number | null>;
     max: Array<number | null>;
   };
+  /** Caudal con que arrancó el pronóstico de cada uno de los días anteriores; null si no hay. */
+  antecedent: { times: string[]; flow: Array<number | null> } | null;
+}
+
+/** Caudales de los periodos de retorno de un tramo (GET /rivers/:id/return-periods). */
+export interface RiverReturnPeriods {
+  riverId: number;
+  method: string;
+  /** De menor a mayor periodo. */
+  thresholds: Array<{ years: number; flow: number }>;
 }
 
 /** Tramo de río elegido en el mapa (por clic en el río o en una alerta). */

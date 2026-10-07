@@ -183,18 +183,18 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             error={forecast.error}
             isLoading={forecast.isLoading || rainLoading}
           />
-          <SeaTemperatureSection
-            sea={data.seaTemperature}
-            visible={showSea}
-            onVisibleChange={setShowSea}
-            isLoading={seaLoading}
-          />
           <FloodLayersSection
             data={data}
             layers={layers}
             onToggleLayer={toggleLayer}
             alertDayIndex={alertDayIndex}
             onAlertDayChange={setAlertDayIndex}
+          />
+          <SeaTemperatureSection
+            sea={data.seaTemperature}
+            visible={showSea}
+            onVisibleChange={setShowSea}
+            isLoading={seaLoading}
           />
         </div>
       </ResponsivePanel>
@@ -236,8 +236,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
 
       <RiverPanel
         target={riverTarget}
-        alertDays={data.riverAlerts?.days ?? []}
-        alertDayIndex={alertDayIndex}
         onClose={() => setRiverTarget(null)}
       />
 

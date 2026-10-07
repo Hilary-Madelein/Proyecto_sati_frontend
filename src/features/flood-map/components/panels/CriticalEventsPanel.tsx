@@ -13,7 +13,7 @@ import {
   SEVERITY_STYLES,
 } from "../../constants";
 import type { EventFilters, EventSeverity, HazardEvent, HazardType } from "../../types";
-import { filterEvents, sortEventsBySeverity } from "../../utils";
+import { filterEvents, sortEventsByPriority } from "../../utils";
 import { HAZARD_ICONS } from "../hazard-icons";
 import { SeverityPill } from "../SeverityPill";
 
@@ -55,7 +55,7 @@ export function CriticalEventsPanel({
   onSelect,
   expanded,
 }: CriticalEventsPanelProps) {
-  const sorted = sortEventsBySeverity(filteredEvents);
+  const sorted = sortEventsByPriority(filteredEvents);
   const [topEvent] = sorted;
   const isDefault = sameFilters(filters, DEFAULT_EVENT_FILTERS);
 
@@ -173,6 +173,7 @@ export function CriticalEventsPanel({
       <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500" aria-live="polite">
         <span>
           Mostrando <strong className="font-semibold text-slate-700">{sorted.length}</strong> de {events.length} eventos
+          <span title="Lo más reciente primero; los críticos y altos se adelantan 48 h y 24 h"> · recientes y graves primero</span>
         </span>
         {!isDefault && (
           <button

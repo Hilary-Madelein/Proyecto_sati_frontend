@@ -64,9 +64,9 @@ export const RAIN_FORECAST_OPACITY = 0.7;
 export const SEA_TEMPERATURE_OPACITY = 0.7;
 
 // ── Inundaciones ────────────────────────────────────────────────────────
-/** Vista inicial: alertas por caudal (la red de ríos se activa aparte). El resto se activa desde el panel de capas. */
+/** Vista inicial: red de ríos y sus alertas por caudal. El resto se activa desde el panel de capas. */
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
-  riverNetwork: false,
+  riverNetwork: true,
   riverAlerts: true,
   fluvial: false,
   flash: false,
@@ -112,6 +112,7 @@ export const RIVER_NORMAL_COLOR = "#2aad27";
 export const HYDROGRAPH_COLORS = {
   ensemble: "#2a78d6",
   highRes: "#eb6834",
+  antecedent: "#1baf7a",
 } as const;
 
 export const FLASH_FLOOD_PROBABILITIES: Record<
@@ -133,6 +134,14 @@ export const HISTORICAL_FREQUENCIES: Record<HistoricalFrequency, { label: string
 export const HISTORICAL_FREQUENCY_ORDER: HistoricalFrequency[] = ["p5", "p1", "p05"];
 
 // ── Eventos críticos ────────────────────────────────────────────────────
+/**
+ * Orden de la lista de eventos: lo más reciente primero, pero la gravedad
+ * cuenta como antigüedad a favor. Un crítico se ordena como si fuera 48 h más
+ * reciente y uno alto, 24 h. Así un moderado de hace 2 h pasa delante de un
+ * crítico de hace 3 días, pero no de uno de ayer.
+ */
+export const SEVERITY_PRIORITY_HOURS: Record<EventSeverity, number> = { critical: 48, high: 24, moderate: 0 };
+
 export const SEVERITY_STYLES: Record<
   EventSeverity,
   {
@@ -181,9 +190,12 @@ export const EVENT_PERIODS: readonly { value: EventPeriod; label: string; hours:
   { value: "7d", label: "Últimos 7 días", hours: EVENTS_WINDOW_DAYS * 24 },
 ];
 
-/** Por defecto solo lo más grave: los moderados se activan desde su recuadro. */
+/**
+ * Por defecto todas las severidades: el orden por prioridad (SEVERITY_PRIORITY_HOURS)
+ * ya pone arriba lo reciente y grave. Cada severidad se oculta desde su recuadro.
+ */
 export const DEFAULT_EVENT_FILTERS: EventFilters = {
-  severities: ["critical", "high"],
+  severities: ["critical", "high", "moderate"],
   period: "7d",
   province: null,
   hazardType: null,
