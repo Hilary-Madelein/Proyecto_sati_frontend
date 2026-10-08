@@ -10,8 +10,13 @@ import type { NextRequest } from "next/server";
  */
 const TIMEOUT_MS = 60_000;
 
-/** Cabeceras de la respuesta del backend que se reenvían al navegador. */
-const PASSTHROUGH_HEADERS = ["content-type", "cache-control", "content-encoding"];
+/**
+ * Cabeceras de la respuesta del backend que se reenvían al navegador. NO se
+ * reenvía `content-encoding`: `fetch` ya descomprime el cuerpo, y si el
+ * navegador recibe "gzip" sobre datos ya descomprimidos falla con "Decoding
+ * failed" (pasa en producción, donde Render comprime las respuestas).
+ */
+const PASSTHROUGH_HEADERS = ["content-type", "cache-control"];
 
 /** Estados HTTP que no llevan cuerpo. */
 const NO_BODY_STATUS = new Set([204, 304]);
