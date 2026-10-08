@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-950: #0b1d30;
+  --color-brand-900: #14273d;
+
+  --color-ec-yellow: #FFD51E;
+  --color-ec-blue: #034ea2;
+  --color-ec-red: #ed1c24;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: #ffffff;
+  color: #0f172a;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Ondas concéntricas muy sutiles en el fondo del header (agua / topografía). */
+.header-ripples {
+  background-image: repeating-radial-gradient(
+    circle at 82% 140%,
+    rgb(255 255 255 / 0.05) 0 1px,
+    transparent 1px 22px
+  );
+  mask-image: linear-gradient(to left, black 20%, transparent 75%);
+}
+
+/* ── Leaflet ─────────────────────────────────────────────────────────── */
+/* El CSS de Leaflet se carga después (con el mapa), por eso el prefijo `html`. */
+
+html .leaflet-container {
+  font-family: inherit;
+}
+
+/* Tonos del mapa base más suaves para que destaquen los datos. */
+html .leaflet-tile-pane {
+  filter: saturate(0.7) contrast(0.95) brightness(1.03);
+}
+
+html .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow:
+    0 10px 30px rgb(15 23 42 / 0.18),
+    0 0 0 1px rgb(15 23 42 / 0.06);
+}
+
+html .leaflet-popup-tip {
+  box-shadow: none;
+}
+
+html .leaflet-popup-content {
+  margin: 12px 14px;
+  min-width: 200px;
+  line-height: 1.4;
+}
+
+html .leaflet-popup-content p {
+  margin: 0;
+}
+
+html .leaflet-container a.leaflet-popup-close-button {
+  top: 6px;
+  right: 6px;
+  color: #94a3b8;
+}
+
+html .leaflet-control-attribution {
+  border-top-left-radius: 8px;
+  background: rgb(255 255 255 / 0.8);
+  backdrop-filter: blur(6px);
+  font-size: 10px;
+}
+
+/* Popup de eventos: el contenido maneja sus propios márgenes (ver EventPopupContent.tsx). */
+html .event-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  overflow: hidden;
+}
+
+html .event-popup .leaflet-popup-content {
+  margin: 0;
+  min-width: 0;
+}
+
+html .event-popup a.leaflet-popup-close-button {
+  top: 12px;
+  right: 8px;
+}
+
+/* Marcadores con forma propia (ver map-symbols.ts). */
+.map-symbol-marker {
+  background: transparent;
+  border: none;
+}
+
+/* Alertas por caudal (ver RiverAlertsLayer.tsx). */
+.river-alert-marker {
+  background: transparent;
+  border: none;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.35));
+}
+
+/* Marcadores de eventos críticos (ver CriticalEventsLayer.tsx). */
+.critical-marker {
+  background: transparent;
+  border: none;
+}
+
+.critical-marker__wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.critical-marker__dot,
+.critical-marker__pulse {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 9999px;
+  background: var(--marker-color);
+}
+
+.critical-marker__dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3);
+  transition: width 0.2s, height 0.2s;
+}
+
+.critical-marker__pulse {
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
+  animation: critical-pulse 1.6s ease-out infinite;
+}
+
+.critical-marker__wrap.is-selected .critical-marker__dot {
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+}
+
+/* Eventos moderados: punto más pequeño y sin pulso. */
+.critical-marker__wrap.is-quiet:not(.is-selected) .critical-marker__dot {
+  width: 11px;
+  height: 11px;
+  border-width: 1.5px;
+}
+
+@keyframes critical-pulse {
+  from {
+    transform: scale(0.35);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .critical-marker__pulse {
+    animation: none;
+    opacity: 0.25;
+  }
+}
