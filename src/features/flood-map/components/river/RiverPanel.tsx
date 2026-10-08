@@ -3,7 +3,7 @@
 import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { IconTile } from "@/components/ui/IconTile";
 import { WavesIcon } from "@/components/ui/icons";
-import { formatDateTime } from "@/lib/format";
+import { formatCalendarDate, formatDateTime } from "@/lib/format";
 import type { RiverTarget } from "../../hooks/useRiverForecast";
 import { useRiverForecast } from "../../hooks/useRiverForecast";
 import { LoadingBadge, Notice } from "../panels/RainForecastSection";
@@ -49,6 +49,13 @@ export function RiverPanel({ target, onClose }: RiverPanelProps) {
             <Notice>{error}</Notice>
           ) : forecast ? (
             <>
+              {forecast.fallbackRun && (
+                <div className="mb-3">
+                  <Notice>
+                    GEOGLOWS aún no tiene lista la corrida de hoy: se muestra la del {formatCalendarDate(runToIsoDate(forecast.fallbackRun))}.
+                  </Notice>
+                </div>
+              )}
               <Hydrograph forecast={forecast} returnPeriods={returnPeriods} returnPeriodsLoading={!returnPeriods && !returnPeriodsFailed} />
               <p className="mt-2 text-[11px] text-slate-500">
                 {forecast.source}
@@ -65,3 +72,6 @@ export function RiverPanel({ target, onClose }: RiverPanelProps) {
     </ResponsivePanel>
   );
 }
+
+/** "20261007" → "2026-10-07". */
+const runToIsoDate = (run: string) => `${run.slice(0, 4)}-${run.slice(4, 6)}-${run.slice(6, 8)}`;

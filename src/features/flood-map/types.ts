@@ -162,6 +162,8 @@ export interface RiverForecast {
   };
   /** Caudal con que arrancó el pronóstico de cada uno de los días anteriores; null si no hay. */
   antecedent: { times: string[]; flow: Array<number | null> } | null;
+  /** AAAAMMDD de la corrida anterior usada porque la más reciente de GEOGLOWS no se pudo leer; null si es la vigente. */
+  fallbackRun: string | null;
 }
 
 /** Caudales de los periodos de retorno de un tramo (GET /rivers/:id/return-periods). */
