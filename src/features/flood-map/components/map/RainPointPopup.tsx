@@ -37,6 +37,13 @@ type Reading =
  */
 export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps) {
   const [click, setClick] = useState<{ id: number; lat: number; lng: number; layers: string } | null>(null);
+  /**
+   * Número de cada clic, siempre creciente. No se deriva del clic anterior: al
+   * hacer clic en otro punto, Leaflet cierra primero el popup (y ese clic se
+   * olvida), así que el nuevo repetiría el número y React reutilizaría el popup
+   * viejo, con los valores del punto anterior.
+   */
+  const clickCount = useRef(0);
   /** Qué capas están activas: si cambia, el popup del clic anterior ya no corresponde. */
   const layers = [
     forecast && `forecast:${forecast.data.day}`,
@@ -50,7 +57,9 @@ export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps)
 
   useMapEvents({
     click: (event) => {
-      if (layers) setClick((previous) => ({ id: (previous?.id ?? 0) + 1, lat: event.latlng.lat, lng: event.latlng.lng, layers }));
+      if (!layers) return;
+      clickCount.current += 1;
+      setClick({ id: clickCount.current, lat: event.latlng.lat, lng: event.latlng.lng, layers });
     },
   });
 
