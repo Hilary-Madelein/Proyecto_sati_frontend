@@ -294,3 +294,39 @@ export interface RainPointValue {
   to: string;
   mm: number | null;
 }
+
+// ── Estaciones del INAMHI (GET /weather-stations) ───────────────────────
+export type WeatherStationCategory = "meteorological" | "hydrological" | "hydrometeorological";
+
+/** Lluvia de la hora que termina en `time`; null si la estación no registró ese dato. */
+export interface WeatherStationHour {
+  time: string;
+  mm: number | null;
+}
+
+export interface WeatherStation {
+  id: number;
+  code: string;
+  name: string;
+  lat: number;
+  lng: number;
+  altitude: number | null;
+  category: WeatherStationCategory;
+  /** Lluvia de cada hora reciente, de la más antigua a la más reciente. */
+  hours: WeatherStationHour[];
+  /** Suma de las horas con dato (mm); null si ninguna tiene dato. */
+  totalMm: number | null;
+  hoursWithData: number;
+  lastTime: string | null;
+}
+
+export interface WeatherStationsSnapshot {
+  updatedAt: string;
+  attribution: string;
+  /** Horas que cubre `hours` (la API del INAMHI solo guarda las últimas 12). */
+  windowHours: number;
+  stations: WeatherStation[];
+}
+
+/** Nivel de lluvia de una estación en la ventana reciente (ver STATION_RAIN_LEVELS). */
+export type StationRainLevel = "none" | "light" | "moderate" | "heavy" | "intense";

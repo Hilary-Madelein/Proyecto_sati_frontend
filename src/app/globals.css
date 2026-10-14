@@ -97,6 +97,36 @@ html .event-popup a.leaflet-popup-close-button {
   border: none;
 }
 
+/* Estaciones del INAMHI (ver map-symbols.ts → diamondSymbolHtml): rombo sin borde blanco que crece al pasar el cursor. */
+.map-diamond {
+  display: block;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 2px;
+  background: var(--marker-color);
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.55), 0 1px 3px rgb(15 23 42 / 0.45);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease-out;
+}
+
+/* 0 mm: hueco, para que las estaciones secas se lean como "sin lluvia" de un vistazo. */
+.map-diamond.is-hollow {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 2px var(--marker-color), 0 1px 2px rgb(15 23 42 / 0.35);
+}
+
+.leaflet-marker-icon:hover .map-diamond,
+.leaflet-marker-icon:focus-visible .map-diamond {
+  transform: rotate(45deg) scale(1.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-diamond,
+  .critical-marker__dot {
+    transition: none;
+  }
+}
+
 /* Alertas por caudal (ver RiverAlertsLayer.tsx). */
 .river-alert-marker {
   background: transparent;
@@ -126,12 +156,17 @@ html .event-popup a.leaflet-popup-close-button {
   background: var(--marker-color);
 }
 
+/* Sin borde blanco: contorno fino oscuro y sombra, para que se lea como algo que se toca. */
 .critical-marker__dot {
   width: 14px;
   height: 14px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3);
-  transition: width 0.2s, height 0.2s;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.55), 0 1px 3px rgb(15 23 42 / 0.45);
+  transition: width 0.2s, height 0.2s, transform 0.15s ease-out;
+}
+
+.critical-marker:hover .critical-marker__dot,
+.critical-marker:focus-visible .critical-marker__dot {
+  transform: scale(1.3);
 }
 
 .critical-marker__pulse {
@@ -144,14 +179,13 @@ html .event-popup a.leaflet-popup-close-button {
 .critical-marker__wrap.is-selected .critical-marker__dot {
   width: 20px;
   height: 20px;
-  border-width: 3px;
+  box-shadow: 0 0 0 2px rgb(15 23 42 / 0.85), 0 2px 6px rgb(15 23 42 / 0.45);
 }
 
 /* Eventos moderados: punto más pequeño y sin pulso. */
 .critical-marker__wrap.is-quiet:not(.is-selected) .critical-marker__dot {
   width: 11px;
   height: 11px;
-  border-width: 1.5px;
 }
 
 @keyframes critical-pulse {

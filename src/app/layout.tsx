@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SATI.EC · Sistema de alerta temprana de inundaciones para el Ecuador",
+  title: "SATI.EC · Sistema de alerta temprana para inundaciones en el Ecuador",
   description: "Monitoreo de lluvia, inundaciones fluviales, repentinas e históricas en Ecuador.",
 };
 

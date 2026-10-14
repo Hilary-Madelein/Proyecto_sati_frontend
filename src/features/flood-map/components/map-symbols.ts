@@ -3,7 +3,8 @@
  * para que se vean idénticas. Cada fuente tiene su forma:
  * - círculo: evento ocurrido (SNGR);
  * - triángulo: alerta de caudal pronosticada (GEOGLOWS);
- * - cuadrado: estación de inundación fluvial (simulada).
+ * - cuadrado: estación de inundación fluvial (simulada);
+ * - rombo: estación del INAMHI con la lluvia que midió.
  */
 
 /** Triángulo de alerta (viewBox 0 0 24 24) como HTML, para íconos de Leaflet. */
@@ -14,4 +15,9 @@ export function triangleSymbolHtml(color: string, size: number, strokeWidth = 1.
 /** Cuadrado de estación fluvial como HTML, para íconos de Leaflet. */
 export function squareSymbolHtml(color: string, size: number): string {
   return `<span style="display:block;width:${size}px;height:${size}px;border-radius:3px;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px rgb(0 0 0 / 0.35)"></span>`;
+}
+
+/** Rombo de estación del INAMHI como HTML, para íconos de Leaflet (estilos en globals.css → .map-diamond). */
+export function diamondSymbolHtml(color: string, size: number, hollow = false): string {
+  return `<span class="map-diamond${hollow ? " is-hollow" : ""}" style="--marker-color:${color};--size:${size}px"></span>`;
 }

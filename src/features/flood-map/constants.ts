@@ -11,6 +11,8 @@ import type {
   ObservedRainProduct,
   ForecastDay,
   RainWindowHours,
+  StationRainLevel,
+  WeatherStationCategory,
 } from "./types";
 
 // ── Mapa ────────────────────────────────────────────────────────────────
@@ -79,6 +81,44 @@ export const OBSERVED_RAIN_OPACITY = 0.7;
 
 // ── Temperatura del mar ─────────────────────────────────────────────────
 export const SEA_TEMPERATURE_OPACITY = 0.7;
+
+// ── Estaciones del INAMHI ───────────────────────────────────────────────
+/**
+ * Lluvia medida en las últimas horas, de menos a más. En rombos chicos los
+ * tonos solos casi no se distinguen, así que cada nivel cambia tres cosas:
+ * relleno (0 mm es hueco), tamaño (crece con la lluvia) y tono (una escala de
+ * violetas ordinal y validada). Violeta porque ninguna otra capa lo usa: la
+ * lluvia va de azul a verde, amarillo y rojo, los ríos son azules y los eventos
+ * y alertas, rojos, naranjas y amarillos. Las estaciones sin datos recientes no
+ * se muestran.
+ */
+export const STATION_RAIN_LEVELS: Record<
+  StationRainLevel,
+  { label: string; color: string; minMm: number; sizePx: number; hollow?: boolean }
+> = {
+  none: { label: "0 mm", color: "#7c3aed", minMm: 0, sizePx: 8, hollow: true },
+  light: { label: "Hasta 2 mm", color: "#a78bfa", minMm: 0.05, sizePx: 9 },
+  moderate: { label: "2 a 10 mm", color: "#7c3aed", minMm: 2, sizePx: 11 },
+  heavy: { label: "10 a 25 mm", color: "#5b21b6", minMm: 10, sizePx: 13 },
+  intense: { label: "25 mm o más", color: "#2e1065", minMm: 25, sizePx: 15 },
+};
+export const STATION_RAIN_LEVEL_ORDER: readonly StationRainLevel[] = ["none", "light", "moderate", "heavy", "intense"];
+
+export const STATION_CATEGORY_LABELS: Record<WeatherStationCategory, string> = {
+  meteorological: "Meteorológica",
+  hydrological: "Hidrológica",
+  hydrometeorological: "Hidrometeorológica",
+};
+
+/** Barras de la lluvia de cada hora en el popup de una estación (una sola serie). */
+export const STATION_HOURLY_BAR_COLOR = "#7c3aed";
+
+/** Cada día del pronóstico en el popup de una estación (las mismas 24 h que la capa del mapa). */
+export const STATION_FORECAST_LABELS: Record<ForecastDay, string> = {
+  1: "Primeras 24 h",
+  2: "De 24 a 48 h",
+  3: "De 48 a 72 h",
+};
 
 // ── Inundaciones ────────────────────────────────────────────────────────
 /** Vista inicial: red de ríos y sus alertas por caudal. El resto se activa desde el panel de capas. */
