@@ -19,6 +19,7 @@ import type {
   ObservedAccumulatedRain,
   SeaTemperatureAnomaly,
   SelectedRiver,
+  WeatherStationsSnapshot,
 } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
@@ -31,6 +32,7 @@ import { MapFocus } from "./MapFocus";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
 import { RiverNetworkLayer } from "./RiverNetworkLayer";
+import { WeatherStationsLayer } from "./WeatherStationsLayer";
 
 export interface FloodMapProps {
   data: FloodMapData;
@@ -43,6 +45,8 @@ export interface FloodMapProps {
   observedRain: { data: ObservedAccumulatedRain; attribution: string } | null;
   /** Anomalía de la temperatura del mar (imagen del backend); null = sin capa. */
   seaTemperature: SeaTemperatureAnomaly | null;
+  /** Lluvia medida en las estaciones del INAMHI; null = sin capa. */
+  weatherStations: WeatherStationsSnapshot | null;
   onRainLoadingChange: (loading: boolean) => void;
   onObservedRainLoadingChange: (loading: boolean) => void;
   onSeaLoadingChange: (loading: boolean) => void;
@@ -69,6 +73,7 @@ export default function FloodMap({
   rainForecast,
   observedRain,
   seaTemperature,
+  weatherStations,
   onRainLoadingChange,
   onObservedRainLoadingChange,
   onSeaLoadingChange,
@@ -143,6 +148,8 @@ export default function FloodMap({
           <FluvialStationsLayer stations={data.fluvialStations} />
         </Pane>
       )}
+      {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
+      {weatherStations && <WeatherStationsLayer snapshot={weatherStations} rain={data.rain} />}
       {layers.riverNetwork && (
         <>
           <Pane name={MAP_PANES.rivers.name} style={{ zIndex: MAP_PANES.rivers.zIndex }}>

@@ -2,7 +2,7 @@
 
 import L from "leaflet";
 import { useCallback, useEffect, useRef } from "react";
-import { Marker, Popup, useMap } from "react-leaflet";
+import { Marker, Popup, Tooltip, useMap } from "react-leaflet";
 import { SEVERITY_STYLES } from "../../constants";
 import type { EventSeverity, HazardEvent } from "../../types";
 import { EventPopupContent } from "./EventPopupContent";
@@ -97,6 +97,14 @@ function EventMarker({
       title={event.title}
       eventHandlers={{ click: () => onSelect(event.id) }}
     >
+      {/* Al pasar el cursor: qué evento es y que se puede tocar. */}
+      <Tooltip direction="top" offset={[0, -10]}>
+        <span className="text-xs">
+          <strong>{event.title}</strong>
+          <br />
+          <span className="text-slate-500">Clic para ver el detalle</span>
+        </span>
+      </Tooltip>
       <Popup ref={popupRef} className="event-popup" maxWidth={320} minWidth={240} autoPanPadding={[16, 16]}>
         <EventPopupContent event={event} onResize={refreshPopup} />
       </Popup>

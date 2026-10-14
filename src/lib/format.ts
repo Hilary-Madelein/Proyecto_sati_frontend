@@ -42,6 +42,12 @@ export function formatDayMonth(iso: string) {
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
 }
 
+/** Hora de Ecuador, p. ej. "14:00". */
+export function formatHour(iso: string) {
+  const date = new Date(new Date(iso).getTime() + ECUADOR_UTC_OFFSET_MS);
+  return `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
 /** Fecha de calendario AAAA-MM-DD (sin hora ni zona), p. ej. "2026-10-03" -> "3 oct". */
 export function formatCalendarDate(ymd: string) {
   const [, month, day] = ymd.split("-").map(Number);

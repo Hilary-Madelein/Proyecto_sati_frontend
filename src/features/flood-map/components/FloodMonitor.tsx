@@ -20,6 +20,7 @@ import {
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
+import { useWeatherStations } from "../hooks/useWeatherStations";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -43,6 +44,7 @@ import { FloodLayersSection } from "./panels/FloodLayersSection";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
 import { SeaTemperatureSection } from "./panels/SeaTemperatureSection";
+import { WeatherStationsSection } from "./panels/WeatherStationsSection";
 import { RiverPanel } from "./river/RiverPanel";
 
 // Leaflet usa `window`: el mapa se renderiza solo en el navegador.
@@ -72,6 +74,9 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
   const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
   const [observedRainLoading, setObservedRainLoading] = useState(false);
+  // Lluvia medida en las estaciones del INAMHI. Apagada al inicio; se pide al encenderla.
+  const [showStations, setShowStations] = useState(false);
+  const stations = useWeatherStations(showStations);
   // Anomalía de la temperatura del mar (El Niño)
   const [showSea, setShowSea] = useState(false);
   const [seaLoading, setSeaLoading] = useState(false);
@@ -167,6 +172,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         rainForecast={rainForecast}
         observedRain={observedRain}
         seaTemperature={showSea ? data.seaTemperature : null}
+        weatherStations={showStations ? stations.snapshot : null}
         onRainLoadingChange={setRainLoading}
         onObservedRainLoadingChange={setObservedRainLoading}
         onSeaLoadingChange={setSeaLoading}
@@ -220,6 +226,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             accumulated={observed.data}
             error={observed.error}
             isLoading={observed.isLoading || observedRainLoading}
+          />
+          <WeatherStationsSection
+            snapshot={stations.snapshot}
+            visible={showStations}
+            onVisibleChange={setShowStations}
+            error={stations.error}
+            isLoading={stations.isLoading}
           />
           <FloodLayersSection
             data={data}

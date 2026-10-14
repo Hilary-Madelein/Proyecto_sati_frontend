@@ -1,5 +1,13 @@
-import { EVENT_PERIODS, RIVER_ALERT_LEVELS, RIVER_NORMAL_COLOR, SEVERITY_PRIORITY_HOURS, SEVERITY_STYLES } from "./constants";
-import type { AlertLevel, EventFilters, HazardEvent, RiverAlert } from "./types";
+import {
+  EVENT_PERIODS,
+  RIVER_ALERT_LEVELS,
+  RIVER_NORMAL_COLOR,
+  SEVERITY_PRIORITY_HOURS,
+  SEVERITY_STYLES,
+  STATION_RAIN_LEVEL_ORDER,
+  STATION_RAIN_LEVELS,
+} from "./constants";
+import type { AlertLevel, EventFilters, HazardEvent, RiverAlert, StationRainLevel, WeatherStation } from "./types";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -50,4 +58,17 @@ export function alertLevelStyle(level: AlertLevel) {
   return level === 0
     ? { label: "Normal", color: RIVER_NORMAL_COLOR }
     : (RIVER_ALERT_LEVELS.find((item) => item.level === level) ?? { label: `${level} años`, color: "#000000" });
+}
+
+/** Estación con lluvia medida en la ventana reciente. */
+export type MeasuredStation = WeatherStation & { totalMm: number };
+
+/** Solo las estaciones con algún dato reciente: las que no informan no se muestran. */
+export function stationsWithRain(stations: WeatherStation[]): MeasuredStation[] {
+  return stations.filter((station): station is MeasuredStation => station.totalMm !== null);
+}
+
+/** Nivel de lluvia de una estación según lo que midió en la ventana reciente (ver STATION_RAIN_LEVELS). */
+export function stationRainLevel(totalMm: number): StationRainLevel {
+  return STATION_RAIN_LEVEL_ORDER.findLast((level) => totalMm >= STATION_RAIN_LEVELS[level].minMm) ?? "none";
 }
