@@ -88,11 +88,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
 
-  // Escritorio: ambos paneles abiertos por defecto. Móvil: una hoja a la vez, cerradas al inicio.
-  const [desktopPanels, setDesktopPanels] = useState<Record<PanelId, boolean>>({
+  // Escritorio: capas abierto; eventos abierto solo si hay alguno en el periodo
+  // inicial (últimas 24 h), si no queda minimizado en su botón. Móvil: una hoja
+  // a la vez, cerradas al inicio.
+  const [desktopPanels, setDesktopPanels] = useState<Record<PanelId, boolean>>(() => ({
     layers: true,
-    events: true,
-  });
+    events: filterEvents(data.eventsFeed.events, DEFAULT_EVENT_FILTERS, data.eventsFeed.fetchedAt).length > 0,
+  }));
   const [mobileSheet, setMobileSheet] = useState<PanelId | null>(null);
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const [eventFilters, setEventFilters] = useState<EventFilters>(DEFAULT_EVENT_FILTERS);
