@@ -159,8 +159,8 @@ export function CriticalEventsPanel({
           />
           <span>
             Mostrar <strong className="font-semibold text-slate-700">{unverifiedCount}</strong>{" "}
-            {unverifiedCount === 1 ? "reporte moderado" : "reportes moderados"} sin afectaciones registradas (calles con
-            agua que luego drenó)
+            {unverifiedCount === 1 ? "reporte moderado" : "reportes moderados"} de lluvia o drenaje sin afectaciones
+            registradas (calles con agua que luego drenó)
           </span>
         </label>
       )}
