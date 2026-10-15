@@ -28,11 +28,13 @@ export function sortEventsByPriority(events: HazardEvent[]) {
 }
 
 /**
- * Moderado (Nivel 1) sin ninguna afectación registrada: casi siempre calles con
- * agua que luego drenó. Los críticos y altos se muestran siempre, aunque aún no
- * tengan cifras (la SNGR las completa mientras evalúa).
+ * Moderado (Nivel 1) por lluvia o drenaje sin ninguna afectación registrada:
+ * casi siempre calles con agua que luego drenó. Se muestran siempre los críticos
+ * y altos, y los desbordes de río: aunque aún no tengan cifras (la SNGR las
+ * completa mientras evalúa), que un río salga de su cauce ya es relevante.
  */
-export const isUnverifiedEvent = (event: HazardEvent) => event.severity === "moderate" && !event.hasDamage;
+export const isUnverifiedEvent = (event: HazardEvent) =>
+  event.severity === "moderate" && event.hazardType !== "river_flood" && !event.hasDamage;
 
 /**
  * Aplica los filtros de eventos. `now` es la hora de la consulta al backend
