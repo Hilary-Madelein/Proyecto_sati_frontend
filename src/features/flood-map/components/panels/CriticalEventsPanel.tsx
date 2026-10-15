@@ -13,7 +13,7 @@ import {
   SEVERITY_STYLES,
 } from "../../constants";
 import type { EventFilters, EventSeverity, HazardEvent, HazardType } from "../../types";
-import { filterEvents, sortEventsByPriority } from "../../utils";
+import { filterEvents, isUnverifiedEvent, sortEventsByPriority } from "../../utils";
 import { HAZARD_ICONS } from "../hazard-icons";
 import { SeverityPill } from "../SeverityPill";
 
@@ -41,6 +41,7 @@ const sameFilters = (a: EventFilters, b: EventFilters) =>
   a.period === b.period &&
   a.province === b.province &&
   a.hazardType === b.hazardType &&
+  a.showUnverified === b.showUnverified &&
   a.severities.length === b.severities.length &&
   a.severities.every((severity) => b.severities.includes(severity));
 
@@ -62,6 +63,10 @@ export function CriticalEventsPanel({
   // Cuántos hay de cada severidad dentro del periodo, provincia y tipo elegidos.
   const inScope = filterEvents(events, filters, fetchedAt, { ignoreSeverity: true });
   const countBySeverity = (severity: EventSeverity) => inScope.filter((event) => event.severity === severity).length;
+  // Moderados sin afectaciones en el periodo, provincia y tipo elegidos (ocultos o no).
+  const unverifiedCount = filterEvents(events, { ...filters, showUnverified: true }, fetchedAt, {
+    ignoreSeverity: true,
+  }).filter(isUnverifiedEvent).length;
 
   // "Ver más": vuelve a 10 cada vez que cambian los filtros.
   const filtersKey = JSON.stringify(filters);
@@ -143,6 +148,22 @@ export function CriticalEventsPanel({
           );
         })}
       </ul>
+
+      {unverifiedCount > 0 && (
+        <label className="flex cursor-pointer items-start gap-2 text-[11px] text-slate-500">
+          <input
+            type="checkbox"
+            checked={filters.showUnverified}
+            onChange={(event) => update({ showUnverified: event.target.checked })}
+            className="mt-px size-3.5 accent-blue-600"
+          />
+          <span>
+            Mostrar <strong className="font-semibold text-slate-700">{unverifiedCount}</strong>{" "}
+            {unverifiedCount === 1 ? "reporte moderado" : "reportes moderados"} sin afectaciones registradas (calles con
+            agua que luego drenó)
+          </span>
+        </label>
+      )}
 
       {/* Filtros: siempre en móvil; en escritorio solo con el panel expandido. */}
       <div className={cn("space-y-2", !expanded && "lg:hidden")}>
@@ -331,9 +352,9 @@ function EventItem({
             <time dateTime={event.occurredAt}>{formatDateTime(event.occurredAt)}</time>
           </span>
           {event.level !== null && <span className="font-medium text-slate-600">Nivel {event.level}</span>}
-          {event.impactLevel && event.impactLevel !== "low" && (
-            <span className={cn("font-medium", event.impactLevel === "high" ? "text-red-700" : "text-amber-700")}>
-              Impacto {event.impactLevelLabel?.toLowerCase()}
+          {event.impact.homeless > 0 && (
+            <span className="font-medium text-red-700 tabular-nums">
+              {event.impact.homeless.toLocaleString("es-EC")} damnificados
             </span>
           )}
           {event.impact.affected > 0 && (
