@@ -32,7 +32,7 @@ export function WeatherStationsSection({ snapshot, visible, onVisibleChange, err
 
       <div className={cn("rounded-xl p-3 ring-1 transition-colors", visible ? "bg-white ring-slate-200" : "bg-slate-50/70 ring-slate-200/70")}>
         <div className="flex items-center gap-3">
-          <IconTile className="bg-violet-50 text-violet-700">
+          <IconTile className="bg-sky-50 text-sky-700">
             <CloudRainIcon className="size-5" />
           </IconTile>
           <div className="min-w-0 flex-1">

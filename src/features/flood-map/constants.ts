@@ -84,25 +84,35 @@ export const SEA_TEMPERATURE_OPACITY = 0.7;
 
 // ── Estaciones del INAMHI ───────────────────────────────────────────────
 /**
- * Lluvia medida en las últimas horas, de menos a más. En rombos chicos los
- * tonos solos casi no se distinguen, así que cada nivel cambia tres cosas:
- * relleno (0 mm es hueco), tamaño (crece con la lluvia) y tono (una escala de
- * violetas ordinal y validada). Violeta porque ninguna otra capa lo usa: la
- * lluvia va de azul a verde, amarillo y rojo, los ríos son azules y los eventos
- * y alertas, rojos, naranjas y amarillos. Las estaciones sin datos recientes no
- * se muestran.
+ * Lluvia medida en las últimas horas, de menos a más, con la escala habitual de
+ * los mapas de lluvia (azul → verde → amarillo → rojo). Cada color es el que la
+ * paleta oficial de PERSIANN (capa "Lluvia registrada") da a esos milímetros:
+ * la misma lluvia se ve igual en el satélite y en el pluviómetro. Además cambian
+ * el relleno (0 mm es hueco) y el tamaño (crece con la lluvia); el borde oscuro
+ * del rombo lo separa de la capa del satélite. Las estaciones sin datos
+ * recientes no se muestran.
  */
 export const STATION_RAIN_LEVELS: Record<
   StationRainLevel,
   { label: string; color: string; minMm: number; sizePx: number; hollow?: boolean }
 > = {
-  none: { label: "0 mm", color: "#7c3aed", minMm: 0, sizePx: 8, hollow: true },
-  light: { label: "Hasta 2 mm", color: "#a78bfa", minMm: 0.05, sizePx: 9 },
-  moderate: { label: "2 a 10 mm", color: "#7c3aed", minMm: 2, sizePx: 11 },
-  heavy: { label: "10 a 25 mm", color: "#5b21b6", minMm: 10, sizePx: 13 },
-  intense: { label: "25 mm o más", color: "#2e1065", minMm: 25, sizePx: 15 },
+  none: { label: "0 mm", color: "#475569", minMm: 0, sizePx: 8, hollow: true },
+  light: { label: "Hasta 4 mm", color: "#75BAFF", minMm: 0.05, sizePx: 9 },
+  moderate: { label: "4 a 15 mm", color: "#0087FF", minMm: 4, sizePx: 10 },
+  heavy: { label: "15 a 30 mm", color: "#1ACF05", minMm: 15, sizePx: 12 },
+  veryHeavy: { label: "30 a 45 mm", color: "#FFF42B", minMm: 30, sizePx: 13 },
+  intense: { label: "45 a 60 mm", color: "#F96D73", minMm: 45, sizePx: 14 },
+  extreme: { label: "60 mm o más", color: "#BF0000", minMm: 60, sizePx: 16 },
 };
-export const STATION_RAIN_LEVEL_ORDER: readonly StationRainLevel[] = ["none", "light", "moderate", "heavy", "intense"];
+export const STATION_RAIN_LEVEL_ORDER: readonly StationRainLevel[] = [
+  "none",
+  "light",
+  "moderate",
+  "heavy",
+  "veryHeavy",
+  "intense",
+  "extreme",
+];
 
 export const STATION_CATEGORY_LABELS: Record<WeatherStationCategory, string> = {
   meteorological: "Meteorológica",
@@ -111,7 +121,7 @@ export const STATION_CATEGORY_LABELS: Record<WeatherStationCategory, string> = {
 };
 
 /** Barras de la lluvia de cada hora en el popup de una estación (una sola serie). */
-export const STATION_HOURLY_BAR_COLOR = "#7c3aed";
+export const STATION_HOURLY_BAR_COLOR = "#0087FF";
 
 /** Cada día del pronóstico en el popup de una estación (las mismas 24 h que la capa del mapa). */
 export const STATION_FORECAST_LABELS: Record<ForecastDay, string> = {
@@ -121,9 +131,9 @@ export const STATION_FORECAST_LABELS: Record<ForecastDay, string> = {
 };
 
 // ── Inundaciones ────────────────────────────────────────────────────────
-/** Vista inicial: red de ríos y sus alertas por caudal. El resto se activa desde el panel de capas. */
+/** Vista inicial: solo las alertas por caudal. El resto (incluida la red de ríos) se activa desde el panel de capas. */
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
-  riverNetwork: true,
+  riverNetwork: false,
   riverAlerts: true,
   fluvial: false,
   flash: false,
@@ -243,7 +253,7 @@ export const EVENTS_WINDOW_DAYS = 7;
 /** Hacia atrás desde ahora: los eventos de la SNGR ya ocurrieron (no son pronóstico). */
 export const EVENT_PERIODS: readonly { value: EventPeriod; label: string; hours: number }[] = [
   { value: "24h", label: "Últimas 24 h", hours: 24 },
-  { value: "48h", label: "Últimas 48 h", hours: 48 },
+  { value: "3d", label: "Últimos 3 días", hours: 3 * 24 },
   { value: "7d", label: "Últimos 7 días", hours: EVENTS_WINDOW_DAYS * 24 },
 ];
 

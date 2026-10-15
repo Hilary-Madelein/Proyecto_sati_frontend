@@ -39,6 +39,12 @@ export function RiverPanel({ target, onClose }: RiverPanelProps) {
       desktopClassName="lg:bottom-6 lg:left-auto lg:right-101 lg:top-auto lg:w-[min(40rem,calc(100%-27rem))] lg:max-h-[calc(100%-3rem)]"
     >
       <div className="space-y-4">
+        {alert?.persistent && alert.alertShare !== null && (
+          <Notice>
+            Este tramo tuvo alerta en el {Math.round(alert.alertShare * 100)} % de los pronósticos de los últimos 30 días.
+            Es probable que el modelo sobrestime su caudal: tome la alerta con cautela.
+          </Notice>
+        )}
         <section>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">Pronóstico de caudal por ensambles</h3>

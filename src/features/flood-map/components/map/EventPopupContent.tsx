@@ -5,11 +5,18 @@ import { ClockIcon, MapPinIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatTimeAgo } from "@/lib/format";
 import { SEVERITY_STYLES } from "../../constants";
-import type { EventImpact, HazardEvent } from "../../types";
+import type { EventImpact, HazardEvent, ImpactLevel } from "../../types";
 import { HAZARD_ICONS } from "../hazard-icons";
 
 /** Descripciones más largas que esto se muestran recortadas con "Leer más". */
 const DESCRIPTION_PREVIEW_CHARS = 160;
+
+/** Color del impacto: alto en rojo, medio en ámbar, bajo en gris. */
+const IMPACT_CLASSES: Record<ImpactLevel, string> = {
+  high: "bg-red-50 text-red-700",
+  medium: "bg-amber-50 text-amber-800",
+  low: "bg-slate-100 text-slate-600",
+};
 
 const STATUS_LABELS: Record<HazardEvent["status"], string> = {
   open: "En seguimiento",
@@ -57,6 +64,7 @@ export function EventPopupContent({ event, onResize }: EventPopupContentProps) {
             <span aria-hidden="true">·</span>
             <span>{STATUS_LABELS[event.status]}</span>
           </p>
+          <p className="mt-0.5 text-xs text-slate-500">{event.hazardTypeLabel}</p>
         </div>
       </header>
 
@@ -81,7 +89,16 @@ export function EventPopupContent({ event, onResize }: EventPopupContentProps) {
       </dl>
 
       <section className="mx-4 mt-3 border-t border-slate-100 pt-3">
-        <h4 className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Afectaciones</h4>
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Afectaciones</h4>
+          {event.impactLevel && (
+            <span
+              className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", IMPACT_CLASSES[event.impactLevel])}
+            >
+              Impacto {event.impactLevelLabel?.toLowerCase()}
+            </span>
+          )}
+        </div>
         {impacts.length > 0 ? (
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {impacts.map(({ key, one, many, tone }) => {
