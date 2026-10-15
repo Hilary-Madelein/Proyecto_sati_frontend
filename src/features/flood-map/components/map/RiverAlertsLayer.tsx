@@ -69,7 +69,9 @@ function AlertMarker({
     <Marker
       position={[alert.latitude, alert.longitude]}
       icon={alertIcon(level, selected)}
-      zIndexOffset={selected ? 2000 : level * 10}
+      // Los tramos que alertan casi siempre se atenúan y quedan debajo de los demás.
+      opacity={alert.persistent && !selected ? 0.4 : 1}
+      zIndexOffset={selected ? 2000 : alert.persistent ? 0 : level * 10}
       keyboard
       title={`Alerta: supera ${alertLevelStyle(level).label}`}
       eventHandlers={{ click: () => onSelect({ riverId: alert.riverId, alert }) }}
@@ -79,6 +81,14 @@ function AlertMarker({
           <strong>Supera {alertLevelStyle(level).label}</strong>
           {day && ` · ${formatCalendarDate(day)}`}
           {place && <><br />{alert.river ?? "Río"} · {place}</>}
+          {alert.persistent && alert.alertShare !== null && (
+            <>
+              <br />
+              <span className="text-slate-500">
+                Alerta persistente ({Math.round(alert.alertShare * 100)} % de los días): posible sobrestimación
+              </span>
+            </>
+          )}
         </span>
       </Tooltip>
     </Marker>

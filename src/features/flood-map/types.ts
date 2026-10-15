@@ -132,6 +132,10 @@ export interface RiverAlert {
   /** Nivel por día del pronóstico (índice 0 = primer día). */
   dailyLevels: AlertLevel[];
   maxLevel: AlertLevel;
+  /** Parte de los pronósticos de los últimos 30 días en que el tramo tuvo alerta (0–1); null sin historia. */
+  alertShare: number | null;
+  /** Alerta casi todos los días: probablemente el modelo sobrestima este tramo. */
+  persistent: boolean;
 }
 
 export interface RiverAlertsSnapshot {
@@ -142,6 +146,8 @@ export interface RiverAlertsSnapshot {
   days: string[];
   totalReaches: number;
   alerts: RiverAlert[];
+  /** Pronósticos con que se midió la persistencia y proporción desde la que se marca; null sin historia. */
+  persistence: { forecasts: number; threshold: number } | null;
 }
 
 /** Pronóstico de caudal (m³/s) de un tramo; los faltantes son null. */
@@ -209,6 +215,10 @@ export type EventStatus = "open" | "closed";
 
 export type HazardType =
   | "flood"
+  | "river_flood"
+  | "rain_flood"
+  | "drainage_flood"
+  | "coastal_flood"
   | "landslide"
   | "mudflow"
   | "heavy_rain"
@@ -217,6 +227,9 @@ export type HazardType =
   | "rockfall"
   | "soil_creep"
   | "other";
+
+/** Impacto según las cifras de daños (lo calcula el backend). */
+export type ImpactLevel = "high" | "medium" | "low";
 
 export interface EventImpact {
   affected: number;
@@ -239,6 +252,10 @@ export interface HazardEvent {
   province: string | null;
   canton: string | null;
   sector: string | null;
+  /** Río, estero o quebrada que se desbordó ("Río Balao"). */
+  waterBody: string | null;
+  impactLevel: ImpactLevel | null;
+  impactLevelLabel: string | null;
   position: LatLng;
   /** Fecha ISO 8601 en que ocurrió el evento. */
   occurredAt: string;
@@ -246,7 +263,7 @@ export interface HazardEvent {
 }
 
 /** Periodo de los eventos según cuándo ocurrieron. */
-export type EventPeriod = "24h" | "48h" | "7d";
+export type EventPeriod = "24h" | "3d" | "7d";
 
 /** Filtros de eventos: se aplican a la lista y a los marcadores del mapa. */
 export interface EventFilters {
@@ -329,4 +346,4 @@ export interface WeatherStationsSnapshot {
 }
 
 /** Nivel de lluvia de una estación en la ventana reciente (ver STATION_RAIN_LEVELS). */
-export type StationRainLevel = "none" | "light" | "moderate" | "heavy" | "intense";
+export type StationRainLevel = "none" | "light" | "moderate" | "heavy" | "veryHeavy" | "intense" | "extreme";

@@ -96,6 +96,21 @@ export function CriticalEventsPanel({
 
   return (
     <div className="space-y-3">
+      {/* Periodo: siempre visible, también con el panel contraído (cambia los conteos y el mapa). */}
+      <div className="space-y-2">
+        <p className="text-[11px] text-slate-500">
+          Eventos <strong className="font-semibold text-slate-700">ya ocurridos</strong>, reportados por la SNGR. Mostrar los
+          ocurridos en:
+        </p>
+        <SegmentedControl
+          name="event-period"
+          label="Mostrar eventos ocurridos en"
+          value={filters.period}
+          options={EVENT_PERIODS}
+          onChange={(period) => update({ period })}
+        />
+      </div>
+
       <ul className="grid grid-cols-3 gap-2" aria-label="Mostrar u ocultar por severidad">
         {SEVERITY_ORDER.map((severity) => {
           const style = SEVERITY_STYLES[severity];
@@ -131,17 +146,6 @@ export function CriticalEventsPanel({
 
       {/* Filtros: siempre en móvil; en escritorio solo con el panel expandido. */}
       <div className={cn("space-y-2", !expanded && "lg:hidden")}>
-        <p className="text-[11px] text-slate-500">
-          Eventos <strong className="font-semibold text-slate-700">ya ocurridos</strong>, reportados por la SNGR. Mostrar los
-          ocurridos en:
-        </p>
-        <SegmentedControl
-          name="event-period"
-          label="Mostrar eventos ocurridos en"
-          value={filters.period}
-          options={EVENT_PERIODS}
-          onChange={(period) => update({ period })}
-        />
         <div className="grid grid-cols-2 gap-2">
           <FilterSelect
             label="Provincia"
@@ -327,6 +331,11 @@ function EventItem({
             <time dateTime={event.occurredAt}>{formatDateTime(event.occurredAt)}</time>
           </span>
           {event.level !== null && <span className="font-medium text-slate-600">Nivel {event.level}</span>}
+          {event.impactLevel && event.impactLevel !== "low" && (
+            <span className={cn("font-medium", event.impactLevel === "high" ? "text-red-700" : "text-amber-700")}>
+              Impacto {event.impactLevelLabel?.toLowerCase()}
+            </span>
+          )}
           {event.impact.affected > 0 && (
             <span className="tabular-nums">{event.impact.affected.toLocaleString("es-EC")} afectados</span>
           )}
