@@ -5,18 +5,11 @@ import { ClockIcon, MapPinIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatTimeAgo } from "@/lib/format";
 import { SEVERITY_STYLES } from "../../constants";
-import type { EventImpact, HazardEvent, ImpactLevel } from "../../types";
+import type { EventImpact, HazardEvent } from "../../types";
 import { HAZARD_ICONS } from "../hazard-icons";
 
 /** Descripciones más largas que esto se muestran recortadas con "Leer más". */
 const DESCRIPTION_PREVIEW_CHARS = 160;
-
-/** Color del impacto: alto en rojo, medio en ámbar, bajo en gris. */
-const IMPACT_CLASSES: Record<ImpactLevel, string> = {
-  high: "bg-red-50 text-red-700",
-  medium: "bg-amber-50 text-amber-800",
-  low: "bg-slate-100 text-slate-600",
-};
 
 const STATUS_LABELS: Record<HazardEvent["status"], string> = {
   open: "En seguimiento",
@@ -26,6 +19,7 @@ const STATUS_LABELS: Record<HazardEvent["status"], string> = {
 /** Cifras de impacto con su texto en singular y plural; solo se muestran las que no son 0. */
 const IMPACT_LABELS: readonly { key: keyof EventImpact; one: string; many: string; tone?: "danger" }[] = [
   { key: "deceased", one: "fallecido", many: "fallecidos", tone: "danger" },
+  { key: "homeless", one: "damnificado", many: "damnificados", tone: "danger" },
   { key: "affected", one: "persona afectada", many: "personas afectadas" },
   { key: "evacuated", one: "persona evacuada", many: "personas evacuadas" },
   { key: "housesAffected", one: "vivienda afectada", many: "viviendas afectadas" },
@@ -89,16 +83,7 @@ export function EventPopupContent({ event, onResize }: EventPopupContentProps) {
       </dl>
 
       <section className="mx-4 mt-3 border-t border-slate-100 pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <h4 className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Afectaciones</h4>
-          {event.impactLevel && (
-            <span
-              className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", IMPACT_CLASSES[event.impactLevel])}
-            >
-              Impacto {event.impactLevelLabel?.toLowerCase()}
-            </span>
-          )}
-        </div>
+        <h4 className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Afectaciones</h4>
         {impacts.length > 0 ? (
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {impacts.map(({ key, one, many, tone }) => {
@@ -118,7 +103,9 @@ export function EventPopupContent({ event, onResize }: EventPopupContentProps) {
             })}
           </ul>
         ) : (
-          <p className="mt-1 text-xs text-slate-500">Sin afectaciones reportadas</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {event.hasDamage ? "Con daños en cultivos o servicios" : "La SNGR no registró afectaciones"}
+          </p>
         )}
       </section>
 

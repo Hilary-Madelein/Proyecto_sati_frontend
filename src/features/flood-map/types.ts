@@ -228,14 +228,13 @@ export type HazardType =
   | "soil_creep"
   | "other";
 
-/** Impacto según las cifras de daños (lo calcula el backend). */
-export type ImpactLevel = "high" | "medium" | "low";
-
 export interface EventImpact {
   affected: number;
   housesAffected: number;
   evacuated: number;
   deceased: number;
+  /** Damnificados: perdieron la vivienda o no pueden habitarla. */
+  homeless: number;
 }
 
 export interface HazardEvent {
@@ -252,10 +251,8 @@ export interface HazardEvent {
   province: string | null;
   canton: string | null;
   sector: string | null;
-  /** Río, estero o quebrada que se desbordó ("Río Balao"). */
-  waterBody: string | null;
-  impactLevel: ImpactLevel | null;
-  impactLevelLabel: string | null;
+  /** La SNGR registró daño en personas, viviendas, cultivos o servicios (no solo calles con agua). */
+  hasDamage: boolean;
   position: LatLng;
   /** Fecha ISO 8601 en que ocurrió el evento. */
   occurredAt: string;
@@ -273,6 +270,8 @@ export interface EventFilters {
   province: string | null;
   /** null = todos los tipos. */
   hazardType: HazardType | null;
+  /** Mostrar también los moderados sin afectaciones registradas (ver isUnverifiedEvent). */
+  showUnverified: boolean;
 }
 
 /** Resultado de pedir los eventos al backend: si falla, la interfaz lo muestra. */

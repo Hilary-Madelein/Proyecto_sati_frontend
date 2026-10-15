@@ -28,6 +28,13 @@ export function sortEventsByPriority(events: HazardEvent[]) {
 }
 
 /**
+ * Moderado (Nivel 1) sin ninguna afectación registrada: casi siempre calles con
+ * agua que luego drenó. Los críticos y altos se muestran siempre, aunque aún no
+ * tengan cifras (la SNGR las completa mientras evalúa).
+ */
+export const isUnverifiedEvent = (event: HazardEvent) => event.severity === "moderate" && !event.hasDamage;
+
+/**
  * Aplica los filtros de eventos. `now` es la hora de la consulta al backend
  * (no la del reloj), así el servidor y el navegador filtran exactamente igual.
  * Con `ignoreSeverity`, sirve para contar cuántos hay de cada severidad.
@@ -44,6 +51,7 @@ export function filterEvents(
     (event) =>
       Date.parse(event.occurredAt) >= since &&
       (ignoreSeverity || filters.severities.includes(event.severity)) &&
+      (filters.showUnverified || !isUnverifiedEvent(event)) &&
       (!filters.province || event.province === filters.province) &&
       (!filters.hazardType || event.hazardType === filters.hazardType),
   );

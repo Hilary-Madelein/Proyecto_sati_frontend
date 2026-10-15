@@ -266,6 +266,7 @@ export const DEFAULT_EVENT_FILTERS: EventFilters = {
   period: "24h",
   province: null,
   hazardType: null,
+  showUnverified: false,
 };
 
 /** Eventos que se muestran antes de "Ver más". */

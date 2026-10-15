@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Marker, Popup, Tooltip, useMap } from "react-leaflet";
 import { SEVERITY_STYLES } from "../../constants";
 import type { EventSeverity, HazardEvent } from "../../types";
+import { isUnverifiedEvent } from "../../utils";
 import { EventPopupContent } from "./EventPopupContent";
 
 const iconCache = new Map<string, L.DivIcon>();
@@ -12,13 +13,14 @@ const iconCache = new Map<string, L.DivIcon>();
 /**
  * Marcador del evento (estilos en globals.css → .critical-marker). Solo los
  * críticos y altos llevan pulso: con decenas de eventos, que todo parpadee
- * distraería de lo importante.
+ * distraería de lo importante. Los moderados sin afectaciones (si se muestran)
+ * van además atenuados.
  */
-function getEventIcon(severity: EventSeverity, selected: boolean) {
-  const key = `${severity}-${selected}`;
+function getEventIcon(severity: EventSeverity, selected: boolean, unverified: boolean) {
+  const key = `${severity}-${selected}-${unverified}`;
   let icon = iconCache.get(key);
   if (!icon) {
-    const classes = ["critical-marker__wrap", selected && "is-selected", severity === "moderate" && "is-quiet"]
+    const classes = ["critical-marker__wrap", selected && "is-selected", severity === "moderate" && "is-quiet", unverified && "is-unverified"]
       .filter(Boolean)
       .join(" ");
     const pulse = severity === "moderate" ? "" : '<span class="critical-marker__pulse"></span>';
@@ -91,7 +93,7 @@ function EventMarker({
     <Marker
       ref={markerRef}
       position={event.position}
-      icon={getEventIcon(event.severity, selected)}
+      icon={getEventIcon(event.severity, selected, isUnverifiedEvent(event))}
       zIndexOffset={selected ? 1000 : SEVERITY_STYLES[event.severity].rank * -100}
       keyboard
       title={event.title}
