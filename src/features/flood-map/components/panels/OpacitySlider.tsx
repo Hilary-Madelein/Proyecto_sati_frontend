@@ -23,6 +23,7 @@ export function OpacitySlider({ value, onChange, layerName }: OpacitySliderProps
         Opacidad
       </label>
       <input
+        autoComplete="off"
         id={id}
         type="range"
         min={10}

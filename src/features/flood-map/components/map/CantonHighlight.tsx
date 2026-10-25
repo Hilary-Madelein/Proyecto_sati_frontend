@@ -4,14 +4,14 @@ import L from "leaflet";
 import { useEffect, useEffectEvent } from "react";
 import { GeoJSON, Pane, useMap } from "react-leaflet";
 import { SEMAPHORE_STYLES } from "../../constants";
+import type { CantonGeometry } from "../../hooks/useCantonGeometries";
 import type { CantonAnalysis } from "../../types";
 
 const PANE = "cantonHighlight";
 
 /** Contorno del cantón elegido en el análisis, con el color de su semáforo; el mapa lo encuadra al elegirlo. */
-export function CantonHighlight({ canton }: { canton: CantonAnalysis }) {
+export function CantonHighlight({ canton, geometry }: { canton: CantonAnalysis; geometry: CantonGeometry | null }) {
   const map = useMap();
-  const geometry = canton.geometry;
 
   const focus = useEffectEvent(() => {
     const bounds = geometry ? L.geoJSON(geometry).getBounds() : null;

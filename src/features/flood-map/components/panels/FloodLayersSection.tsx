@@ -143,6 +143,7 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
                   </span>
                 </span>
                 <input
+                  autoComplete="off"
                   type="range"
                   min={0}
                   max={Math.max(snapshot.days.length - 1, 0)}

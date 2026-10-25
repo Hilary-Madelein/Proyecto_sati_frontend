@@ -394,36 +394,31 @@ export interface OverlayOpacity {
   sea: number;
 }
 
-// ── Análisis por cantón (lluvia de 12 h, vía backend) ───────────────────
+// ── Análisis por cantón (lluvia pronosticada de 12 y 24 h, vía backend) ─
 export type Semaphore = "green" | "yellow" | "red";
-/** De dónde sale la lluvia del semáforo: pluviómetro del INAMHI o satélite ajustado con las estaciones. */
-export type RainBasis = "station" | "satellite" | "none";
-
-export interface CantonStationReading {
-  code: string;
-  name: string;
-  mm: number;
-  hoursWithData: number;
-  lastTime: string | null;
-}
+/** Ventana que decidió el color (S = máx(S12h, S24h)). */
+export type RainWindow = "12h" | "24h";
+/** Categoría de lluvia del documento, de menor a mayor. */
+export type RainCategory = "minima" | "ligera" | "moderada" | "fuerte" | "intensa" | "torrencial" | "extrema";
 
 /** Un cantón con su semáforo y lo que hay en él (GET /canton-analysis). */
 export interface CantonAnalysis {
   code: string;
   name: string;
   province: string;
+  /** Región del INEC (Costa, Sierra, Amazonía, Región Insular). */
+  region: string | null;
   center: LatLng;
   semaphore: Semaphore;
+  category: RainCategory;
   categoryLabel: string;
   consequences: string;
   actions: string;
-  rain12hMm: number | null;
-  basis: RainBasis;
+  /** Lluvia pronosticada por el WRF en el cantón (percentil 90): próximas 12 h y día 1 de la corrida (24 h). */
+  forecast: { mm12h: number | null; mm24h: number | null; category12h: RainCategory | null; category24h: RainCategory | null };
+  /** Ventana que decidió el color; null si no hay pronóstico. */
+  decidedBy: RainWindow | null;
   triggers: {
-    stations: CantonStationReading[];
-    satellite12hMm: number | null;
-    satellite12hAdjustedMm: number | null;
-    forecast24hMm: number | null;
     riverAlerts: number;
     riverMaxLevel: number;
     floodHubFlagged: number;
@@ -453,22 +448,16 @@ export interface CantonAnalysis {
     roadEventsOpen: number;
     recoveryWorks: number;
   };
-  /** Contorno simplificado; solo viene para los cantones en amarillo o rojo. */
-  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
 }
 
 export interface CantonAnalysisSnapshot {
   updatedAt: string;
-  windowHours: number;
-  satellite: {
-    product: string;
-    from: string;
-    to: string;
-    /** Factor con el que se ajusta el satélite a lo medido por las estaciones; null si hubo pocas con lluvia. */
-    correction: { factor: number; pairs: number } | null;
-  } | null;
   forecastRun: string | null;
-  counts: Record<Semaphore, number> & { stationCantons: number };
+  /** Ventanas del pronóstico usadas (null si la corrida no las tenía). */
+  forecast12h: { from: string; to: string } | null;
+  forecast24h: { from: string; to: string } | null;
+  /** Por color; los cantones sin pronóstico van aparte, no como verdes. */
+  counts: Record<Semaphore, number> & { noData: number };
   /** Del más al menos afectado. */
   cantons: CantonAnalysis[];
   sources: { name: string; ok: boolean; detail: string }[];

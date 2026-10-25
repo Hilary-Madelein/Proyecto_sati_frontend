@@ -75,6 +75,13 @@ export type BasemapId = keyof typeof BASEMAPS;
  * simplificados a ~200 m: 25 polígonos, ~300 KB (~90 KB comprimido). Archivo fijo.
  */
 export const PROVINCE_BOUNDARIES_URL = "/data/provincias-ecuador.geojson";
+
+/**
+ * Contornos de los 224 cantones del INEC (capa "Cantones del Ecuador" de ArcGIS),
+ * simplificados a ~200 m (~670 KB, ~175 KB comprimido), con su código DPA para
+ * unirlos al análisis por cantón. Archivo fijo.
+ */
+export const CANTON_BOUNDARIES_URL = "/data/cantones-ecuador.geojson";
 export const DEFAULT_BASEMAP: BasemapId = "light";
 
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */

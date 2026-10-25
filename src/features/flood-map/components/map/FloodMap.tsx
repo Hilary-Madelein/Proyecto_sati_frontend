@@ -30,7 +30,9 @@ import type {
 } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
+import type { CantonGeometry } from "../../hooks/useCantonGeometries";
 import { CantonHighlight } from "./CantonHighlight";
+import { CantonSemaphoreLayer } from "./CantonSemaphoreLayer";
 import { FeatureHighlight } from "./FeatureHighlight";
 import { FloodHubLayer } from "./FloodHubLayer";
 import { MapClickHandler } from "./MapClickHandler";
@@ -67,6 +69,12 @@ export interface FloodMapProps {
   showImerg: boolean;
   /** Cantón elegido en el análisis por cantón: se resalta y se encuadra. */
   selectedCanton: CantonAnalysis | null;
+  /** Semáforo de todos los cantones (con la pestaña del análisis abierta); null = no se dibuja. */
+  cantonSemaphore: { cantons: CantonAnalysis[]; updatedAt: string } | null;
+  /** Contornos de los cantones por código DPA (null mientras se cargan). */
+  cantonGeometries: ReadonlyMap<string, CantonGeometry> | null;
+  /** Se tocó en el mapa un cantón del semáforo. */
+  onCantonClick: (canton: CantonAnalysis) => void;
   /** Opacidad de cada capa de imagen (deslizadores del panel). */
   opacity: OverlayOpacity;
   onRainLoadingChange: (loading: boolean) => void;
@@ -102,6 +110,9 @@ export default function FloodMap({
   riskFeatureZoomRequest,
   showImerg,
   selectedCanton,
+  cantonSemaphore,
+  cantonGeometries,
+  onCantonClick,
   opacity,
   onRainLoadingChange,
   onObservedRainLoadingChange,
@@ -185,7 +196,15 @@ export default function FloodMap({
       <Pane name={MAP_PANES.risk.name} style={{ zIndex: MAP_PANES.risk.zIndex }} />
       <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={onRiskFeaturesSelect} />
       {selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
-      {selectedCanton && <CantonHighlight canton={selectedCanton} />}
+      {cantonSemaphore && cantonGeometries && (
+        <CantonSemaphoreLayer
+          cantons={cantonSemaphore.cantons}
+          geometries={cantonGeometries}
+          updatedAt={cantonSemaphore.updatedAt}
+          onCantonClick={onCantonClick}
+        />
+      )}
+      {selectedCanton && <CantonHighlight canton={selectedCanton} geometry={cantonGeometries?.get(selectedCanton.code) ?? null} />}
       {/* Marcadores en el panel de Leaflet: su popup queda encima de todo. */}
       {layers.floodHub && data.floodHub && <FloodHubLayer snapshot={data.floodHub} />}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
