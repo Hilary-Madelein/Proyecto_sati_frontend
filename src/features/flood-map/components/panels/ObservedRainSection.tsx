@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { IconTile } from "@/components/ui/IconTile";
 import { CloudRainIcon } from "@/components/ui/icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -13,6 +14,7 @@ import type {
   RainWindowHours,
 } from "../../types";
 import { LoadingBadge, Notice } from "./RainForecastSection";
+import { OpacitySlider } from "./OpacitySlider";
 import { SectionHeading } from "./SectionHeading";
 
 interface ObservedRainSectionProps {
@@ -27,6 +29,12 @@ interface ObservedRainSectionProps {
   accumulated: ObservedAccumulatedRain | null;
   error: string | null;
   isLoading: boolean;
+  /** Otra fila del mismo cuadro (la lluvia en estaciones), debajo del satélite. */
+  children?: ReactNode;
+  /** El cuadro se ve encendido si alguna de sus filas lo está. */
+  active?: boolean;
+  opacity: number;
+  onOpacityChange: (opacity: number) => void;
 }
 
 const staleHint = (status: ObservedRainProductStatus) =>
@@ -47,6 +55,10 @@ export function ObservedRainSection({
   accumulated,
   error,
   isLoading,
+  children,
+  active = visible,
+  opacity,
+  onOpacityChange,
 }: ObservedRainSectionProps) {
   const products = availability?.products ?? [];
   const status = products.find((item) => item.key === product);
@@ -67,9 +79,9 @@ export function ObservedRainSection({
 
   return (
     <section>
-      <SectionHeading aside={isLoading && visible && <LoadingBadge />}>Lluvia observada</SectionHeading>
+      <SectionHeading aside={isLoading && <LoadingBadge />}>Lluvia observada</SectionHeading>
 
-      <div className={cn("rounded-xl p-3 ring-1 transition-colors", visible ? "bg-white ring-slate-200" : "bg-slate-50/70 ring-slate-200/70")}>
+      <div className={cn("rounded-xl p-3 ring-1 transition-colors", active ? "bg-white ring-slate-200" : "bg-slate-50/70 ring-slate-200/70")}>
         <div className="flex items-center gap-3">
           <IconTile className="bg-indigo-50 text-indigo-600">
             <CloudRainIcon className="size-5" />
@@ -98,6 +110,7 @@ export function ObservedRainSection({
               options={hourOptions}
               onChange={(value) => onHoursChange(Number(value) as RainWindowHours)}
             />
+            <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="la lluvia registrada por satélite" />
             {/* El selector solo aparece si hay más de un producto para elegir. */}
             {productOptions.length > 1 && (
               <SegmentedControl
@@ -134,6 +147,8 @@ export function ObservedRainSection({
             )}
           </div>
         )}
+
+        {children && <div className="mt-3 border-t border-slate-100 pt-3">{children}</div>}
       </div>
     </section>
   );

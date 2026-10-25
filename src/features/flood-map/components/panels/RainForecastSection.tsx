@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { FORECAST_DAY_LABELS, FORECAST_DAYS } from "../../constants";
 import type { ForecastDay, RainForecastAvailability } from "../../types";
+import { OpacitySlider } from "./OpacitySlider";
 import { SectionHeading } from "./SectionHeading";
 
 interface RainForecastSectionProps {
@@ -17,6 +18,8 @@ interface RainForecastSectionProps {
   onVisibleChange: (visible: boolean) => void;
   error: string | null;
   isLoading: boolean;
+  opacity: number;
+  onOpacityChange: (opacity: number) => void;
 }
 
 /** Lluvia pronosticada por el modelo WRF del INAMHI, un día a la vez (no acumulada). */
@@ -28,6 +31,8 @@ export function RainForecastSection({
   onVisibleChange,
   error,
   isLoading,
+  opacity,
+  onOpacityChange,
 }: RainForecastSectionProps) {
   const period = rain?.days.find((item) => item.day === day);
   const options = FORECAST_DAYS.map((option) => {
@@ -64,7 +69,7 @@ export function RainForecastSection({
 
         {/* Las opciones solo aparecen con la capa encendida. */}
         {visible && (
-          <div className="mt-3">
+          <div className="mt-3 space-y-3">
             <SegmentedControl
               name="rain-forecast-day"
               label="Tramo de 24 h del pronóstico"
@@ -72,6 +77,7 @@ export function RainForecastSection({
               options={options}
               onChange={(value) => onDayChange(Number(value) as ForecastDay)}
             />
+            <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="la lluvia pronosticada" />
           </div>
         )}
 

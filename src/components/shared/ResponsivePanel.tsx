@@ -217,8 +217,9 @@ export function ResponsivePanel({
       >
         {icon}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-slate-900">{title}</h2>
-          {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
+          {/* Título y subtítulo pueden ocupar varias líneas: así se leen completos. */}
+          <h2 className="text-sm font-semibold text-pretty text-slate-900">{title}</h2>
+          {subtitle && <p className="text-xs text-pretty text-slate-500">{subtitle}</p>}
         </div>
         <button
           type="button"

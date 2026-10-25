@@ -3,6 +3,7 @@ import { satiGet, SatiApiError } from "@/lib/api/sati-api";
 import { EVENTS_WINDOW_DAYS } from "../constants";
 import type {
   EventsFeed,
+  FloodHubSnapshot,
   FloodMapData,
   HazardEvent,
   ObservedRainAvailability,
@@ -10,12 +11,10 @@ import type {
   RiverAlertsSnapshot,
   SeaTemperatureAnomaly,
 } from "../types";
-import { MOCK_FLOOD_LAYERS } from "./mock-data";
 
 /*
- * Punto único de acceso a los datos del mapa (se ejecuta en el servidor).
- * - Eventos, lluvia y caudales: backend SATI.EC.
- * - Inundaciones repentinas e históricas: aún simuladas (sin fuente).
+ * Punto único de acceso a los datos del mapa (se ejecuta en el servidor):
+ * eventos, lluvia, caudales y Google Flood Hub, todo del backend SATI.EC.
  */
 
 /** Forma de un evento en la API del backend (GET /events). */
@@ -29,14 +28,15 @@ interface ApiEventsPage {
 }
 
 export async function getFloodMapData(): Promise<FloodMapData> {
-  const [eventsFeed, rain, observedRain, seaTemperature, riverAlerts] = await Promise.all([
+  const [eventsFeed, rain, observedRain, seaTemperature, riverAlerts, floodHub] = await Promise.all([
     getEventsFeed(),
     getRainAvailability(),
     getObservedRainAvailability(),
     getSeaTemperature(),
     getRiverAlerts(),
+    getFloodHub(),
   ]);
-  return { ...MOCK_FLOOD_LAYERS, eventsFeed, rain, observedRain, seaTemperature, riverAlerts };
+  return { eventsFeed, rain, observedRain, seaTemperature, riverAlerts, floodHub };
 }
 
 /** Eventos abiertos de los últimos días. Si el backend falla, devuelve el error en vez de lanzar. */
@@ -82,6 +82,15 @@ async function getSeaTemperature(): Promise<SeaTemperatureAnomaly | null> {
 async function getRiverAlerts(): Promise<RiverAlertsSnapshot | null> {
   try {
     return await satiGet<RiverAlertsSnapshot>("/rivers/alerts", undefined, 20_000);
+  } catch {
+    return null;
+  }
+}
+
+/** Último pronóstico de Google Flood Hub en los puntos del Ecuador. */
+async function getFloodHub(): Promise<FloodHubSnapshot | null> {
+  try {
+    return await satiGet<FloodHubSnapshot>("/flood-hub", undefined, 20_000);
   } catch {
     return null;
   }

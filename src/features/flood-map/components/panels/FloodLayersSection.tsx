@@ -1,16 +1,9 @@
 import { IconTile } from "@/components/ui/IconTile";
-import { AlertTriangleIcon, HistoryIcon, WavesIcon, ZapIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, WavesIcon } from "@/components/ui/icons";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
-import { formatCalendarDate } from "@/lib/format";
-import {
-  FLASH_FLOOD_ORDER,
-  FLASH_FLOOD_PROBABILITIES,
-  FLUVIAL_LEVEL_ORDER,
-  FLUVIAL_LEVELS,
-  HISTORICAL_FREQUENCIES,
-  HISTORICAL_FREQUENCY_ORDER,
-} from "../../constants";
+import { formatCalendarDate, formatDateTime } from "@/lib/format";
+import { FLOOD_HUB_FLAGGED_ORDER, FLOOD_HUB_SEVERITIES } from "../../constants";
 import type { FloodLayerId, FloodMapData, LayerVisibility } from "../../types";
 import { alertLevelForDay } from "../../utils";
 import { LayerCard } from "./LayerCard";
@@ -33,98 +26,55 @@ function countBy<T, K extends string>(items: T[], key: (item: T) => K) {
   return (value: K) => counts[value] ?? 0;
 }
 
-export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange }: FloodLayersSectionProps) {
-  const stationsByLevel = countBy(data.fluvialStations, (station) => station.level);
-  const zonesByProbability = countBy(data.flashFloodZones, (zone) => zone.probability);
-  const zonesByFrequency = countBy(data.historicalZones, (zone) => zone.frequency);
+/** Pronóstico de inundaciones del INAMHI: red de ríos y alertas por caudal (GEOGLOWS). */
+export function RiversSection(props: FloodLayersSectionProps) {
+  return (
+    <section>
+      <SectionHeading>Pronóstico de inundaciones</SectionHeading>
+      <RiversCard {...props} />
+    </section>
+  );
+}
+
+/** Pronóstico de Google Flood Hub: nivel de inundación previsto en cada punto de los ríos. */
+export function FloodHubSection({ data, layers, onToggleLayer }: Pick<FloodLayersSectionProps, "data" | "layers" | "onToggleLayer">) {
+  const snapshot = data.floodHub;
+  const bySeverity = countBy(snapshot?.gauges ?? [], (gauge) => gauge.severity);
+  const meta = snapshot
+    ? `${snapshot.flaggedCount} ${snapshot.flaggedCount === 1 ? "punto" : "puntos"} con aviso de ${snapshot.gauges.length.toLocaleString("es-EC")}`
+    : "Sin conexión con Flood Hub";
 
   return (
-    <section className="space-y-5">
-      <div>
-        <SectionHeading>Caudales de ríos</SectionHeading>
-        <RiversCard
-          data={data}
-          layers={layers}
-          onToggleLayer={onToggleLayer}
-          alertDayIndex={alertDayIndex}
-          onAlertDayChange={onAlertDayChange}
-        />
-      </div>
-
-      <div>
-        <SectionHeading aside={<span className="text-[10px] font-medium text-amber-700">Datos simulados</span>}>
-          Datos de inundaciones
-        </SectionHeading>
-        <div className="space-y-2">
-          <LayerCard
-            title="Inundaciones fluviales"
-            meta={`${data.fluvialStations.length} estaciones`}
-            icon={
-              <IconTile className="bg-blue-50 text-blue-600">
-                <WavesIcon className="size-5" />
-              </IconTile>
-            }
-            enabled={layers.fluvial}
-            onToggle={(enabled) => onToggleLayer("fluvial", enabled)}
-          >
-            {FLUVIAL_LEVEL_ORDER.map((level) => (
-              <LegendItem
-                key={level}
-                label={FLUVIAL_LEVELS[level].label}
-                color={FLUVIAL_LEVELS[level].color}
-                count={stationsByLevel(level)}
-              />
-            ))}
-          </LayerCard>
-
-          <LayerCard
-            title="Inundaciones repentinas"
-            meta={`Próximas 24h · ${data.flashFloodZones.length} zonas`}
-            icon={
-              <IconTile className="bg-orange-50 text-orange-600">
-                <ZapIcon className="size-5" />
-              </IconTile>
-            }
-            enabled={layers.flash}
-            onToggle={(enabled) => onToggleLayer("flash", enabled)}
-          >
-            {FLASH_FLOOD_ORDER.map((probability) => {
-              const style = FLASH_FLOOD_PROBABILITIES[probability];
-              return (
-                <LegendItem
-                  key={probability}
-                  shape="square"
-                  label={style.label}
-                  color={style.fill}
-                  borderColor={style.stroke}
-                  count={zonesByProbability(probability)}
-                />
-              );
-            })}
-          </LayerCard>
-
-          <LayerCard
-            title="Inundaciones históricas"
-            meta="Frecuencia de inundación"
-            icon={
-              <IconTile className="bg-purple-50 text-purple-600">
-                <HistoryIcon className="size-5" />
-              </IconTile>
-            }
-            enabled={layers.historical}
-            onToggle={(enabled) => onToggleLayer("historical", enabled)}
-          >
-            {HISTORICAL_FREQUENCY_ORDER.map((frequency) => (
-              <LegendItem
-                key={frequency}
-                label={HISTORICAL_FREQUENCIES[frequency].label}
-                color={HISTORICAL_FREQUENCIES[frequency].color}
-                count={zonesByFrequency(frequency)}
-              />
-            ))}
-          </LayerCard>
-        </div>
-      </div>
+    <section>
+      <SectionHeading>Google Flood Hub</SectionHeading>
+      <LayerCard
+        title="Pronóstico de Flood Hub"
+        meta={meta}
+        icon={
+          <IconTile className="bg-blue-50 text-blue-600">
+            <WavesIcon className="size-5" />
+          </IconTile>
+        }
+        enabled={layers.floodHub}
+        onToggle={(enabled) => onToggleLayer("floodHub", enabled)}
+      >
+        {FLOOD_HUB_FLAGGED_ORDER.map((severity) => (
+          <LegendItem
+            key={severity}
+            shape="square"
+            label={FLOOD_HUB_SEVERITIES[severity].label}
+            color={FLOOD_HUB_SEVERITIES[severity].color}
+            borderColor="#ffffff"
+            count={bySeverity(severity)}
+          />
+        ))}
+        <li className="col-span-2 text-[11px] text-slate-500">
+          Puntos de los ríos donde el modelo de Google prevé un nivel sobre lo normal en los próximos días; los demás no se
+          muestran.
+          {snapshot?.issuedAt && ` Emitido el ${formatDateTime(snapshot.issuedAt)}.`} {snapshot?.attribution}
+          {snapshot?.isStale && " La fuente no responde: se muestra la última descarga."}
+        </li>
+      </LayerCard>
     </section>
   );
 }

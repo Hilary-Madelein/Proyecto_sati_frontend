@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime, formatSigned } from "@/lib/format";
 import type { SeaTemperatureAnomaly } from "../../types";
 import { LoadingBadge, Notice } from "./RainForecastSection";
+import { OpacitySlider } from "./OpacitySlider";
 import { SectionHeading } from "./SectionHeading";
 
 interface SeaTemperatureSectionProps {
@@ -13,13 +14,15 @@ interface SeaTemperatureSectionProps {
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
   isLoading: boolean;
+  opacity: number;
+  onOpacityChange: (opacity: number) => void;
 }
 
 /**
  * Cuánto más cálido (o frío) está el mar que lo normal frente a Ecuador, el
  * indicador con el que se vigila El Niño. No es pronóstico: es el dato diario más reciente.
  */
-export function SeaTemperatureSection({ sea, visible, onVisibleChange, isLoading }: SeaTemperatureSectionProps) {
+export function SeaTemperatureSection({ sea, visible, onVisibleChange, isLoading, opacity, onOpacityChange }: SeaTemperatureSectionProps) {
   return (
     <section>
       <SectionHeading aside={isLoading && visible && <LoadingBadge />}>Océano · El Niño</SectionHeading>
@@ -42,6 +45,7 @@ export function SeaTemperatureSection({ sea, visible, onVisibleChange, isLoading
 
         {visible && sea && (
           <div className="mt-3 space-y-2">
+            <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="la anomalía de temperatura del mar" />
             {sea.nino12Anomaly !== null && (
               <p className="rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
                 Región Niño 1+2 (costa de Ecuador y Perú):{" "}
