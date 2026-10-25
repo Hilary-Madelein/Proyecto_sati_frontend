@@ -152,6 +152,7 @@ export function CriticalEventsPanel({
       {unverifiedCount > 0 && (
         <label className="flex cursor-pointer items-start gap-2 text-[11px] text-slate-500">
           <input
+            autoComplete="off"
             type="checkbox"
             checked={filters.showUnverified}
             onChange={(event) => update({ showUnverified: event.target.checked })}
@@ -264,6 +265,7 @@ function FilterSelect({
     <label className="relative block">
       <span className="sr-only">{label}</span>
       <select
+        autoComplete="off"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(

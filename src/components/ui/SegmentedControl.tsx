@@ -20,6 +20,8 @@ interface SegmentedControlProps<T extends string> {
 /**
  * Grupo de opciones tipo "píldora". Usa radios nativos ocultos, así funcionan
  * las flechas del teclado y los lectores de pantalla sin código extra.
+ * Con autoComplete="off": si no, al recargar (F5) el navegador (p. ej. Firefox)
+ * vuelve a marcar la última opción aunque la página haya vuelto a la inicial.
  */
 export function SegmentedControl<T extends string>({
   name,
@@ -34,6 +36,7 @@ export function SegmentedControl<T extends string>({
       {options.map((option) => (
         <label key={option.value} className="relative" title={option.hint}>
           <input
+            autoComplete="off"
             type="radio"
             name={name}
             value={option.value}

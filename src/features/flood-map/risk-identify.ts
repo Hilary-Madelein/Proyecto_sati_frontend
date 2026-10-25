@@ -73,6 +73,13 @@ function nearLine(line: Position[], click: Projected, project: (position: Positi
   return false;
 }
 
+/** Si un polígono o multipolígono (GeoJSON) contiene el punto. */
+export function geometryContains(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon, latlng: L.LatLng): boolean {
+  return geometry.type === "Polygon"
+    ? inPolygon(geometry.coordinates, latlng)
+    : geometry.coordinates.some((polygon) => inPolygon(polygon, latlng));
+}
+
 /** Dentro del anillo exterior y fuera de los huecos. */
 function inPolygon(rings: Position[][], latlng: L.LatLng): boolean {
   const [outer, ...holes] = rings;

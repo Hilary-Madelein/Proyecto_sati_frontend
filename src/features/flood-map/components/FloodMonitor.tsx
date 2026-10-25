@@ -24,7 +24,9 @@ import {
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
+import { DEFAULT_CANTON_FILTERS, filterCantons, type CantonFilters } from "../canton-filters";
 import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
+import { useCantonGeometries } from "../hooks/useCantonGeometries";
 import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
@@ -144,6 +146,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [eventsTab, setEventsTab] = useState<"events" | "analysis">("events");
   const cantonAnalysis = useCantonAnalysis(eventsTab === "analysis");
   const [selectedCanton, setSelectedCanton] = useState<CantonAnalysis | null>(null);
+  // Filtros del análisis: la lista y el mapa muestran los mismos cantones.
+  const [cantonFilters, setCantonFilters] = useState<CantonFilters>(DEFAULT_CANTON_FILTERS);
+  const cantonSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
+  const cantonGeometries = useCantonGeometries(eventsTab === "analysis");
 
   const { events, fetchedAt, error: eventsError } = data.eventsFeed;
   // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
@@ -280,6 +286,19 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           riskFeatureZoomRequest={featureDetail.zoomRequest}
           showImerg={showImerg}
           selectedCanton={eventsTab === "analysis" ? selectedCanton : null}
+          cantonSemaphore={
+            cantonSnapshot && {
+              cantons: filterCantons(cantonSnapshot.cantons, cantonFilters).listed,
+              updatedAt: cantonSnapshot.updatedAt,
+            }
+          }
+          cantonGeometries={cantonGeometries}
+          onCantonClick={(canton) => {
+            // La ficha está en el panel del análisis: se abre si estaba cerrado.
+            setSelectedCanton(canton);
+            if (window.matchMedia("(min-width: 1024px)").matches) openDesktopPanel("events");
+            else openMobileSheet("events");
+          }}
           opacity={opacity}
           onRainLoadingChange={setRainLoading}
           onObservedRainLoadingChange={setObservedRainLoading}
@@ -405,8 +424,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           subtitle={
             eventsTab === "analysis"
               ? cantonAnalysis.snapshot
-                ? `Lluvia de 12 h · INAMHI y satélite · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
-                : "Lluvia de 12 h · INAMHI y satélite"
+                ? `Pronóstico de lluvia de 12 y 24 h · WRF · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
+                : "Pronóstico de lluvia de 12 y 24 h · WRF"
               : eventsError
                 ? "Sin conexión con el servidor de datos"
                 : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
@@ -458,6 +477,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               isLoading={cantonAnalysis.isLoading}
               selectedCode={selectedCanton?.code ?? null}
               onSelect={setSelectedCanton}
+              filters={cantonFilters}
+              onFiltersChange={setCantonFilters}
             />
           )}
         </ResponsivePanel>
