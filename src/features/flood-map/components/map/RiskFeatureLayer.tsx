@@ -39,7 +39,7 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
       for (const { style } of layers) if (style.geometry === geometry) groups.current.get(style.id)?.bringToFront();
     }
   });
-  const drawn = layers.map(({ style, data }) => `${style.id}:${data.fetchedAt}`).join("|");
+  const drawn = layers.map(({ style, data }) => `${style.id}:${data.fetchedAt}:${data.view ?? ""}`).join("|");
   useEffect(() => reorder(), [drawn]);
 
   // Puntos más chicos con el mapa alejado: si no, a escala nacional se vuelven una mancha.
@@ -65,11 +65,11 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
   };
 
   return layers.map(({ style, data }) => {
-    const key = `${style.id}:${data.fetchedAt}`;
+    // Se vuelve a crear con cada descarga nueva o cambio de filtro (periodo).
+    const key = `${style.id}:${data.fetchedAt}:${data.view ?? ""}`;
     if (style.cluster && style.geometry === "point") {
       return (
         <ClusteredRiskPoints
-          // Se vuelve a crear cuando llega una descarga nueva.
           key={key}
           style={style}
           data={data}
@@ -81,7 +81,7 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
     }
     return (
       <GeoJSON
-        // Se vuelve a crear cuando llega una descarga nueva (GeoJSON de react-leaflet no se actualiza solo).
+        // GeoJSON de react-leaflet no se actualiza solo: se recrea con la clave.
         key={key}
         ref={(group) => {
           if (group) groups.current.set(style.id, group);

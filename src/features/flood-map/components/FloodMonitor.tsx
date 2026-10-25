@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { FloatingButton } from "@/components/ui/FloatingButton";
 import { IconTile } from "@/components/ui/IconTile";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CircleDotIcon, LayersIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -23,14 +24,16 @@ import {
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
+import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
 import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
-import { RISK_LAYER_STYLES } from "../risk-layers";
+import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodMonths } from "../risk-layers";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
   ActiveLayer,
+  CantonAnalysis,
   EventFilters,
   OverlayOpacity,
   RiskComponentId,
@@ -48,6 +51,7 @@ import type {
 } from "../types";
 import { RainLegend } from "./map/RainLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
+import { CantonAnalysisPanel } from "./panels/CantonAnalysisPanel";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { RISK_COMPONENT_ICONS, RiskComponentBar } from "./navigation/RiskComponentBar";
 import { ActiveLayersBar } from "./panels/ActiveLayersBar";
@@ -106,7 +110,18 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYER_VISIBILITY);
   // Capas de gestión del riesgo (servicios de ArcGIS y GeoJSON propios): apagadas al inicio, se piden al encenderlas.
   const [riskLayersOn, setRiskLayersOn] = useState<ReadonlySet<string>>(() => new Set());
-  const riskLayerState = useRiskLayers([...riskLayersOn]);
+  // Varias capas pueden salir de la misma del backend (p. ej. albergues y campamentos): se pide una vez.
+  const riskLayerState = useRiskLayers([
+    ...new Set(RISK_LAYER_STYLES.filter((style) => riskLayersOn.has(style.id)).map(riskDataId)),
+  ]);
+  // Periodo elegido en las capas con fecha (si no se eligió, el de la capa).
+  const [riskPeriods, setRiskPeriods] = useState<Record<string, RiskPeriodMonths>>({});
+  const periodOf = (style: RiskLayerStyle) => (style.id in riskPeriods ? riskPeriods[style.id] : (style.period?.defaultMonths ?? null));
+  /** Estado de la capa con sus datos ya filtrados (su parte y su periodo). */
+  const riskViewState = (style: RiskLayerStyle) => {
+    const state = riskLayerState(riskDataId(style));
+    return state.data ? { ...state, data: riskLayerView(style, state.data, periodOf(style)) } : state;
+  };
   // Panel de detalle al tocar una entidad de esas capas.
   const featureDetail = useFeatureDetail([...riskLayersOn]);
   // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
@@ -125,6 +140,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [mobileSheet, setMobileSheet] = useState<PanelId | null>(null);
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const [eventFilters, setEventFilters] = useState<EventFilters>(DEFAULT_EVENT_FILTERS);
+  // Segunda pestaña del panel de eventos: semáforo de lluvia de 12 h por cantón.
+  const [eventsTab, setEventsTab] = useState<"events" | "analysis">("events");
+  const cantonAnalysis = useCantonAnalysis(eventsTab === "analysis");
+  const [selectedCanton, setSelectedCanton] = useState<CantonAnalysis | null>(null);
 
   const { events, fetchedAt, error: eventsError } = data.eventsFeed;
   // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
@@ -183,7 +202,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   ].filter((layer) => layer !== false);
   // Se dibujan en el orden del catálogo, con los datos ya recibidos.
   const visibleRiskLayers = RISK_LAYER_STYLES.flatMap((style) => {
-    const data = riskLayersOn.has(style.id) ? riskLayerState(style.id).data : null;
+    const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
     return data ? [{ style, data }] : [];
   });
   const activeCounts = Object.fromEntries(
@@ -260,6 +279,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           selectedRiskFeature={featureDetail.selected}
           riskFeatureZoomRequest={featureDetail.zoomRequest}
           showImerg={showImerg}
+          selectedCanton={eventsTab === "analysis" ? selectedCanton : null}
           opacity={opacity}
           onRainLoadingChange={setRainLoading}
           onObservedRainLoadingChange={setObservedRainLoading}
@@ -345,7 +365,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   onAlertDayChange={setAlertDayIndex}
                 />
                 <FloodHubSection data={data} layers={layers} onToggleLayer={toggleLayer} />
-                <RiskLayersSection component="amenaza" enabled={riskLayersOn} onToggle={toggleRiskLayer} stateOf={riskLayerState} />
+                <RiskLayersSection
+                  component="amenaza"
+                  enabled={riskLayersOn}
+                  onToggle={toggleRiskLayer}
+                  stateOf={riskViewState}
+                  periodOf={periodOf}
+                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                />
                 <SeaTemperatureSection
                   sea={data.seaTemperature}
                   visible={showSea}
@@ -357,7 +384,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               </div>
             ) : (
               <div>
-                <RiskLayersSection component={riskTab} enabled={riskLayersOn} onToggle={toggleRiskLayer} stateOf={riskLayerState} />
+                <RiskLayersSection
+                  component={riskTab}
+                  enabled={riskLayersOn}
+                  onToggle={toggleRiskLayer}
+                  stateOf={riskViewState}
+                  periodOf={periodOf}
+                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                />
                 <p className="mt-3 text-[11px] text-slate-500">
                   Lo que enciendas en cualquier componente se ve junto en el mapa, para cruzar la información.
                 </p>
@@ -367,11 +401,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         </ResponsivePanel>
 
         <ResponsivePanel
-          title="Eventos críticos"
+          title={eventsTab === "analysis" ? "Análisis por cantón" : "Eventos críticos"}
           subtitle={
-            eventsError
-              ? "Sin conexión con el servidor de datos"
-              : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
+            eventsTab === "analysis"
+              ? cantonAnalysis.snapshot
+                ? `Lluvia de 12 h · INAMHI y satélite · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
+                : "Lluvia de 12 h · INAMHI y satélite"
+              : eventsError
+                ? "Sin conexión con el servidor de datos"
+                : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
           }
           icon={<PulsingAlertIcon />}
           mobileOpen={mobileSheet === "events"}
@@ -379,6 +417,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onClose={() => closePanel("events")}
           desktopClassName="lg:bottom-6 lg:left-4 lg:right-auto lg:w-90 lg:max-h-[calc(100%-11rem)]"
           desktopFooter={
+            eventsTab === "events" &&
             events.length > 0 && (
               <EventsExpandButton
                 expanded={eventsExpanded}
@@ -388,17 +427,39 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             )
           }
         >
-          <CriticalEventsPanel
-            events={events}
-            filteredEvents={filteredEvents}
-            filters={eventFilters}
-            onFiltersChange={setEventFilters}
-            fetchedAt={fetchedAt}
-            error={eventsError}
-            selectedId={selectedEventId}
-            onSelect={selectEvent}
-            expanded={eventsExpanded}
-          />
+          <div className="mb-3">
+            <SegmentedControl
+              name="events-tab"
+              label="Contenido del panel"
+              value={eventsTab}
+              options={[
+                { value: "events", label: "Eventos" },
+                { value: "analysis", label: "Análisis por cantón" },
+              ]}
+              onChange={setEventsTab}
+            />
+          </div>
+          {eventsTab === "events" ? (
+            <CriticalEventsPanel
+              events={events}
+              filteredEvents={filteredEvents}
+              filters={eventFilters}
+              onFiltersChange={setEventFilters}
+              fetchedAt={fetchedAt}
+              error={eventsError}
+              selectedId={selectedEventId}
+              onSelect={selectEvent}
+              expanded={eventsExpanded}
+            />
+          ) : (
+            <CantonAnalysisPanel
+              snapshot={cantonAnalysis.snapshot}
+              error={cantonAnalysis.error}
+              isLoading={cantonAnalysis.isLoading}
+              selectedCode={selectedCanton?.code ?? null}
+              onSelect={setSelectedCanton}
+            />
+          )}
         </ResponsivePanel>
 
         <FeatureDetailPanel

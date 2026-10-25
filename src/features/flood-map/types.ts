@@ -365,6 +365,8 @@ export interface RiskLayerData {
   omitted: number;
   /** Las entidades pueden tener fotos (GET /risk-layers/:id/features/:objectId/attachments). */
   hasAttachments: boolean;
+  /** Filtro aplicado en el navegador (parte de la capa, periodo); al cambiar, la capa se vuelve a dibujar. */
+  view?: string;
   type: "FeatureCollection";
   features: RiskFeature[];
 }
@@ -390,4 +392,84 @@ export interface OverlayOpacity {
   observed: number;
   imerg: number;
   sea: number;
+}
+
+// ── Análisis por cantón (lluvia de 12 h, vía backend) ───────────────────
+export type Semaphore = "green" | "yellow" | "red";
+/** De dónde sale la lluvia del semáforo: pluviómetro del INAMHI o satélite ajustado con las estaciones. */
+export type RainBasis = "station" | "satellite" | "none";
+
+export interface CantonStationReading {
+  code: string;
+  name: string;
+  mm: number;
+  hoursWithData: number;
+  lastTime: string | null;
+}
+
+/** Un cantón con su semáforo y lo que hay en él (GET /canton-analysis). */
+export interface CantonAnalysis {
+  code: string;
+  name: string;
+  province: string;
+  center: LatLng;
+  semaphore: Semaphore;
+  categoryLabel: string;
+  consequences: string;
+  actions: string;
+  rain12hMm: number | null;
+  basis: RainBasis;
+  triggers: {
+    stations: CantonStationReading[];
+    satellite12hMm: number | null;
+    satellite12hAdjustedMm: number | null;
+    forecast24hMm: number | null;
+    riverAlerts: number;
+    riverMaxLevel: number;
+    floodHubFlagged: number;
+    sngrEvents: number;
+    criticalPoints: number;
+  };
+  exposed: {
+    population: number | null;
+    schools: number;
+    schoolsHighFlood: number;
+    students: number;
+    healthCenters: number;
+    healthFloodSusceptible: number;
+    rveKm: number;
+    rveCautionKm: number;
+    bridges: number;
+    bridgesBad: number;
+    floodTowns: number;
+  };
+  preventive: { actions: number; enosWorksActive: number; culverts: number };
+  response: {
+    shelters: number;
+    sheltersActive: number;
+    machinery: number;
+    machineryOperational: number;
+    camps: number;
+    roadEventsOpen: number;
+    recoveryWorks: number;
+  };
+  /** Contorno simplificado; solo viene para los cantones en amarillo o rojo. */
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
+}
+
+export interface CantonAnalysisSnapshot {
+  updatedAt: string;
+  windowHours: number;
+  satellite: {
+    product: string;
+    from: string;
+    to: string;
+    /** Factor con el que se ajusta el satélite a lo medido por las estaciones; null si hubo pocas con lluvia. */
+    correction: { factor: number; pairs: number } | null;
+  } | null;
+  forecastRun: string | null;
+  counts: Record<Semaphore, number> & { stationCantons: number };
+  /** Del más al menos afectado. */
+  cantons: CantonAnalysis[];
+  sources: { name: string; ok: boolean; detail: string }[];
 }

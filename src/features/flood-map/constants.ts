@@ -11,6 +11,7 @@ import type {
   ForecastDay,
   RainWindowHours,
   RiskComponentId,
+  Semaphore,
   StationRainLevel,
   WeatherStationCategory,
 } from "./types";
@@ -29,11 +30,52 @@ export const MAP_CONFIG = {
   minZoom: 5,
   maxZoom: 18,
   focusZoom: 10,
-  tiles: {
+} as const;
+
+const ESRI_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services";
+
+/**
+ * Mapas base que se pueden elegir. El gris claro deja resaltar las capas de
+ * colores encima; sus nombres (ciudades, provincias) van en una capa aparte.
+ * `provinceLinesMaxZoom`: hasta qué zoom se dibujan los límites provinciales
+ * propios (ver ProvinceBoundaries); null = nunca, porque el mapa ya los trae.
+ */
+export const BASEMAPS: Record<
+  "light" | "streets",
+  {
+    label: string;
+    url: string;
+    attribution: string;
+    maxNativeZoom?: number;
+    labelsUrl?: string;
+    provinceLinesMaxZoom: number | null;
+  }
+> = {
+  light: {
+    label: "Gris claro",
+    url: `${ESRI_TILES}/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
+    labelsUrl: `${ESRI_TILES}/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
+    // Más cerca no hay teselas: Leaflet amplía las del zoom 16.
+    maxNativeZoom: 16,
+    attribution: "Esri, HERE, Garmin, &copy; colaboradores de OpenStreetMap",
+    // Desde el zoom 8 el mapa gris dibuja sus propias provincias: se dejan las suyas, sin repetirlas.
+    provinceLinesMaxZoom: 7,
+  },
+  streets: {
+    label: "Calles",
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    provinceLinesMaxZoom: null,
   },
-} as const;
+};
+export type BasemapId = keyof typeof BASEMAPS;
+
+/**
+ * Límites de las provincias del INEC (capa "Provincias del Ecuador" de ArcGIS),
+ * simplificados a ~200 m: 25 polígonos, ~300 KB (~90 KB comprimido). Archivo fijo.
+ */
+export const PROVINCE_BOUNDARIES_URL = "/data/provincias-ecuador.geojson";
+export const DEFAULT_BASEMAP: BasemapId = "light";
 
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */
 export const MAP_PANES = {
@@ -44,6 +86,9 @@ export const MAP_PANES = {
   // Un solo lienzo para todas las capas de gestión del riesgo: con uno por capa (o por
   // geometría), el de arriba se queda con los clics y las de abajo no se pueden tocar.
   risk: { name: "risk", zIndex: 395 },
+  // Límites de provincias y nombres del mapa base gris: encima de la lluvia, debajo de las capas de riesgo.
+  provinces: { name: "provinces", zIndex: 386 },
+  basemapLabels: { name: "basemapLabels", zIndex: 390 },
   rivers: { name: "rivers", zIndex: 380 },
 } as const;
 
@@ -152,6 +197,14 @@ export const FLOOD_HUB_SEVERITIES: Record<FloodHubSeverity, { label: string; col
   above_normal: { label: "Sobre lo normal", color: "#f59e0b", sizePx: 14 },
   no_flooding: { label: "Sin inundación", color: "#94a3b8", sizePx: 10 },
   unknown: { label: "Sin dato", color: "#cbd5e1", sizePx: 10 },
+};
+
+// ── Análisis por cantón (lluvia de 12 h) ────────────────────────────────
+/** Semáforo del documento de la SNGR, en tres colores (el naranja pasa a rojo). */
+export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; color: string; panelClass: string }> = {
+  red: { label: "Rojo", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
+  yellow: { label: "Amarillo", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
+  green: { label: "Verde", color: "#16a34a", panelClass: "bg-green-50 text-green-900 ring-1 ring-green-600/20" },
 };
 
 /** Niveles con aviso, los únicos que se dibujan (de mayor a menor). */
@@ -325,13 +378,6 @@ export const PLANNED_LAYERS: Record<RiskComponentId, readonly PlannedLayer[]> = 
       icon: "users",
     },
   ],
-  respuesta: [
-    {
-      id: "rve-recovery",
-      title: "Trabajos para recuperar la transitabilidad en la RVE",
-      description: "El servicio compartido solo permite llenar el formulario; falta su vista de resultados.",
-      icon: "refresh",
-    },
-  ],
+  respuesta: [],
 };
 
