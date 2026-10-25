@@ -542,6 +542,28 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       ],
     },
   },
+  {
+    id: "rve-recovery",
+    title: "Trabajos para recuperar la transitabilidad",
+    description: "Trabajos del MTOP para reabrir o mantener las vías afectadas.",
+    component: "respuesta",
+    section: "Vías",
+    icon: "refresh",
+    geometry: "point",
+    color: "#0f766e",
+    popup: {
+      titleField: "descripci_n_de_trabaj",
+      fallbackTitle: "Trabajo de transitabilidad",
+      fields: [
+        { field: "fecha_de_inicio", label: "Inicio", format: "date" },
+        { field: "fecha_fin", label: "Fin", format: "date" },
+        { field: "maquinaria", label: "Maquinaria" },
+        { field: "instituciones_involucradas", label: "Instituciones" },
+        { field: "cant_n", label: "Cantón" },
+        { field: "provincia", label: "Provincia" },
+      ],
+    },
+  },
 ];
 
 /** Radio de los puntos sueltos según el zoom: más chicos a escala nacional. */

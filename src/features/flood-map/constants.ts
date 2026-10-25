@@ -11,6 +11,7 @@ import type {
   ForecastDay,
   RainWindowHours,
   RiskComponentId,
+  Semaphore,
   StationRainLevel,
   WeatherStationCategory,
 } from "./types";
@@ -152,6 +153,14 @@ export const FLOOD_HUB_SEVERITIES: Record<FloodHubSeverity, { label: string; col
   above_normal: { label: "Sobre lo normal", color: "#f59e0b", sizePx: 14 },
   no_flooding: { label: "Sin inundación", color: "#94a3b8", sizePx: 10 },
   unknown: { label: "Sin dato", color: "#cbd5e1", sizePx: 10 },
+};
+
+// ── Análisis por cantón (lluvia de 12 h) ────────────────────────────────
+/** Semáforo del documento de la SNGR, en tres colores (el naranja pasa a rojo). */
+export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; color: string; panelClass: string }> = {
+  red: { label: "Rojo", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
+  yellow: { label: "Amarillo", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
+  green: { label: "Verde", color: "#16a34a", panelClass: "bg-green-50 text-green-900 ring-1 ring-green-600/20" },
 };
 
 /** Niveles con aviso, los únicos que se dibujan (de mayor a menor). */
@@ -325,13 +334,6 @@ export const PLANNED_LAYERS: Record<RiskComponentId, readonly PlannedLayer[]> = 
       icon: "users",
     },
   ],
-  respuesta: [
-    {
-      id: "rve-recovery",
-      title: "Trabajos para recuperar la transitabilidad en la RVE",
-      description: "El servicio compartido solo permite llenar el formulario; falta su vista de resultados.",
-      icon: "refresh",
-    },
-  ],
+  respuesta: [],
 };
 

@@ -8,6 +8,7 @@ import { IMERG_MAX_NATIVE_ZOOM, IMERG_TILE_URL, MAP_CONFIG, MAP_PANES } from "..
 import type { RiskHit } from "../../risk-identify";
 import type { RiskLayerStyle } from "../../risk-layers";
 import type {
+  CantonAnalysis,
   DailyRainForecast,
   FloodMapData,
   HazardEvent,
@@ -21,6 +22,7 @@ import type {
 } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
+import { CantonHighlight } from "./CantonHighlight";
 import { FeatureHighlight } from "./FeatureHighlight";
 import { FloodHubLayer } from "./FloodHubLayer";
 import { MapClickHandler } from "./MapClickHandler";
@@ -54,6 +56,8 @@ export interface FloodMapProps {
   riskFeatureZoomRequest: number;
   /** Tasa de lluvia IMERG (NASA) de la última media hora. */
   showImerg: boolean;
+  /** Cantón elegido en el análisis por cantón: se resalta y se encuadra. */
+  selectedCanton: CantonAnalysis | null;
   /** Opacidad de cada capa de imagen (deslizadores del panel). */
   opacity: OverlayOpacity;
   onRainLoadingChange: (loading: boolean) => void;
@@ -88,6 +92,7 @@ export default function FloodMap({
   selectedRiskFeature,
   riskFeatureZoomRequest,
   showImerg,
+  selectedCanton,
   opacity,
   onRainLoadingChange,
   onObservedRainLoadingChange,
@@ -159,6 +164,7 @@ export default function FloodMap({
       <Pane name={MAP_PANES.risk.name} style={{ zIndex: MAP_PANES.risk.zIndex }} />
       <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={onRiskFeaturesSelect} />
       {selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
+      {selectedCanton && <CantonHighlight canton={selectedCanton} />}
       {/* Marcadores en el panel de Leaflet: su popup queda encima de todo. */}
       {layers.floodHub && data.floodHub && <FloodHubLayer snapshot={data.floodHub} />}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
