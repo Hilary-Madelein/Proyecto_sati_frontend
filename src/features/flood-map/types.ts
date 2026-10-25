@@ -450,6 +450,21 @@ export interface CantonAnalysis {
   };
 }
 
+/** Indicadores del índice de preparación provincial (ISPP-FEN). */
+export type PreparednessIndicator = "shelters" | "camps" | "preventiveActions" | "roadProjects";
+/** Semáforo del índice, de menor a mayor preparación relativa. */
+export type PreparednessLevel = "very-low" | "low" | "medium" | "high" | "very-high";
+
+/** Una provincia en el índice de preparación (ISPP-FEN): conteos, puntuaciones 0–100 e índice. */
+export interface ProvincePreparedness {
+  code: string;
+  name: string;
+  counts: Record<PreparednessIndicator, number>;
+  scores: Record<PreparednessIndicator, number>;
+  index: number;
+  level: PreparednessLevel;
+}
+
 export interface CantonAnalysisSnapshot {
   updatedAt: string;
   forecastRun: string | null;
@@ -460,5 +475,7 @@ export interface CantonAnalysisSnapshot {
   counts: Record<Semaphore, number> & { noData: number };
   /** Del más al menos afectado. */
   cantons: CantonAnalysis[];
+  /** Índice de preparación de las 24 provincias, de la más a la menos preparada. */
+  provinces: ProvincePreparedness[];
   sources: { name: string; ok: boolean; detail: string }[];
 }

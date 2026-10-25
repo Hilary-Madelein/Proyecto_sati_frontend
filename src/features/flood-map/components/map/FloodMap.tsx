@@ -23,6 +23,7 @@ import type {
   LayerVisibility,
   ObservedAccumulatedRain,
   OverlayOpacity,
+  ProvincePreparedness,
   RiskLayerData,
   SeaTemperatureAnomaly,
   SelectedRiver,
@@ -31,6 +32,7 @@ import type {
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import type { CantonGeometry } from "../../hooks/useCantonGeometries";
+import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
 import { CantonHighlight } from "./CantonHighlight";
 import { CantonSemaphoreLayer } from "./CantonSemaphoreLayer";
 import { FeatureHighlight } from "./FeatureHighlight";
@@ -39,6 +41,7 @@ import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
 import { ProvinceBoundaries } from "./ProvinceBoundaries";
+import { ProvincePreparednessLayer } from "./ProvincePreparednessLayer";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
 import { RiskFeatureLayers } from "./RiskFeatureLayer";
@@ -73,6 +76,8 @@ export interface FloodMapProps {
   cantonSemaphore: { cantons: CantonAnalysis[]; updatedAt: string } | null;
   /** Contornos de los cantones por código DPA (null mientras se cargan). */
   cantonGeometries: ReadonlyMap<string, CantonGeometry> | null;
+  /** Índice de preparación provincial pintado en el mapa; null = no se dibuja. */
+  provincePreparedness: { provinces: ProvincePreparedness[]; geometries: ReadonlyMap<string, ProvinceGeometry> } | null;
   /** Se tocó en el mapa un cantón del semáforo. */
   onCantonClick: (canton: CantonAnalysis) => void;
   /** Opacidad de cada capa de imagen (deslizadores del panel). */
@@ -112,6 +117,7 @@ export default function FloodMap({
   selectedCanton,
   cantonSemaphore,
   cantonGeometries,
+  provincePreparedness,
   onCantonClick,
   opacity,
   onRainLoadingChange,
@@ -196,6 +202,9 @@ export default function FloodMap({
       <Pane name={MAP_PANES.risk.name} style={{ zIndex: MAP_PANES.risk.zIndex }} />
       <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={onRiskFeaturesSelect} />
       {selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
+      {provincePreparedness && (
+        <ProvincePreparednessLayer provinces={provincePreparedness.provinces} geometries={provincePreparedness.geometries} />
+      )}
       {cantonSemaphore && cantonGeometries && (
         <CantonSemaphoreLayer
           cantons={cantonSemaphore.cantons}

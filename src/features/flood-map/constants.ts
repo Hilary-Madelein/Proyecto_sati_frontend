@@ -10,6 +10,8 @@ import type {
   ObservedRainProduct,
   ForecastDay,
   RainWindowHours,
+  PreparednessIndicator,
+  PreparednessLevel,
   RiskComponentId,
   Semaphore,
   StationRainLevel,
@@ -208,6 +210,26 @@ export const FLOOD_HUB_SEVERITIES: Record<FloodHubSeverity, { label: string; col
 
 // ── Análisis por cantón (lluvia de 12 h) ────────────────────────────────
 /** Semáforo del documento de la SNGR, en tres colores (el naranja pasa a rojo). */
+/**
+ * Semáforo del índice de preparación provincial (documento "Semaforización para
+ * componente Preparación"): cinco niveles; los intervalos son propuestos, no oficiales.
+ */
+export const PREPAREDNESS_LEVEL_STYLES: Record<PreparednessLevel, { label: string; range: string; color: string }> = {
+  "very-high": { label: "Muy alta", range: "más de 80", color: "#047857" },
+  high: { label: "Alta", range: "60 a 80", color: "#22c55e" },
+  medium: { label: "Media", range: "40 a 60", color: "#facc15" },
+  low: { label: "Baja", range: "20 a 40", color: "#f97316" },
+  "very-low": { label: "Muy baja", range: "0 a 20", color: "#dc2626" },
+};
+
+/** Lo que cuenta cada indicador del índice de preparación. */
+export const PREPAREDNESS_INDICATOR_LABELS: Record<PreparednessIndicator, string> = {
+  shelters: "Alojamientos calificados",
+  camps: "Campamentos del MTOP",
+  preventiveActions: "Acciones preventivas realizadas",
+  roadProjects: "Proyectos viales en ejecución o terminados",
+};
+
 export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; color: string; panelClass: string }> = {
   red: { label: "Rojo", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
   yellow: { label: "Amarillo", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
