@@ -23,8 +23,8 @@ export const RAIN_CATEGORIES: readonly { id: RainCategory; label: string }[] = [
   { id: "minima", label: "Mínima" },
 ];
 
-/** Sin tildes ni mayúsculas, para buscar "Cañar" con "canar". */
-const normalize = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+/** Sin tildes ni mayúsculas, para buscar "Cañar" con "canar" o unir nombres de distintas fuentes. */
+export const normalizeName = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 
 export function isFiltered(filters: CantonFilters): boolean {
   return filters.color !== "alerted" || filters.category !== null || filters.province !== "" || filters.query.trim() !== "";
@@ -35,12 +35,12 @@ export function isFiltered(filters: CantonFilters): boolean {
  * por color); el color y la categoría eligen qué cantones se listan y se pintan.
  */
 export function filterCantons(cantons: readonly CantonAnalysis[], filters: CantonFilters) {
-  const search = normalize(filters.query.trim());
+  const search = normalizeName(filters.query.trim());
   const withData = cantons.filter(
     (canton) =>
       canton.decidedBy !== null &&
       (!filters.province || canton.province === filters.province) &&
-      (!search || normalize(canton.name).includes(search)),
+      (!search || normalizeName(canton.name).includes(search)),
   );
   const counts: Record<Semaphore, number> = {
     red: withData.filter((canton) => canton.semaphore === "red").length,

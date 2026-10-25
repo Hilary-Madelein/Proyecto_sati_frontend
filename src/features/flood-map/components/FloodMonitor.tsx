@@ -27,6 +27,7 @@ import { useRainLegends } from "../hooks/useRainLegends";
 import { DEFAULT_CANTON_FILTERS, filterCantons, type CantonFilters } from "../canton-filters";
 import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
 import { useCantonGeometries } from "../hooks/useCantonGeometries";
+import { useProvinceGeometries } from "../hooks/useProvinceGeometries";
 import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
@@ -58,6 +59,7 @@ import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEvents
 import { RISK_COMPONENT_ICONS, RiskComponentBar } from "./navigation/RiskComponentBar";
 import { ActiveLayersBar } from "./panels/ActiveLayersBar";
 import { FloodHubSection, RiversSection } from "./panels/FloodLayersSection";
+import { PreparednessSection } from "./panels/PreparednessSection";
 import { RiskLayersSection } from "./panels/RiskLayersSection";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
@@ -144,7 +146,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [eventFilters, setEventFilters] = useState<EventFilters>(DEFAULT_EVENT_FILTERS);
   // Segunda pestaña del panel de eventos: semáforo de lluvia de 12 h por cantón.
   const [eventsTab, setEventsTab] = useState<"events" | "analysis">("events");
-  const cantonAnalysis = useCantonAnalysis(eventsTab === "analysis");
+  // Índice de preparación provincial (pestaña Preparación): viene en el mismo análisis, y se pide al encenderlo.
+  const [showPreparedness, setShowPreparedness] = useState(false);
+  const cantonAnalysis = useCantonAnalysis(eventsTab === "analysis" || showPreparedness);
+  const provinceGeometries = useProvinceGeometries(showPreparedness);
   const [selectedCanton, setSelectedCanton] = useState<CantonAnalysis | null>(null);
   // Filtros del análisis: la lista y el mapa muestran los mismos cantones.
   const [cantonFilters, setCantonFilters] = useState<CantonFilters>(DEFAULT_CANTON_FILTERS);
@@ -199,6 +204,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     layers.floodHub && { key: "floodHub", label: "Flood Hub", component: "amenaza" as const, turnOff: () => toggleLayer("floodHub", false) },
     showSea && { key: "sea", label: "Temperatura del mar", component: "amenaza" as const, turnOff: () => setShowSea(false) },
     showImerg && { key: "imerg", label: "Lluvia IMERG", component: "amenaza" as const, turnOff: () => setShowImerg(false) },
+    showPreparedness && {
+      key: "preparedness",
+      label: "Índice de preparación",
+      component: "preparacion" as const,
+      turnOff: () => setShowPreparedness(false),
+    },
     ...RISK_LAYER_STYLES.filter((layer) => riskLayersOn.has(layer.id)).map((layer) => ({
       key: `risk:${layer.id}`,
       label: layer.title,
@@ -293,6 +304,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             }
           }
           cantonGeometries={cantonGeometries}
+          provincePreparedness={
+            showPreparedness && cantonAnalysis.snapshot && provinceGeometries
+              ? { provinces: cantonAnalysis.snapshot.provinces, geometries: provinceGeometries }
+              : null
+          }
           onCantonClick={(canton) => {
             // La ficha está en el panel del análisis: se abre si estaba cerrado.
             setSelectedCanton(canton);
@@ -402,7 +418,16 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 />
               </div>
             ) : (
-              <div>
+              <div className="space-y-5">
+                {riskTab === "preparacion" && (
+                  <PreparednessSection
+                    provinces={cantonAnalysis.snapshot?.provinces ?? null}
+                    error={cantonAnalysis.error}
+                    isLoading={cantonAnalysis.isLoading}
+                    visible={showPreparedness}
+                    onVisibleChange={setShowPreparedness}
+                  />
+                )}
                 <RiskLayersSection
                   component={riskTab}
                   enabled={riskLayersOn}
@@ -411,7 +436,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   periodOf={periodOf}
                   onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
                 />
-                <p className="mt-3 text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500">
                   Lo que enciendas en cualquier componente se ve junto en el mapa, para cruzar la información.
                 </p>
               </div>
