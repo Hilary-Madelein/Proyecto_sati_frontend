@@ -346,3 +346,14 @@ export interface WeatherStationsSnapshot {
 
 /** Nivel de lluvia de una estación en la ventana reciente (ver STATION_RAIN_LEVELS). */
 export type StationRainLevel = "none" | "light" | "moderate" | "heavy" | "veryHeavy" | "intense" | "extreme";
+
+// ── Componentes de la gestión del riesgo (pestañas del panel de capas) ──
+export type RiskComponentId = "amenaza" | "exposicion" | "preparacion" | "respuesta";
+
+/** Capa encendida en el mapa, de cualquier pestaña (para la franja "En el mapa"). */
+export interface ActiveLayer {
+  key: string;
+  label: string;
+  component: RiskComponentId;
+  turnOff: () => void;
+}

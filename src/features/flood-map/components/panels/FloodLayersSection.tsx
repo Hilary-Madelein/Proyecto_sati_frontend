@@ -33,97 +33,95 @@ function countBy<T, K extends string>(items: T[], key: (item: T) => K) {
   return (value: K) => counts[value] ?? 0;
 }
 
-export function FloodLayersSection({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange }: FloodLayersSectionProps) {
+/** Pronóstico de inundaciones del INAMHI: red de ríos y alertas por caudal (GEOGLOWS). */
+export function RiversSection(props: FloodLayersSectionProps) {
+  return (
+    <section>
+      <SectionHeading>Pronóstico de inundaciones</SectionHeading>
+      <RiversCard {...props} />
+    </section>
+  );
+}
+
+/** Inundaciones históricas, fluviales y repentinas: capas de ejemplo hasta tener su fuente real. */
+export function SimulatedFloodSection({ data, layers, onToggleLayer }: Pick<FloodLayersSectionProps, "data" | "layers" | "onToggleLayer">) {
   const stationsByLevel = countBy(data.fluvialStations, (station) => station.level);
   const zonesByProbability = countBy(data.flashFloodZones, (zone) => zone.probability);
   const zonesByFrequency = countBy(data.historicalZones, (zone) => zone.frequency);
 
   return (
-    <section className="space-y-5">
-      <div>
-        <SectionHeading>Caudales de ríos</SectionHeading>
-        <RiversCard
-          data={data}
-          layers={layers}
-          onToggleLayer={onToggleLayer}
-          alertDayIndex={alertDayIndex}
-          onAlertDayChange={onAlertDayChange}
-        />
-      </div>
+    <section>
+      <SectionHeading aside={<span className="text-[10px] font-medium text-amber-700">Datos simulados</span>}>
+        Inundaciones históricas y repentinas
+      </SectionHeading>
+      <div className="space-y-2">
+        <LayerCard
+          title="Inundaciones históricas"
+          meta="Frecuencia de inundación"
+          icon={
+            <IconTile className="bg-purple-50 text-purple-600">
+              <HistoryIcon className="size-5" />
+            </IconTile>
+          }
+          enabled={layers.historical}
+          onToggle={(enabled) => onToggleLayer("historical", enabled)}
+        >
+          {HISTORICAL_FREQUENCY_ORDER.map((frequency) => (
+            <LegendItem
+              key={frequency}
+              label={HISTORICAL_FREQUENCIES[frequency].label}
+              color={HISTORICAL_FREQUENCIES[frequency].color}
+              count={zonesByFrequency(frequency)}
+            />
+          ))}
+        </LayerCard>
 
-      <div>
-        <SectionHeading aside={<span className="text-[10px] font-medium text-amber-700">Datos simulados</span>}>
-          Datos de inundaciones
-        </SectionHeading>
-        <div className="space-y-2">
-          <LayerCard
-            title="Inundaciones fluviales"
-            meta={`${data.fluvialStations.length} estaciones`}
-            icon={
-              <IconTile className="bg-blue-50 text-blue-600">
-                <WavesIcon className="size-5" />
-              </IconTile>
-            }
-            enabled={layers.fluvial}
-            onToggle={(enabled) => onToggleLayer("fluvial", enabled)}
-          >
-            {FLUVIAL_LEVEL_ORDER.map((level) => (
+        <LayerCard
+          title="Inundaciones fluviales"
+          meta={`${data.fluvialStations.length} estaciones`}
+          icon={
+            <IconTile className="bg-blue-50 text-blue-600">
+              <WavesIcon className="size-5" />
+            </IconTile>
+          }
+          enabled={layers.fluvial}
+          onToggle={(enabled) => onToggleLayer("fluvial", enabled)}
+        >
+          {FLUVIAL_LEVEL_ORDER.map((level) => (
+            <LegendItem
+              key={level}
+              label={FLUVIAL_LEVELS[level].label}
+              color={FLUVIAL_LEVELS[level].color}
+              count={stationsByLevel(level)}
+            />
+          ))}
+        </LayerCard>
+
+        <LayerCard
+          title="Inundaciones repentinas"
+          meta={`Próximas 24h · ${data.flashFloodZones.length} zonas`}
+          icon={
+            <IconTile className="bg-orange-50 text-orange-600">
+              <ZapIcon className="size-5" />
+            </IconTile>
+          }
+          enabled={layers.flash}
+          onToggle={(enabled) => onToggleLayer("flash", enabled)}
+        >
+          {FLASH_FLOOD_ORDER.map((probability) => {
+            const style = FLASH_FLOOD_PROBABILITIES[probability];
+            return (
               <LegendItem
-                key={level}
-                label={FLUVIAL_LEVELS[level].label}
-                color={FLUVIAL_LEVELS[level].color}
-                count={stationsByLevel(level)}
+                key={probability}
+                shape="square"
+                label={style.label}
+                color={style.fill}
+                borderColor={style.stroke}
+                count={zonesByProbability(probability)}
               />
-            ))}
-          </LayerCard>
-
-          <LayerCard
-            title="Inundaciones repentinas"
-            meta={`Próximas 24h · ${data.flashFloodZones.length} zonas`}
-            icon={
-              <IconTile className="bg-orange-50 text-orange-600">
-                <ZapIcon className="size-5" />
-              </IconTile>
-            }
-            enabled={layers.flash}
-            onToggle={(enabled) => onToggleLayer("flash", enabled)}
-          >
-            {FLASH_FLOOD_ORDER.map((probability) => {
-              const style = FLASH_FLOOD_PROBABILITIES[probability];
-              return (
-                <LegendItem
-                  key={probability}
-                  shape="square"
-                  label={style.label}
-                  color={style.fill}
-                  borderColor={style.stroke}
-                  count={zonesByProbability(probability)}
-                />
-              );
-            })}
-          </LayerCard>
-
-          <LayerCard
-            title="Inundaciones históricas"
-            meta="Frecuencia de inundación"
-            icon={
-              <IconTile className="bg-purple-50 text-purple-600">
-                <HistoryIcon className="size-5" />
-              </IconTile>
-            }
-            enabled={layers.historical}
-            onToggle={(enabled) => onToggleLayer("historical", enabled)}
-          >
-            {HISTORICAL_FREQUENCY_ORDER.map((frequency) => (
-              <LegendItem
-                key={frequency}
-                label={HISTORICAL_FREQUENCIES[frequency].label}
-                color={HISTORICAL_FREQUENCIES[frequency].color}
-                count={zonesByFrequency(frequency)}
-              />
-            ))}
-          </LayerCard>
-        </div>
+            );
+          })}
+        </LayerCard>
       </div>
     </section>
   );

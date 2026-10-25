@@ -11,6 +11,7 @@ import type {
   ObservedRainProduct,
   ForecastDay,
   RainWindowHours,
+  RiskComponentId,
   StationRainLevel,
   WeatherStationCategory,
 } from "./types";
@@ -274,3 +275,99 @@ export const EVENTS_PAGE_SIZE = 10;
 
 /** Cada cuánto se vuelven a pedir los datos con la página abierta. */
 export const DATA_REFRESH_MS = 5 * 60 * 1000;
+
+// ── Componentes de la gestión del riesgo ────────────────────────────────
+/**
+ * Pestañas del panel de capas. Solo organizan el panel: cada capa se enciende
+ * por su cuenta, así que capas de pestañas distintas se superponen en el mapa
+ * (p. ej. el pronóstico de lluvia de Amenaza con las vías de Exposición).
+ */
+export const RISK_COMPONENTS: readonly { id: RiskComponentId; label: string; description: string }[] = [
+  {
+    id: "amenaza",
+    label: "Amenaza",
+    description: "Lluvia, ríos e inundaciones: lo que está pasando y lo que se pronostica.",
+  },
+  {
+    id: "exposicion",
+    label: "Exposición",
+    description: "Vías, puentes, escuelas y centros de salud que pueden verse afectados.",
+  },
+  {
+    id: "preparacion",
+    label: "Preparación",
+    description: "Recursos y trabajos preventivos para estar listos antes del evento.",
+  },
+  {
+    id: "respuesta",
+    label: "Respuesta",
+    description: "Acciones para atender y recuperar lo afectado después del evento.",
+  },
+];
+export const DEFAULT_RISK_COMPONENT: RiskComponentId = "amenaza";
+
+export type PlannedLayerIcon = "waves" | "mountain" | "alert" | "map" | "pin" | "shield" | "users" | "refresh";
+
+/** Una capa prevista que aún no tiene fuente de datos: se muestra como "Próximamente". */
+export interface PlannedLayer {
+  id: string;
+  title: string;
+  description: string;
+  icon: PlannedLayerIcon;
+}
+
+/** Capas previstas de cada componente, en el orden en que se muestran (aún sin fuente de datos). */
+export const PLANNED_LAYERS: Record<RiskComponentId, readonly PlannedLayer[]> = {
+  amenaza: [
+    {
+      id: "mass-movements",
+      title: "Movimientos de masa",
+      description: "Deslizamientos y zonas susceptibles.",
+      icon: "mountain",
+    },
+    {
+      id: "rve-critical-points",
+      title: "Puntos críticos en la Red Vial Estatal",
+      description: "Tramos de la RVE con problemas recurrentes.",
+      icon: "alert",
+    },
+  ],
+  exposicion: [
+    { id: "rve", title: "Red Vial Estatal (RVE)", description: "Vías del Estado que pueden quedar afectadas.", icon: "map" },
+    { id: "bridges", title: "Puentes", description: "Puentes de la red vial.", icon: "map" },
+    { id: "schools", title: "Centros de educación", description: "Escuelas y colegios.", icon: "pin" },
+    { id: "health-centers", title: "Centros médicos", description: "Hospitales y centros de salud.", icon: "pin" },
+  ],
+  preparacion: [
+    { id: "machinery", title: "Maquinaria distribuida a nivel nacional", description: "Dónde está la maquinaria disponible.", icon: "pin" },
+    { id: "shelters", title: "Albergues destinados a atención", description: "Albergues habilitados para la emergencia.", icon: "users" },
+    { id: "rve-preventive-works", title: "Trabajos preventivos en la RVE", description: "Obras preventivas en la Red Vial Estatal.", icon: "shield" },
+    {
+      id: "microenterprises",
+      title: "Microempresas distribuidas a nivel nacional",
+      description: "Microempresas de mantenimiento vial y su ubicación.",
+      icon: "users",
+    },
+    {
+      id: "microenterprises-loja",
+      title: "Seguimiento de microempresas en Loja",
+      description: "Avance de las microempresas de la provincia de Loja.",
+      icon: "users",
+    },
+    {
+      id: "el-nino-road-projects",
+      title: "Proyectos viales asociados al fenómeno de El Niño",
+      description: "Proyectos para reducir el impacto de El Niño en las vías.",
+      icon: "shield",
+    },
+  ],
+  respuesta: [
+    {
+      id: "rve-recovery",
+      title: "Trabajos para recuperar la transitabilidad en la RVE",
+      description: "Intervenciones para reabrir las vías afectadas.",
+      icon: "refresh",
+    },
+  ],
+};
+

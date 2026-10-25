@@ -12,6 +12,9 @@ import {
   DATA_REFRESH_MS,
   DEFAULT_EVENT_FILTERS,
   DEFAULT_LAYER_VISIBILITY,
+  DEFAULT_RISK_COMPONENT,
+  PLANNED_LAYERS,
+  RISK_COMPONENTS,
   DEFAULT_FORECAST_DAY,
   FORECAST_DAY_LABELS,
   EVENT_PERIODS,
@@ -24,7 +27,9 @@ import { useWeatherStations } from "../hooks/useWeatherStations";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
+  ActiveLayer,
   EventFilters,
+  RiskComponentId,
   FloodLayerId,
   FloodMapData,
   LayerVisibility,
@@ -40,11 +45,15 @@ import type {
 import { RainLegend } from "./map/RainLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
-import { FloodLayersSection } from "./panels/FloodLayersSection";
+import { RISK_COMPONENT_ICONS, RiskComponentBar } from "./navigation/RiskComponentBar";
+import { ActiveLayersBar } from "./panels/ActiveLayersBar";
+import { RiversSection, SimulatedFloodSection } from "./panels/FloodLayersSection";
+import { PlannedLayerList } from "./panels/PlannedLayers";
+import { SectionHeading } from "./panels/SectionHeading";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
 import { SeaTemperatureSection } from "./panels/SeaTemperatureSection";
-import { WeatherStationsSection } from "./panels/WeatherStationsSection";
+import { WeatherStationsRow } from "./panels/WeatherStationsRow";
 import { RiverPanel } from "./river/RiverPanel";
 
 // Leaflet usa `window`: el mapa se renderiza solo en el navegador.
@@ -85,6 +94,9 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [riverTarget, setRiverTarget] = useState<RiverTarget | null>(null);
 
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYER_VISIBILITY);
+  // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
+  // pero las encendidas de los demás siguen en el mapa (así se cruza la información).
+  const [riskTab, setRiskTab] = useState<RiskComponentId>(DEFAULT_RISK_COMPONENT);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
 
@@ -137,6 +149,22 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     return () => clearInterval(interval);
   }, [router]);
 
+  // Capas encendidas de todos los componentes: se superponen en el mapa y se listan en "En el mapa".
+  const activeLayers: ActiveLayer[] = [
+    showRain && { key: "rain", label: "Pronóstico de lluvia", component: "amenaza" as const, turnOff: () => setShowRain(false) },
+    showObservedRain && { key: "observed", label: "Lluvia observada", component: "amenaza" as const, turnOff: () => setShowObservedRain(false) },
+    showStations && { key: "stations", label: "Lluvia en estaciones", component: "amenaza" as const, turnOff: () => setShowStations(false) },
+    layers.riverNetwork && { key: "riverNetwork", label: "Red de ríos", component: "amenaza" as const, turnOff: () => toggleLayer("riverNetwork", false) },
+    layers.riverAlerts && { key: "riverAlerts", label: "Alertas por caudal", component: "amenaza" as const, turnOff: () => toggleLayer("riverAlerts", false) },
+    layers.historical && { key: "historical", label: "Inundaciones históricas", component: "amenaza" as const, turnOff: () => toggleLayer("historical", false) },
+    layers.fluvial && { key: "fluvial", label: "Inundaciones fluviales", component: "amenaza" as const, turnOff: () => toggleLayer("fluvial", false) },
+    layers.flash && { key: "flash", label: "Inundaciones repentinas", component: "amenaza" as const, turnOff: () => toggleLayer("flash", false) },
+    showSea && { key: "sea", label: "Temperatura del mar", component: "amenaza" as const, turnOff: () => setShowSea(false) },
+  ].filter((layer) => layer !== false);
+  const activeCounts = Object.fromEntries(
+    RISK_COMPONENTS.map((item) => [item.id, activeLayers.filter((layer) => layer.component === item.id).length]),
+  ) as Record<RiskComponentId, number>;
+
   const openDesktopPanel = (panel: PanelId) => setDesktopPanels((current) => ({ ...current, [panel]: true }));
 
   const closePanel = (panel: PanelId) => {
@@ -149,6 +177,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     setRiverTarget(null);
     setMobileSheet(panel);
   };
+
+  /** Elegir un componente en la barra superior abre el panel de capas con sus capas. */
+  const selectRiskComponent = (component: RiskComponentId) => {
+    setRiskTab(component);
+    if (window.matchMedia("(min-width: 1024px)").matches) openDesktopPanel("layers");
+    else openMobileSheet("layers");
+  };
+  const riskComponent = RISK_COMPONENTS.find((item) => item.id === riskTab) ?? RISK_COMPONENTS[0];
+  const RiskIcon = RISK_COMPONENT_ICONS[riskComponent.id];
 
   const showRiver = (target: RiverTarget) => {
     setRiverTarget(target);
@@ -166,165 +203,190 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   };
 
   return (
-    <div className="relative size-full overflow-hidden">
-      <FloodMap
-        data={data}
-        visibleEvents={filteredEvents}
-        layers={layers}
-        rainForecast={rainForecast}
-        observedRain={observedRain}
-        seaTemperature={showSea ? data.seaTemperature : null}
-        weatherStations={showStations ? stations.snapshot : null}
-        onRainLoadingChange={setRainLoading}
-        onObservedRainLoadingChange={setObservedRainLoading}
-        onSeaLoadingChange={setSeaLoading}
-        alertDayIndex={alertDayIndex}
-        selectedRiverId={selectedRiverId}
-        onSelectRiver={(river: SelectedRiver) => showRiver({ kind: "river", river })}
-        onRiverLookup={(lat, lng) => showRiver({ kind: "point", lat, lng })}
-        selectedEventId={selectedEventId}
-        focusRequest={focusRequest}
-        onSelectEvent={selectEvent}
-      />
-      {/* Leyendas de las capas visibles, una debajo de la otra. */}
-      {(rainLegends.length > 0 || (showSea && data.seaTemperature)) && (
-        <div className="absolute top-4 left-16 z-1000 flex w-56 flex-col gap-2">
-          <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
-          {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
-        </div>
-      )}
-
-      <ResponsivePanel
-        title="Capas del mapa"
-        subtitle="Lluvia e inundaciones"
-        icon={
-          <IconTile className="bg-blue-600 text-white shadow-sm shadow-blue-600/30">
-            <LayersIcon className="size-4.5" />
-          </IconTile>
-        }
-        mobileOpen={mobileSheet === "layers"}
-        desktopOpen={desktopPanels.layers}
-        onClose={() => closePanel("layers")}
-        desktopClassName="lg:top-4 lg:right-4 lg:bottom-auto lg:left-auto lg:w-95 lg:max-h-[calc(100%-2rem)]"
-      >
-        <div className="space-y-5">
-          <RainForecastSection
-            rain={data.rain}
-            day={forecastDay}
-            onDayChange={setForecastDay}
-            visible={showRain}
-            onVisibleChange={setShowRain}
-            error={forecast.error}
-            isLoading={forecast.isLoading || rainLoading}
-          />
-          <ObservedRainSection
-            availability={data.observedRain}
-            visible={showObservedRain}
-            onVisibleChange={setShowObservedRain}
-            product={observedProduct}
-            onProductChange={setObservedProduct}
-            hours={observedHours}
-            onHoursChange={setObservedHours}
-            accumulated={observed.data}
-            error={observed.error}
-            isLoading={observed.isLoading || observedRainLoading}
-          />
-          <WeatherStationsSection
-            snapshot={stations.snapshot}
-            visible={showStations}
-            onVisibleChange={setShowStations}
-            error={stations.error}
-            isLoading={stations.isLoading}
-          />
-          <FloodLayersSection
-            data={data}
-            layers={layers}
-            onToggleLayer={toggleLayer}
-            alertDayIndex={alertDayIndex}
-            onAlertDayChange={setAlertDayIndex}
-          />
-          <SeaTemperatureSection
-            sea={data.seaTemperature}
-            visible={showSea}
-            onVisibleChange={setShowSea}
-            isLoading={seaLoading}
-          />
-        </div>
-      </ResponsivePanel>
-
-      <ResponsivePanel
-        title="Eventos críticos"
-        subtitle={
-          eventsError
-            ? "Sin conexión con el servidor de datos"
-            : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
-        }
-        icon={<PulsingAlertIcon />}
-        mobileOpen={mobileSheet === "events"}
-        desktopOpen={desktopPanels.events}
-        onClose={() => closePanel("events")}
-        desktopClassName="lg:bottom-6 lg:left-4 lg:right-auto lg:w-90 lg:max-h-[calc(100%-11rem)]"
-        desktopFooter={
-          events.length > 0 && (
-            <EventsExpandButton
-              expanded={eventsExpanded}
-              total={filteredEvents.length}
-              onToggle={() => setEventsExpanded((value) => !value)}
-            />
-          )
-        }
-      >
-        <CriticalEventsPanel
-          events={events}
-          filteredEvents={filteredEvents}
-          filters={eventFilters}
-          onFiltersChange={setEventFilters}
-          fetchedAt={fetchedAt}
-          error={eventsError}
-          selectedId={selectedEventId}
-          onSelect={selectEvent}
-          expanded={eventsExpanded}
+    <div className="flex size-full flex-col">
+      <RiskComponentBar value={riskTab} onSelect={selectRiskComponent} activeCounts={activeCounts} />
+      {/* El mapa y todo lo que flota sobre él se ubican respecto de esta área, debajo de la barra. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <FloodMap
+          data={data}
+          visibleEvents={filteredEvents}
+          layers={layers}
+          rainForecast={rainForecast}
+          observedRain={observedRain}
+          seaTemperature={showSea ? data.seaTemperature : null}
+          weatherStations={showStations ? stations.snapshot : null}
+          onRainLoadingChange={setRainLoading}
+          onObservedRainLoadingChange={setObservedRainLoading}
+          onSeaLoadingChange={setSeaLoading}
+          alertDayIndex={alertDayIndex}
+          selectedRiverId={selectedRiverId}
+          onSelectRiver={(river: SelectedRiver) => showRiver({ kind: "river", river })}
+          onRiverLookup={(lat, lng) => showRiver({ kind: "point", lat, lng })}
+          selectedEventId={selectedEventId}
+          focusRequest={focusRequest}
+          onSelectEvent={selectEvent}
         />
-      </ResponsivePanel>
+        {/* Leyendas de las capas visibles, una debajo de la otra. */}
+        {(rainLegends.length > 0 || (showSea && data.seaTemperature)) && (
+          <div className="absolute top-4 left-16 z-1000 flex w-56 flex-col gap-2">
+            <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
+            {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
+          </div>
+        )}
 
-      <RiverPanel
-        target={riverTarget}
-        onClose={() => setRiverTarget(null)}
-      />
-
-      {/* Escritorio: botones para reabrir los paneles cerrados. */}
-      {!desktopPanels.layers && (
-        <FloatingButton className="absolute top-4 right-4 hidden lg:flex" onClick={() => openDesktopPanel("layers")}>
-          <LayersIcon className="size-4 text-blue-600" />
-          Capas
-        </FloatingButton>
-      )}
-      {!desktopPanels.events && (
-        <FloatingButton className="absolute bottom-6 left-4 hidden lg:flex" onClick={() => openDesktopPanel("events")}>
-          <CircleDotIcon className="size-4 text-red-600" />
-          Eventos críticos
-          <CountBadge count={criticalCount} />
-        </FloatingButton>
-      )}
-
-      {/* Móvil y tablet: barra inferior para abrir las hojas. */}
-      {mobileSheet === null && riverTarget === null && (
-        <nav
-          aria-label="Paneles del mapa"
-          className="absolute bottom-6 left-1/2 z-1000 flex -translate-x-1/2 gap-1 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
+        <ResponsivePanel
+          title={riskComponent.label}
+          subtitle={riskComponent.description}
+          icon={
+            <IconTile className="bg-blue-600 text-white shadow-sm shadow-blue-600/30">
+              <RiskIcon className="size-4.5" />
+            </IconTile>
+          }
+          mobileOpen={mobileSheet === "layers"}
+          desktopOpen={desktopPanels.layers}
+          onClose={() => closePanel("layers")}
+          desktopClassName="lg:top-4 lg:right-4 lg:bottom-auto lg:left-auto lg:w-95 lg:max-h-[calc(100%-2rem)]"
         >
-          <MobileBarButton onClick={() => openMobileSheet("layers")}>
+          <div className="space-y-4">
+            <ActiveLayersBar layers={activeLayers} />
+
+            {riskTab === "amenaza" ? (
+              <div className="space-y-5">
+                <RainForecastSection
+                  rain={data.rain}
+                  day={forecastDay}
+                  onDayChange={setForecastDay}
+                  visible={showRain}
+                  onVisibleChange={setShowRain}
+                  error={forecast.error}
+                  isLoading={forecast.isLoading || rainLoading}
+                />
+                <ObservedRainSection
+                  availability={data.observedRain}
+                  visible={showObservedRain}
+                  onVisibleChange={setShowObservedRain}
+                  product={observedProduct}
+                  onProductChange={setObservedProduct}
+                  hours={observedHours}
+                  onHoursChange={setObservedHours}
+                  accumulated={observed.data}
+                  error={observed.error}
+                  isLoading={(showObservedRain && (observed.isLoading || observedRainLoading)) || stations.isLoading}
+                  active={showObservedRain || showStations}
+                >
+                  <WeatherStationsRow
+                    snapshot={stations.snapshot}
+                    visible={showStations}
+                    onVisibleChange={setShowStations}
+                    error={stations.error}
+                  />
+                </ObservedRainSection>
+                <RiversSection
+                  data={data}
+                  layers={layers}
+                  onToggleLayer={toggleLayer}
+                  alertDayIndex={alertDayIndex}
+                  onAlertDayChange={setAlertDayIndex}
+                />
+                <SimulatedFloodSection data={data} layers={layers} onToggleLayer={toggleLayer} />
+                <section>
+                  <SectionHeading>Otras amenazas</SectionHeading>
+                  <PlannedLayerList layers={PLANNED_LAYERS.amenaza} />
+                </section>
+                <SeaTemperatureSection
+                  sea={data.seaTemperature}
+                  visible={showSea}
+                  onVisibleChange={setShowSea}
+                  isLoading={seaLoading}
+                />
+              </div>
+            ) : (
+              <section>
+                <SectionHeading>Capas</SectionHeading>
+                <PlannedLayerList layers={PLANNED_LAYERS[riskTab]} />
+                <p className="mt-3 text-[11px] text-slate-500">
+                  Estas capas se agregarán cuando estén sus datos. Lo que enciendas en cualquier componente se ve junto en el mapa,
+                  para cruzar la información.
+                </p>
+              </section>
+            )}
+          </div>
+        </ResponsivePanel>
+
+        <ResponsivePanel
+          title="Eventos críticos"
+          subtitle={
+            eventsError
+              ? "Sin conexión con el servidor de datos"
+              : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
+          }
+          icon={<PulsingAlertIcon />}
+          mobileOpen={mobileSheet === "events"}
+          desktopOpen={desktopPanels.events}
+          onClose={() => closePanel("events")}
+          desktopClassName="lg:bottom-6 lg:left-4 lg:right-auto lg:w-90 lg:max-h-[calc(100%-11rem)]"
+          desktopFooter={
+            events.length > 0 && (
+              <EventsExpandButton
+                expanded={eventsExpanded}
+                total={filteredEvents.length}
+                onToggle={() => setEventsExpanded((value) => !value)}
+              />
+            )
+          }
+        >
+          <CriticalEventsPanel
+            events={events}
+            filteredEvents={filteredEvents}
+            filters={eventFilters}
+            onFiltersChange={setEventFilters}
+            fetchedAt={fetchedAt}
+            error={eventsError}
+            selectedId={selectedEventId}
+            onSelect={selectEvent}
+            expanded={eventsExpanded}
+          />
+        </ResponsivePanel>
+
+        <RiverPanel
+          target={riverTarget}
+          onClose={() => setRiverTarget(null)}
+        />
+
+        {/* Escritorio: botones para reabrir los paneles cerrados. */}
+        {!desktopPanels.layers && (
+          <FloatingButton className="absolute top-4 right-4 hidden lg:flex" onClick={() => openDesktopPanel("layers")}>
             <LayersIcon className="size-4 text-blue-600" />
             Capas
-          </MobileBarButton>
-          <span aria-hidden="true" className="my-1.5 w-px bg-slate-200" />
-          <MobileBarButton onClick={() => openMobileSheet("events")}>
+          </FloatingButton>
+        )}
+        {!desktopPanels.events && (
+          <FloatingButton className="absolute bottom-6 left-4 hidden lg:flex" onClick={() => openDesktopPanel("events")}>
             <CircleDotIcon className="size-4 text-red-600" />
-            Eventos
+            Eventos críticos
             <CountBadge count={criticalCount} />
-          </MobileBarButton>
-        </nav>
-      )}
+          </FloatingButton>
+        )}
+
+        {/* Móvil y tablet: barra inferior para abrir las hojas. */}
+        {mobileSheet === null && riverTarget === null && (
+          <nav
+            aria-label="Paneles del mapa"
+            className="absolute bottom-6 left-1/2 z-1000 flex -translate-x-1/2 gap-1 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
+          >
+            <MobileBarButton onClick={() => openMobileSheet("layers")}>
+              <LayersIcon className="size-4 text-blue-600" />
+              Capas
+            </MobileBarButton>
+            <span aria-hidden="true" className="my-1.5 w-px bg-slate-200" />
+            <MobileBarButton onClick={() => openMobileSheet("events")}>
+              <CircleDotIcon className="size-4 text-red-600" />
+              Eventos
+              <CountBadge count={criticalCount} />
+            </MobileBarButton>
+          </nav>
+        )}
+      </div>
     </div>
   );
 }
