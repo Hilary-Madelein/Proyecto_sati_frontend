@@ -13,7 +13,7 @@ interface MapControlsProps {
   onBasemapChange: (basemap: BasemapId) => void;
 }
 
-/** Zoom, "volver a Ecuador" y mapa base, con el mismo estilo vidrio que los paneles. */
+/** Zoom, "volver a Ecuador" y mapa base (gris claro o calles), con el mismo estilo vidrio que los paneles. */
 export function MapControls({ homeOptions, basemap, onBasemapChange }: MapControlsProps) {
   const map = useMap();
   const ref = useRef<HTMLDivElement>(null);

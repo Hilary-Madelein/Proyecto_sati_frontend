@@ -36,6 +36,7 @@ import { FloodHubLayer } from "./FloodHubLayer";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
+import { ProvinceBoundaries } from "./ProvinceBoundaries";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
 import { RiskFeatureLayers } from "./RiskFeatureLayer";
@@ -141,6 +142,7 @@ export default function FloodMap({
           <TileLayer key={basemap} url={BASEMAPS[basemap].labelsUrl} maxNativeZoom={BASEMAPS[basemap].maxNativeZoom} />
         </Pane>
       )}
+      {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
       <MapControls homeOptions={boundsOptions} basemap={basemap} onBasemapChange={setBasemap} />
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
