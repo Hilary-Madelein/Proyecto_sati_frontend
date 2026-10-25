@@ -1,5 +1,5 @@
 import type { PlannedLayerIcon } from "./constants";
-import type { RiskComponentId, RiskFeature } from "./types";
+import type { RiskComponentId, RiskFeature, RiskLayerData } from "./types";
 
 /*
  * Capas de amenaza, exposición, preparación y respuesta. Los datos llegan del
@@ -37,8 +37,19 @@ export interface RiskLayerStyle {
   classify?: { field: string; classes: readonly RiskClass[]; otherLabel?: string };
   /** Puntos agrupados en clusters a escala regional (inventarios con miles de puntos o muchos en el mismo sitio). */
   cluster?: boolean;
+  /**
+   * Parte de otra capa del backend que se muestra como capa propia (p. ej. solo
+   * los albergues de los alojamientos temporales): se pide una vez y se filtra aquí.
+   */
+  subsetOf?: { id: string; field: string; values: readonly string[] };
+  /** Capa con fecha: muestra solo los últimos meses (se eligen en el panel; null = todos). */
+  period?: { field: string; defaultMonths: RiskPeriodMonths };
   popup: { titleField: string; fallbackTitle: string; fields: readonly RiskPopupField[] };
 }
+
+/** Meses hacia atrás que muestra una capa con fecha; null = todos. */
+export type RiskPeriodMonths = 3 | 6 | 12 | null;
+export const RISK_PERIOD_OPTIONS: readonly RiskPeriodMonths[] = [3, 6, 12, null];
 
 const GOOD = "#16a34a";
 const FAIR = "#d97706";
@@ -366,37 +377,39 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       ],
     },
   },
-  {
-    id: "shelters",
-    title: "Alojamientos temporales",
-    description: "Albergues y campamentos calificados por la SNGR.",
-    component: "preparacion",
-    section: "Recursos",
-    icon: "users",
-    geometry: "point",
-    color: NEUTRAL,
-    cluster: true,
-    classify: {
-      field: "MODALIDAD",
-      classes: [
-        { label: "Albergue", color: "#7c3aed", values: ["ALBERGUE"] },
-        { label: "Campamento", color: "#c026d3", values: ["CAMPAMENTO"] },
-      ],
-    },
-    popup: {
-      titleField: "NOMBRE_DEL_ALOJAMIENTO",
-      fallbackTitle: "Alojamiento temporal",
-      fields: [
-        { field: "MODALIDAD", label: "Modalidad" },
-        { field: "ESTADO", label: "Estado" },
-        { field: "CATEGORÍA", label: "Categoría" },
-        { field: "SECTOR", label: "Sector" },
-        { field: "PARROQUIA", label: "Parroquia" },
-        { field: "CANTON", label: "Cantón" },
-        { field: "PROVINCIA", label: "Provincia" },
-      ],
-    },
-  },
+  // Albergues y campamentos son la misma capa de la SNGR (alojamientos temporales),
+  // separada por modalidad para encenderlos por separado.
+  ...(
+    [
+      { id: "shelters-albergues", title: "Albergues para la población", modality: "ALBERGUE", color: "#7c3aed" },
+      { id: "shelters-campamentos", title: "Campamentos para la población", modality: "CAMPAMENTO", color: "#c026d3" },
+    ] as const
+  ).map(
+    ({ id, title, modality, color }): RiskLayerStyle => ({
+      id,
+      title,
+      description: `${modality === "ALBERGUE" ? "Albergues" : "Campamentos"} para la población afectada, calificados por la SNGR.`,
+      component: "preparacion",
+      section: "Recursos",
+      icon: "users",
+      geometry: "point",
+      color,
+      cluster: true,
+      subsetOf: { id: "shelters", field: "MODALIDAD", values: [modality] },
+      popup: {
+        titleField: "NOMBRE_DEL_ALOJAMIENTO",
+        fallbackTitle: modality === "ALBERGUE" ? "Albergue" : "Campamento",
+        fields: [
+          { field: "ESTADO", label: "Estado" },
+          { field: "CATEGORÍA", label: "Categoría" },
+          { field: "SECTOR", label: "Sector" },
+          { field: "PARROQUIA", label: "Parroquia" },
+          { field: "CANTON", label: "Cantón" },
+          { field: "PROVINCIA", label: "Provincia" },
+        ],
+      },
+    }),
+  ),
   {
     id: "mtop-camps",
     title: "Campamentos del MTOP",
@@ -513,6 +526,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "alert",
     geometry: "point",
+    // El servicio guarda eventos desde 2015: por defecto, solo los recientes.
+    period: { field: "fecha_en_que_ocurri_el_evento", defaultMonths: 3 },
     color: NEUTRAL,
     classify: {
       field: "circulaci_n",
@@ -582,4 +597,43 @@ export function riskClassOf(style: RiskLayerStyle, feature: RiskFeature): RiskCl
 
 export function riskColorOf(style: RiskLayerStyle, feature: RiskFeature): string {
   return riskClassOf(style, feature)?.color ?? style.color;
+}
+
+/** Capa del backend de la que salen los datos de un estilo (la suya, o aquella de la que es una parte). */
+export function riskDataId(style: RiskLayerStyle): string {
+  return style.subsetOf?.id ?? style.id;
+}
+
+const views = new WeakMap<RiskLayerData, Map<string, RiskLayerData>>();
+
+/**
+ * Lo que se dibuja de una capa: solo su parte (subsetOf) y su periodo. Se
+ * guarda por descarga, así cada filtro conserva su identidad entre renders
+ * (los clusters no se recalculan) y `view` cambia cuando cambia el filtro.
+ */
+export function riskLayerView(style: RiskLayerStyle, data: RiskLayerData, months: RiskPeriodMonths): RiskLayerData {
+  const { subsetOf, period } = style;
+  if (!subsetOf && !(period && months)) return data;
+  const view = `${style.id}:${period ? (months ?? "todos") : ""}`;
+  let cache = views.get(data);
+  if (!cache) views.set(data, (cache = new Map()));
+  let result = cache.get(view);
+  if (!result) {
+    const cutoff = period && months ? new Date() : null;
+    cutoff?.setMonth(cutoff.getMonth() - (months ?? 0));
+    const features = data.features.filter((feature) => {
+      if (subsetOf) {
+        const value = feature.properties[subsetOf.field];
+        if (typeof value !== "string" || !subsetOf.values.includes(value.trim().toUpperCase())) return false;
+      }
+      if (cutoff && period) {
+        const time = Date.parse(String(feature.properties[period.field] ?? ""));
+        if (Number.isNaN(time) || time < cutoff.getTime()) return false;
+      }
+      return true;
+    });
+    result = { ...data, features, view };
+    cache.set(view, result);
+  }
+  return result;
 }

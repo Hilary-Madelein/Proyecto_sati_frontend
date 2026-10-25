@@ -28,7 +28,7 @@ import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
 import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
-import { RISK_LAYER_STYLES } from "../risk-layers";
+import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodMonths } from "../risk-layers";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -110,7 +110,18 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYER_VISIBILITY);
   // Capas de gestión del riesgo (servicios de ArcGIS y GeoJSON propios): apagadas al inicio, se piden al encenderlas.
   const [riskLayersOn, setRiskLayersOn] = useState<ReadonlySet<string>>(() => new Set());
-  const riskLayerState = useRiskLayers([...riskLayersOn]);
+  // Varias capas pueden salir de la misma del backend (p. ej. albergues y campamentos): se pide una vez.
+  const riskLayerState = useRiskLayers([
+    ...new Set(RISK_LAYER_STYLES.filter((style) => riskLayersOn.has(style.id)).map(riskDataId)),
+  ]);
+  // Periodo elegido en las capas con fecha (si no se eligió, el de la capa).
+  const [riskPeriods, setRiskPeriods] = useState<Record<string, RiskPeriodMonths>>({});
+  const periodOf = (style: RiskLayerStyle) => (style.id in riskPeriods ? riskPeriods[style.id] : (style.period?.defaultMonths ?? null));
+  /** Estado de la capa con sus datos ya filtrados (su parte y su periodo). */
+  const riskViewState = (style: RiskLayerStyle) => {
+    const state = riskLayerState(riskDataId(style));
+    return state.data ? { ...state, data: riskLayerView(style, state.data, periodOf(style)) } : state;
+  };
   // Panel de detalle al tocar una entidad de esas capas.
   const featureDetail = useFeatureDetail([...riskLayersOn]);
   // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
@@ -191,7 +202,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   ].filter((layer) => layer !== false);
   // Se dibujan en el orden del catálogo, con los datos ya recibidos.
   const visibleRiskLayers = RISK_LAYER_STYLES.flatMap((style) => {
-    const data = riskLayersOn.has(style.id) ? riskLayerState(style.id).data : null;
+    const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
     return data ? [{ style, data }] : [];
   });
   const activeCounts = Object.fromEntries(
@@ -354,7 +365,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   onAlertDayChange={setAlertDayIndex}
                 />
                 <FloodHubSection data={data} layers={layers} onToggleLayer={toggleLayer} />
-                <RiskLayersSection component="amenaza" enabled={riskLayersOn} onToggle={toggleRiskLayer} stateOf={riskLayerState} />
+                <RiskLayersSection
+                  component="amenaza"
+                  enabled={riskLayersOn}
+                  onToggle={toggleRiskLayer}
+                  stateOf={riskViewState}
+                  periodOf={periodOf}
+                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                />
                 <SeaTemperatureSection
                   sea={data.seaTemperature}
                   visible={showSea}
@@ -366,7 +384,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               </div>
             ) : (
               <div>
-                <RiskLayersSection component={riskTab} enabled={riskLayersOn} onToggle={toggleRiskLayer} stateOf={riskLayerState} />
+                <RiskLayersSection
+                  component={riskTab}
+                  enabled={riskLayersOn}
+                  onToggle={toggleRiskLayer}
+                  stateOf={riskViewState}
+                  periodOf={periodOf}
+                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                />
                 <p className="mt-3 text-[11px] text-slate-500">
                   Lo que enciendas en cualquier componente se ve junto en el mapa, para cruzar la información.
                 </p>

@@ -30,11 +30,39 @@ export const MAP_CONFIG = {
   minZoom: 5,
   maxZoom: 18,
   focusZoom: 10,
-  tiles: {
+} as const;
+
+const ESRI_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services";
+
+/**
+ * Mapas base que se pueden elegir. El gris claro deja resaltar las capas de
+ * colores encima; sus nombres (ciudades, provincias) van en una capa aparte.
+ */
+export const BASEMAPS: Record<
+  "light" | "streets" | "satellite",
+  { label: string; url: string; attribution: string; maxNativeZoom?: number; labelsUrl?: string }
+> = {
+  light: {
+    label: "Gris claro",
+    url: `${ESRI_TILES}/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
+    labelsUrl: `${ESRI_TILES}/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
+    // Más cerca no hay teselas: Leaflet amplía las del zoom 16.
+    maxNativeZoom: 16,
+    attribution: "Esri, HERE, Garmin, &copy; colaboradores de OpenStreetMap",
+  },
+  streets: {
+    label: "Calles",
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   },
-} as const;
+  satellite: {
+    label: "Satélite",
+    url: `${ESRI_TILES}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
+    attribution: "Imágenes: Esri, Maxar, Earthstar Geographics",
+  },
+};
+export type BasemapId = keyof typeof BASEMAPS;
+export const DEFAULT_BASEMAP: BasemapId = "light";
 
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */
 export const MAP_PANES = {
@@ -45,6 +73,8 @@ export const MAP_PANES = {
   // Un solo lienzo para todas las capas de gestión del riesgo: con uno por capa (o por
   // geometría), el de arriba se queda con los clics y las de abajo no se pueden tocar.
   risk: { name: "risk", zIndex: 395 },
+  // Nombres del mapa base gris: encima de la lluvia y las zonas, debajo de los puntos y líneas.
+  basemapLabels: { name: "basemapLabels", zIndex: 390 },
   rivers: { name: "rivers", zIndex: 380 },
 } as const;
 

@@ -365,6 +365,8 @@ export interface RiskLayerData {
   omitted: number;
   /** Las entidades pueden tener fotos (GET /risk-layers/:id/features/:objectId/attachments). */
   hasAttachments: boolean;
+  /** Filtro aplicado en el navegador (parte de la capa, periodo); al cambiar, la capa se vuelve a dibujar. */
+  view?: string;
   type: "FeatureCollection";
   features: RiskFeature[];
 }

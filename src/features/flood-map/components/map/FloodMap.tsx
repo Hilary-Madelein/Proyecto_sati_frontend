@@ -4,7 +4,15 @@ import "leaflet/dist/leaflet.css";
 import L, { type FitBoundsOptions } from "leaflet";
 import { useState } from "react";
 import { MapContainer, Pane, TileLayer } from "react-leaflet";
-import { IMERG_MAX_NATIVE_ZOOM, IMERG_TILE_URL, MAP_CONFIG, MAP_PANES } from "../../constants";
+import {
+  BASEMAPS,
+  DEFAULT_BASEMAP,
+  IMERG_MAX_NATIVE_ZOOM,
+  IMERG_TILE_URL,
+  MAP_CONFIG,
+  MAP_PANES,
+  type BasemapId,
+} from "../../constants";
 import type { RiskHit } from "../../risk-identify";
 import type { RiskLayerStyle } from "../../risk-layers";
 import type {
@@ -109,6 +117,7 @@ export default function FloodMap({
   const [boundsOptions] = useState(getInitialBoundsOptions);
   // Un solo lienzo para todas las capas de gestión del riesgo (ver MAP_PANES.risk).
   const [riskRenderer] = useState(() => L.canvas({ pane: MAP_PANES.risk.name }));
+  const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
 
   return (
     <MapContainer
@@ -121,8 +130,18 @@ export default function FloodMap({
       preferCanvas
       className="size-full bg-slate-100"
     >
-      <TileLayer url={MAP_CONFIG.tiles.url} attribution={MAP_CONFIG.tiles.attribution} />
-      <MapControls homeOptions={boundsOptions} />
+      <TileLayer
+        key={basemap}
+        url={BASEMAPS[basemap].url}
+        maxNativeZoom={BASEMAPS[basemap].maxNativeZoom}
+        attribution={BASEMAPS[basemap].attribution}
+      />
+      {BASEMAPS[basemap].labelsUrl && (
+        <Pane name={MAP_PANES.basemapLabels.name} style={{ zIndex: MAP_PANES.basemapLabels.zIndex, pointerEvents: "none" }}>
+          <TileLayer key={basemap} url={BASEMAPS[basemap].labelsUrl} maxNativeZoom={BASEMAPS[basemap].maxNativeZoom} />
+        </Pane>
+      )}
+      <MapControls homeOptions={boundsOptions} basemap={basemap} onBasemapChange={setBasemap} />
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
       {seaTemperature && (

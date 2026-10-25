@@ -1,10 +1,11 @@
 import { IconTile } from "@/components/ui/IconTile";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { PLANNED_LAYERS } from "../../constants";
 import type { RiskLayerState } from "../../hooks/useRiskLayers";
-import { RISK_LAYER_STYLES, riskClassOf, type RiskLayerStyle } from "../../risk-layers";
+import { RISK_LAYER_STYLES, RISK_PERIOD_OPTIONS, riskClassOf, type RiskLayerStyle, type RiskPeriodMonths } from "../../risk-layers";
 import type { RiskComponentId, RiskFeature } from "../../types";
 import { LegendItem } from "./LegendItem";
 import { PLANNED_LAYER_ICONS, PlannedLayerList } from "./PlannedLayers";
@@ -15,14 +16,18 @@ interface RiskLayersSectionProps {
   component: RiskComponentId;
   enabled: ReadonlySet<string>;
   onToggle: (id: string, enabled: boolean) => void;
-  stateOf: (id: string) => RiskLayerState;
+  /** Estado de la capa con sus datos ya filtrados (su parte y su periodo). */
+  stateOf: (layer: RiskLayerStyle) => RiskLayerState;
+  /** Periodo de las capas con fecha (meses; null = todos). */
+  periodOf: (layer: RiskLayerStyle) => RiskPeriodMonths;
+  onPeriodChange: (id: string, months: RiskPeriodMonths) => void;
 }
 
 /**
  * Capas de la pestaña (amenaza, exposición, preparación o respuesta) agrupadas
  * por sección, y al final las previstas que aún no tienen datos.
  */
-export function RiskLayersSection({ component, enabled, onToggle, stateOf }: RiskLayersSectionProps) {
+export function RiskLayersSection({ component, enabled, onToggle, stateOf, periodOf, onPeriodChange }: RiskLayersSectionProps) {
   const layers = RISK_LAYER_STYLES.filter((layer) => layer.component === component);
   const sections = [...new Set(layers.map((layer) => layer.section))];
   const planned = PLANNED_LAYERS[component];
@@ -41,7 +46,9 @@ export function RiskLayersSection({ component, enabled, onToggle, stateOf }: Ris
                   layer={layer}
                   visible={enabled.has(layer.id)}
                   onVisibleChange={(value) => onToggle(layer.id, value)}
-                  state={stateOf(layer.id)}
+                  state={stateOf(layer)}
+                  period={periodOf(layer)}
+                  onPeriodChange={(months) => onPeriodChange(layer.id, months)}
                 />
               ))}
           </ul>
@@ -62,15 +69,24 @@ function RiskLayerRow({
   visible,
   onVisibleChange,
   state,
+  period,
+  onPeriodChange,
 }: {
   layer: RiskLayerStyle;
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
   state: RiskLayerState;
+  period: RiskPeriodMonths;
+  onPeriodChange: (months: RiskPeriodMonths) => void;
 }) {
   const Icon = PLANNED_LAYER_ICONS[layer.icon];
   const { data, error, isLoading } = state;
-  const meta = visible && isLoading && !data ? "Cargando…" : data ? countLabel(layer, data.features.length) : layer.description;
+  const meta =
+    visible && isLoading && !data
+      ? "Cargando…"
+      : data
+        ? `${countLabel(layer, data.features.length)}${layer.period ? ` · ${periodLabel(period)}` : ""}`
+        : layer.description;
 
   return (
     <li className={cn("rounded-xl p-3 ring-1 transition-colors", visible ? "bg-white ring-slate-200" : "bg-slate-50/70 ring-slate-200/70")}>
@@ -94,6 +110,18 @@ function RiskLayerRow({
       {visible && (error || data) && (
         <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
           {error && <Notice>{error}</Notice>}
+          {layer.period && (
+            <SegmentedControl
+              name={`${layer.id}-period`}
+              label="Periodo"
+              value={String(period ?? "all")}
+              options={RISK_PERIOD_OPTIONS.map((months) => ({
+                value: String(months ?? "all"),
+                label: months ? `${months} meses` : "Todos",
+              }))}
+              onChange={(value) => onPeriodChange(value === "all" ? null : (Number(value) as RiskPeriodMonths))}
+            />
+          )}
           {data && layer.classify && (
             <ul className="grid grid-cols-2 gap-x-4 gap-y-2">
               {legendOf(layer, data.features).map((item) => (
@@ -118,6 +146,10 @@ function RiskLayerRow({
 function countLabel(layer: RiskLayerStyle, count: number): string {
   const unit = layer.geometry === "point" ? (count === 1 ? "punto" : "puntos") : layer.geometry === "line" ? (count === 1 ? "tramo" : "tramos") : count === 1 ? "zona" : "zonas";
   return `${count.toLocaleString("es-EC")} ${unit}`;
+}
+
+function periodLabel(months: RiskPeriodMonths): string {
+  return months ? `últimos ${months} meses` : "todos";
 }
 
 function legendShape(layer: RiskLayerStyle): "circle" | "square" {
