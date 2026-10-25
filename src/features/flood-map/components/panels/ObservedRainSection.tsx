@@ -14,6 +14,7 @@ import type {
   RainWindowHours,
 } from "../../types";
 import { LoadingBadge, Notice } from "./RainForecastSection";
+import { OpacitySlider } from "./OpacitySlider";
 import { SectionHeading } from "./SectionHeading";
 
 interface ObservedRainSectionProps {
@@ -32,6 +33,8 @@ interface ObservedRainSectionProps {
   children?: ReactNode;
   /** El cuadro se ve encendido si alguna de sus filas lo está. */
   active?: boolean;
+  opacity: number;
+  onOpacityChange: (opacity: number) => void;
 }
 
 const staleHint = (status: ObservedRainProductStatus) =>
@@ -54,6 +57,8 @@ export function ObservedRainSection({
   isLoading,
   children,
   active = visible,
+  opacity,
+  onOpacityChange,
 }: ObservedRainSectionProps) {
   const products = availability?.products ?? [];
   const status = products.find((item) => item.key === product);
@@ -105,6 +110,7 @@ export function ObservedRainSection({
               options={hourOptions}
               onChange={(value) => onHoursChange(Number(value) as RainWindowHours)}
             />
+            <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="la lluvia registrada por satélite" />
             {/* El selector solo aparece si hay más de un producto para elegir. */}
             {productOptions.length > 1 && (
               <SegmentedControl

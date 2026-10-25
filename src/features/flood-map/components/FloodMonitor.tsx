@@ -12,6 +12,7 @@ import {
   DATA_REFRESH_MS,
   DEFAULT_EVENT_FILTERS,
   DEFAULT_LAYER_VISIBILITY,
+  DEFAULT_OVERLAY_OPACITY,
   DEFAULT_RISK_COMPONENT,
   RISK_COMPONENTS,
   DEFAULT_FORECAST_DAY,
@@ -22,6 +23,7 @@ import {
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
+import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
 import { RISK_LAYER_STYLES } from "../risk-layers";
@@ -30,6 +32,7 @@ import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
   ActiveLayer,
   EventFilters,
+  OverlayOpacity,
   RiskComponentId,
   FloodLayerId,
   FloodMapData,
@@ -54,6 +57,8 @@ import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
 import { SeaTemperatureSection } from "./panels/SeaTemperatureSection";
 import { WeatherStationsRow } from "./panels/WeatherStationsRow";
+import { FeatureDetailPanel } from "./panels/FeatureDetailPanel";
+import { ImergRow } from "./panels/ImergRow";
 import { RiverPanel } from "./river/RiverPanel";
 
 // Leaflet usa `window`: el mapa se renderiza solo en el navegador.
@@ -86,6 +91,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Lluvia medida en las estaciones del INAMHI. Apagada al inicio; se pide al encenderla.
   const [showStations, setShowStations] = useState(false);
   const stations = useWeatherStations(showStations);
+  // Lluvia IMERG (NASA) de la última media hora. Apagada al inicio.
+  const [showImerg, setShowImerg] = useState(false);
+  // Opacidad de las capas de imagen, para que se distingan al superponerlas.
+  const [opacity, setOpacity] = useState<OverlayOpacity>({ ...DEFAULT_OVERLAY_OPACITY });
+  const opacityHandler = (key: keyof OverlayOpacity) => (value: number) => setOpacity((current) => ({ ...current, [key]: value }));
   // Anomalía de la temperatura del mar (El Niño)
   const [showSea, setShowSea] = useState(false);
   const [seaLoading, setSeaLoading] = useState(false);
@@ -97,6 +107,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Capas de gestión del riesgo (servicios de ArcGIS y GeoJSON propios): apagadas al inicio, se piden al encenderlas.
   const [riskLayersOn, setRiskLayersOn] = useState<ReadonlySet<string>>(() => new Set());
   const riskLayerState = useRiskLayers([...riskLayersOn]);
+  // Panel de detalle al tocar una entidad de esas capas.
+  const featureDetail = useFeatureDetail([...riskLayersOn]);
   // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
   // pero las encendidas de los demás siguen en el mapa (así se cruza la información).
   const [riskTab, setRiskTab] = useState<RiskComponentId>(DEFAULT_RISK_COMPONENT);
@@ -161,6 +173,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     layers.riverAlerts && { key: "riverAlerts", label: "Alertas por caudal", component: "amenaza" as const, turnOff: () => toggleLayer("riverAlerts", false) },
     layers.floodHub && { key: "floodHub", label: "Flood Hub", component: "amenaza" as const, turnOff: () => toggleLayer("floodHub", false) },
     showSea && { key: "sea", label: "Temperatura del mar", component: "amenaza" as const, turnOff: () => setShowSea(false) },
+    showImerg && { key: "imerg", label: "Lluvia IMERG", component: "amenaza" as const, turnOff: () => setShowImerg(false) },
     ...RISK_LAYER_STYLES.filter((layer) => riskLayersOn.has(layer.id)).map((layer) => ({
       key: `risk:${layer.id}`,
       label: layer.title,
@@ -185,8 +198,9 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   };
 
   const openMobileSheet = (panel: PanelId) => {
-    // En móvil solo cabe una hoja a la vez: abrir otra cierra la del río.
+    // En móvil solo cabe una hoja a la vez: abrir otra cierra la del río y la del detalle.
     setRiverTarget(null);
+    featureDetail.close();
     setMobileSheet(panel);
   };
 
@@ -200,6 +214,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const RiskIcon = RISK_COMPONENT_ICONS[riskComponent.id];
 
   const showRiver = (target: RiverTarget) => {
+    featureDetail.close();
     setRiverTarget(target);
     setMobileSheet(null);
   };
@@ -236,6 +251,16 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           seaTemperature={showSea ? data.seaTemperature : null}
           weatherStations={showStations ? stations.snapshot : null}
           riskLayers={visibleRiskLayers}
+          onRiskFeaturesSelect={(hits) => {
+            // Un solo detalle a la vez: se cierran el del río y la hoja móvil.
+            setRiverTarget(null);
+            setMobileSheet(null);
+            featureDetail.open(hits);
+          }}
+          selectedRiskFeature={featureDetail.selected}
+          riskFeatureZoomRequest={featureDetail.zoomRequest}
+          showImerg={showImerg}
+          opacity={opacity}
           onRainLoadingChange={setRainLoading}
           onObservedRainLoadingChange={setObservedRainLoading}
           onSeaLoadingChange={setSeaLoading}
@@ -281,6 +306,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   onVisibleChange={setShowRain}
                   error={forecast.error}
                   isLoading={forecast.isLoading || rainLoading}
+                  opacity={opacity.forecast}
+                  onOpacityChange={opacityHandler("forecast")}
                 />
                 <ObservedRainSection
                   availability={data.observedRain}
@@ -293,13 +320,21 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   accumulated={observed.data}
                   error={observed.error}
                   isLoading={(showObservedRain && (observed.isLoading || observedRainLoading)) || stations.isLoading}
-                  active={showObservedRain || showStations}
+                  active={showObservedRain || showStations || showImerg}
+                  opacity={opacity.observed}
+                  onOpacityChange={opacityHandler("observed")}
                 >
                   <WeatherStationsRow
                     snapshot={stations.snapshot}
                     visible={showStations}
                     onVisibleChange={setShowStations}
                     error={stations.error}
+                  />
+                  <ImergRow
+                    visible={showImerg}
+                    onVisibleChange={setShowImerg}
+                    opacity={opacity.imerg}
+                    onOpacityChange={opacityHandler("imerg")}
                   />
                 </ObservedRainSection>
                 <RiversSection
@@ -316,6 +351,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   visible={showSea}
                   onVisibleChange={setShowSea}
                   isLoading={seaLoading}
+                  opacity={opacity.sea}
+                  onOpacityChange={opacityHandler("sea")}
                 />
               </div>
             ) : (
@@ -364,6 +401,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           />
         </ResponsivePanel>
 
+        <FeatureDetailPanel
+          state={featureDetail.state}
+          onClose={featureDetail.close}
+          onNext={featureDetail.next}
+          onPrevious={featureDetail.previous}
+          onZoom={featureDetail.zoomToSelected}
+        />
+
         <RiverPanel
           target={riverTarget}
           onClose={() => setRiverTarget(null)}
@@ -385,7 +430,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         )}
 
         {/* Móvil y tablet: barra inferior para abrir las hojas. */}
-        {mobileSheet === null && riverTarget === null && (
+        {mobileSheet === null && riverTarget === null && featureDetail.state === null && (
           <nav
             aria-label="Paneles del mapa"
             className="absolute bottom-6 left-1/2 z-1000 flex -translate-x-1/2 gap-1 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"

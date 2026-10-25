@@ -3,8 +3,8 @@ import type { RiskLayerStyle, RiskPopupField } from "./risk-layers";
 import type { RiskFeature } from "./types";
 
 /*
- * Textos del popup de una entidad de gestión del riesgo, en HTML (Leaflet lo
- * pinta tal cual): todo valor que viene del servicio pasa por escapeHtml.
+ * Textos de una entidad de gestión del riesgo: su título (también en el aviso
+ * flotante, en HTML: pasa por escapeHtml) y sus datos para el panel de detalle.
  */
 
 export function titleOf(style: RiskLayerStyle, feature: RiskFeature): string {
@@ -12,26 +12,19 @@ export function titleOf(style: RiskLayerStyle, feature: RiskFeature): string {
   return value === null || value === undefined || value === "" ? style.popup.fallbackTitle : String(value);
 }
 
-/** Popup completo: capa, título, campos con valor y fuente. */
-export function popupHtml(style: RiskLayerStyle, feature: RiskFeature, attribution: string): string {
-  const rows = style.popup.fields
-    .map((field) => [field.label, formatValue(field, feature.properties[field.field])] as const)
-    .filter(([, value]) => value !== null)
-    .map(
-      ([label, value]) =>
-        `<div class="flex gap-3 py-0.5"><dt class="w-24 shrink-0 text-slate-500">${escapeHtml(label)}</dt><dd class="min-w-0 flex-1 font-medium text-slate-800 break-words">${escapeHtml(value!)}</dd></div>`,
-    )
-    .join("");
-  return `<div class="w-64">
-    <p class="text-[11px] font-medium text-slate-500">${escapeHtml(style.title)}</p>
-    <h3 class="text-sm font-semibold text-slate-900">${escapeHtml(titleOf(style, feature))}</h3>
-    ${rows ? `<dl class="mt-2 text-xs">${rows}</dl>` : ""}
-    <p class="mt-2 text-[11px] text-slate-400">Fuente: ${escapeHtml(attribution)}</p>
-  </div>`;
+/** Datos de una entidad para el panel de detalle, ya con formato; sin los vacíos. */
+export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: string; value: string }[] {
+  return style.popup.fields.flatMap((field) => {
+    const value = formatValue(field, feature.properties[field.field]);
+    return value === null ? [] : [{ label: field.label, value }];
+  });
 }
 
+/** Valores que los formularios guardan cuando no hay dato. */
+const EMPTY_VALUES = new Set(["", "NO APLICABLE", "N/A"]);
+
 function formatValue(field: RiskPopupField, value: string | number | boolean | null | undefined): string | null {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || EMPTY_VALUES.has(String(value).trim().toUpperCase())) return null;
   if (typeof value === "number") {
     switch (field.format) {
       case "percent":

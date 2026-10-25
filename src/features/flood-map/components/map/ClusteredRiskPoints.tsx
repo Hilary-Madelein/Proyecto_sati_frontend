@@ -1,12 +1,12 @@
 "use client";
 
 import L from "leaflet";
-import { useMemo, useState, type MouseEvent } from "react";
-import { CircleMarker, Marker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { useMemo, useState } from "react";
+import { CircleMarker, Marker, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
 import { MAP_PANES } from "../../constants";
 import { riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
-import { popupHtml, titleOf } from "../../risk-popup";
+import { titleOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 
 /** Hasta este zoom se agrupa; desde el siguiente (escala de ciudad) se ven todos los puntos sueltos. */
@@ -33,6 +33,17 @@ interface ClusterProps {
   counts: number[];
 }
 
+interface ClusteredRiskPointsProps {
+  style: RiskLayerStyle;
+  data: RiskLayerData;
+  /** Lienzo compartido por las capas de gestión del riesgo. */
+  renderer: L.Canvas;
+  /** Se tocó un punto suelto (abre su detalle con lo que haya en ese punto). */
+  onFeatureClick: (feature: RiskFeature, latlng: L.LatLng) => void;
+  /** Se tocó una pila de puntos en el mismo sitio (abre el detalle con todos, "1 de N"). */
+  onStackClick: (features: RiskFeature[]) => void;
+}
+
 interface View {
   bbox: [number, number, number, number];
   zoom: number;
@@ -44,9 +55,9 @@ interface View {
  * número no esconde, p. ej., cuánta maquinaria está parada). Al tocarlo, el
  * mapa se acerca hasta separarlo. Desde el zoom de ciudad se ven los puntos
  * sueltos; los que quedan uno encima de otro (p. ej. la maquinaria de una
- * base) se muestran como una pila con una lista para elegir cada uno.
+ * base) se muestran como una pila: al tocarla, el panel de detalle los recorre uno a uno.
  */
-export function ClusteredRiskPoints({ style, data }: { style: RiskLayerStyle; data: RiskLayerData }) {
+export function ClusteredRiskPoints({ style, data, renderer, onFeatureClick, onStackClick }: ClusteredRiskPointsProps) {
   const map = useMap();
   const [view, setView] = useState(() => viewOf(map));
   useMapEvents({ moveend: () => setView(viewOf(map)) });
@@ -95,17 +106,13 @@ export function ClusteredRiskPoints({ style, data }: { style: RiskLayerStyle; da
               key={`s${clusterId}`}
               position={[lat, lng]}
               icon={clusterIcon(counts, colors, count)}
-              // El aviso flotante quedaría encima del popup.
-              eventHandlers={{ popupopen: (event) => event.target.closeTooltip() }}
+              eventHandlers={{ click: () => onStackClick(features) }}
             >
               <Tooltip direction="top" offset={[0, -12]}>
                 <span className="text-xs">
                   <strong>{count}</strong> en el mismo sitio · clic para ver cada uno
                 </span>
               </Tooltip>
-              <Popup maxWidth={300} autoPanPadding={[16, 16]}>
-                <StackPopupContent style={style} features={features} attribution={data.attribution} />
-              </Popup>
             </Marker>
           );
         }
@@ -135,70 +142,18 @@ export function ClusteredRiskPoints({ style, data }: { style: RiskLayerStyle; da
           <CircleMarker
             key={`p${point.properties.index}`}
             center={[lat, lng]}
-            pane={MAP_PANES.riskPoints.name}
+            pane={MAP_PANES.risk.name}
+            renderer={renderer}
             radius={riskPointRadius(view.zoom)}
             pathOptions={{ color: "#ffffff", weight: 1, fillColor: riskColorOf(style, feature), fillOpacity: 0.95 }}
             bubblingMouseEvents={false}
+            eventHandlers={{ click: (event) => onFeatureClick(feature, event.latlng) }}
           >
             <Tooltip direction="top">{titleOf(style, feature)}</Tooltip>
-            <Popup maxWidth={280} autoPanPadding={[16, 16]}>
-              <div dangerouslySetInnerHTML={{ __html: popupHtml(style, feature, data.attribution) }} />
-            </Popup>
           </CircleMarker>
         );
       })}
     </>
-  );
-}
-
-/** Lista de los puntos de un mismo sitio; al elegir uno se ven sus datos. */
-function StackPopupContent({
-  style,
-  features,
-  attribution,
-}: {
-  style: RiskLayerStyle;
-  features: RiskFeature[];
-  attribution: string;
-}) {
-  const [selected, setSelected] = useState<number | null>(null);
-  // El clic no debe llegar al mapa: React cambia el contenido antes de que Leaflet
-  // lo procese, Leaflet ve un elemento que ya no está en el popup y lo cierra.
-  const choose = (index: number | null) => (event: MouseEvent) => {
-    event.stopPropagation();
-    setSelected(index);
-  };
-
-  if (selected !== null) {
-    return (
-      <div>
-        <button type="button" onClick={choose(null)} className="mb-1 text-xs font-medium text-blue-700 hover:underline">
-          ← Volver a los {features.length}
-        </button>
-        <div dangerouslySetInnerHTML={{ __html: popupHtml(style, features[selected], attribution) }} />
-      </div>
-    );
-  }
-  return (
-    <div className="w-64">
-      <p className="text-[11px] font-medium text-slate-500">{style.title}</p>
-      <h3 className="text-sm font-semibold text-slate-900">{features.length} en el mismo sitio</h3>
-      <ul className="mt-2 max-h-56 space-y-0.5 overflow-y-auto text-xs">
-        {features.map((feature, i) => (
-          <li key={i}>
-            <button
-              type="button"
-              onClick={choose(i)}
-              className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-slate-100"
-            >
-              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: riskColorOf(style, feature) }} />
-              <span className="min-w-0 flex-1 truncate text-slate-800">{titleOf(style, feature)}</span>
-              <span className="shrink-0 text-slate-500">{riskClassOf(style, feature)?.label ?? ""}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

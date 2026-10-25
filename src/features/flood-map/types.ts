@@ -345,6 +345,8 @@ export type RiskComponentId = "amenaza" | "exposicion" | "preparacion" | "respue
 /** Entidad GeoJSON de una capa de gestión del riesgo (puntos, líneas o polígonos en WGS84). */
 export interface RiskFeature {
   type: "Feature";
+  /** Identificador en el servicio de origen (ArcGIS); con él se piden sus fotos. */
+  id?: number | string;
   geometry: GeoJSON.Geometry | null;
   properties: Record<string, string | number | boolean | null>;
 }
@@ -361,8 +363,17 @@ export interface RiskLayerData {
   isStale: boolean;
   /** Entidades del origen sin ubicación válida (sin coordenadas o fuera del Ecuador), que no se dibujan. */
   omitted: number;
+  /** Las entidades pueden tener fotos (GET /risk-layers/:id/features/:objectId/attachments). */
+  hasAttachments: boolean;
   type: "FeatureCollection";
   features: RiskFeature[];
+}
+
+/** Foto de una entidad, servida desde el servicio de origen. */
+export interface RiskAttachment {
+  id: number;
+  name: string;
+  url: string;
 }
 
 /** Capa encendida en el mapa, de cualquier pestaña (para la franja "En el mapa"). */
@@ -371,4 +382,12 @@ export interface ActiveLayer {
   label: string;
   component: RiskComponentId;
   turnOff: () => void;
+}
+
+/** Opacidad (0–1) de cada capa de imagen, ajustable desde el panel. */
+export interface OverlayOpacity {
+  forecast: number;
+  observed: number;
+  imerg: number;
+  sea: number;
 }

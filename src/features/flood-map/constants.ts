@@ -41,9 +41,9 @@ export const MAP_PANES = {
   observedRain: { name: "observedRain", zIndex: 345 },
   rain: { name: "rain", zIndex: 350 },
   // Gestión del riesgo: polígonos debajo de los ríos; líneas y puntos encima.
-  riskAreas: { name: "riskAreas", zIndex: 365 },
-  riskLines: { name: "riskLines", zIndex: 385 },
-  riskPoints: { name: "riskPoints", zIndex: 395 },
+  // Un solo lienzo para todas las capas de gestión del riesgo: con uno por capa (o por
+  // geometría), el de arriba se queda con los clics y las de abajo no se pueden tocar.
+  risk: { name: "risk", zIndex: 395 },
   rivers: { name: "rivers", zIndex: 380 },
 } as const;
 
@@ -64,7 +64,6 @@ export const DEFAULT_FORECAST_DAY: ForecastDay = 1;
 
 /** Capa del backend cuya paleta usa la imagen de lluvia acumulada (para la leyenda). */
 export const RAIN_FORECAST_LEGEND_LAYER = "wrf-precipitation-daily";
-export const RAIN_FORECAST_OPACITY = 0.7;
 
 // ── Lluvia observada por satélite ───────────────────────────────────────
 // Productos, nombres y disponibilidad llegan del backend (GET /observed-rain).
@@ -78,10 +77,16 @@ export const OBSERVED_RAIN_WINDOWS: readonly { value: `${RainWindowHours}`; labe
 ];
 
 export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product}-24h`;
-export const OBSERVED_RAIN_OPACITY = 0.7;
 
-// ── Temperatura del mar ─────────────────────────────────────────────────
-export const SEA_TEMPERATURE_OPACITY = 0.7;
+/** Opacidad inicial de cada capa de imagen (después se ajusta con su deslizador). */
+export const DEFAULT_OVERLAY_OPACITY = { forecast: 0.7, observed: 0.7, imerg: 0.7, sea: 0.7 } as const;
+
+/** IMERG (NASA): tasa de lluvia de 30 min, la más reciente ("default"), en teselas de NASA GIBS. */
+export const IMERG_TILE_URL =
+  "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/IMERG_Precipitation_Rate_30min/default/default/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png";
+export const IMERG_LEGEND_URL = "https://gibs.earthdata.nasa.gov/legends/GPM_Precipitation_Rate_H.svg";
+/** GIBS publica IMERG hasta el zoom 6; más cerca, Leaflet amplía esas teselas. */
+export const IMERG_MAX_NATIVE_ZOOM = 6;
 
 // ── Estaciones del INAMHI ───────────────────────────────────────────────
 /**
