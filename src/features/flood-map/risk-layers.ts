@@ -19,7 +19,8 @@ export interface RiskClass {
 export interface RiskPopupField {
   field: string;
   label: string;
-  format?: "date" | "number" | "percent" | "money" | "hectares";
+  /** "plain": número tal cual, sin separador de miles (p. ej. un año). */
+  format?: "date" | "number" | "percent" | "money" | "hectares" | "plain";
 }
 
 export interface RiskLayerStyle {
@@ -34,6 +35,8 @@ export interface RiskLayerStyle {
   /** Color de las entidades que no caen en ninguna clase (o de todas, si no hay clases). */
   color: string;
   classify?: { field: string; classes: readonly RiskClass[]; otherLabel?: string };
+  /** Puntos agrupados en clusters a escala regional (inventarios con miles de puntos o muchos en el mismo sitio). */
+  cluster?: boolean;
   popup: { titleField: string; fallbackTitle: string; fields: readonly RiskPopupField[] };
 }
 
@@ -198,6 +201,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "pin",
     geometry: "point",
     color: NEUTRAL,
+    cluster: true,
     classify: {
       field: "SUSCEPTIBI",
       classes: [
@@ -230,6 +234,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "pin",
     geometry: "point",
     color: "#0d9488",
+    cluster: true,
     popup: RPIS_POPUP([
       { field: "HAU_DESCRI", label: "Horario" },
       { field: "UNI_TELEFO", label: "Teléfono" },
@@ -279,6 +284,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "pin",
     geometry: "point",
     color: NEUTRAL,
+    cluster: true,
     classify: {
       field: "estado",
       classes: [
@@ -297,7 +303,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { field: "estado", label: "Estado" },
         { field: "marca", label: "Marca" },
         { field: "modelo", label: "Modelo" },
-        { field: "a_o", label: "Año" },
+        { field: "a_o", label: "Año", format: "plain" },
         { field: "tiempo_estimado_de_reparaci_n_d", label: "Reparación (días)", format: "number" },
         { field: "provincia", label: "Provincia" },
         { field: "provincia_donde_opera", label: "Opera en" },
@@ -314,6 +320,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "users",
     geometry: "point",
     color: NEUTRAL,
+    cluster: true,
     classify: {
       field: "MODALIDAD",
       classes: [
@@ -466,6 +473,11 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     },
   },
 ];
+
+/** Radio de los puntos sueltos según el zoom: más chicos a escala nacional. */
+export function riskPointRadius(zoom: number): number {
+  return zoom <= 7 ? 3.5 : zoom <= 9 ? 4.5 : 5.5;
+}
 
 /** Clase de la leyenda en la que cae una entidad; null = "otro" (color base de la capa). */
 export function riskClassOf(style: RiskLayerStyle, feature: RiskFeature): RiskClass | null {
