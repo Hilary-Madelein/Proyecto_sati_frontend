@@ -419,6 +419,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               </div>
             ) : (
               <div className="space-y-5">
+                <RiskLayersSection
+                  component={riskTab}
+                  enabled={riskLayersOn}
+                  onToggle={toggleRiskLayer}
+                  stateOf={riskViewState}
+                  periodOf={periodOf}
+                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                />
+                {/* Al final de Preparación, después de sus capas. */}
                 {riskTab === "preparacion" && (
                   <PreparednessSection
                     provinces={cantonAnalysis.snapshot?.provinces ?? null}
@@ -428,14 +437,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                     onVisibleChange={setShowPreparedness}
                   />
                 )}
-                <RiskLayersSection
-                  component={riskTab}
-                  enabled={riskLayersOn}
-                  onToggle={toggleRiskLayer}
-                  stateOf={riskViewState}
-                  periodOf={periodOf}
-                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
-                />
                 <p className="text-[11px] text-slate-500">
                   Lo que enciendas en cualquier componente se ve junto en el mapa, para cruzar la información.
                 </p>
