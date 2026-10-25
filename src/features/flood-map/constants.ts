@@ -208,7 +208,7 @@ export const FLOOD_HUB_SEVERITIES: Record<FloodHubSeverity, { label: string; col
   unknown: { label: "Sin dato", color: "#cbd5e1", sizePx: 10 },
 };
 
-// ── Análisis por cantón (lluvia de 12 h) ────────────────────────────────
+// ── Alerta de inundación por cantón (lluvia pronosticada de 12 y 24 h) ──
 /** Semáforo del documento de la SNGR, en tres colores (el naranja pasa a rojo). */
 /**
  * Semáforo del índice de preparación provincial (documento "Semaforización para
@@ -230,10 +230,11 @@ export const PREPAREDNESS_INDICATOR_LABELS: Record<PreparednessIndicator, string
   roadProjects: "Proyectos viales en ejecución o terminados",
 };
 
-export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; color: string; panelClass: string }> = {
-  red: { label: "Rojo", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
-  yellow: { label: "Amarillo", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
-  green: { label: "Verde", color: "#16a34a", panelClass: "bg-green-50 text-green-900 ring-1 ring-green-600/20" },
+export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; alert: string; color: string; panelClass: string }> = {
+  // Se nombra por el nivel de alerta, no por el color (rojo = alta, amarillo = moderada, verde = baja).
+  red: { label: "Alta", alert: "Alerta alta", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
+  yellow: { label: "Moderada", alert: "Alerta moderada", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
+  green: { label: "Baja", alert: "Alerta baja", color: "#16a34a", panelClass: "bg-green-50 text-green-900 ring-1 ring-green-600/20" },
 };
 
 /** Niveles con aviso, los únicos que se dibujan (de mayor a menor). */

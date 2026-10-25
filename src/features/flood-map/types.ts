@@ -450,6 +450,17 @@ export interface CantonAnalysis {
   };
 }
 
+/** Una fila de la tabla del documento: categoría, desde cuántos mm empieza (12 y 24 h), nivel, consecuencias y acciones. */
+export interface RainBand {
+  category: RainCategory;
+  label: string;
+  from12h: number;
+  from24h: number;
+  semaphore: Semaphore;
+  consequences: string;
+  actions: string;
+}
+
 /** Indicadores del índice de preparación provincial (ISPP-FEN). */
 export type PreparednessIndicator = "shelters" | "camps" | "preventiveActions" | "roadProjects";
 /** Semáforo del índice, de menor a mayor preparación relativa. */
@@ -475,6 +486,8 @@ export interface CantonAnalysisSnapshot {
   counts: Record<Semaphore, number> & { noData: number };
   /** Del más al menos afectado. */
   cantons: CantonAnalysis[];
+  /** Tabla del documento, de menor a mayor categoría (para la leyenda). */
+  bands: RainBand[];
   /** Índice de preparación de las 24 provincias, de la más a la menos preparada. */
   provinces: ProvincePreparedness[];
   sources: { name: string; ok: boolean; detail: string }[];

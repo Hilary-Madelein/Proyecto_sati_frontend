@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime, formatHour } from "@/lib/format";
 import { SEMAPHORE_STYLES } from "../../constants";
 import { DEFAULT_CANTON_FILTERS, RAIN_CATEGORIES, filterCantons, isFiltered, type CantonFilters } from "../../canton-filters";
-import type { CantonAnalysis, CantonAnalysisSnapshot, RainCategory, Semaphore } from "../../types";
+import type { CantonAnalysis, CantonAnalysisSnapshot, RainBand, RainCategory, Semaphore } from "../../types";
 import { Notice } from "./RainForecastSection";
 
 interface CantonAnalysisPanelProps {
@@ -27,9 +27,9 @@ const counted = (value: number, singular: string, plural: string) => `${formatCo
 const PREVIEW = 15;
 
 /**
- * Semáforo por cantón con la lluvia pronosticada (WRF) de las próximas 12 y 24 h
- * (umbrales del documento de la SNGR: verde, amarillo y rojo; manda el más alto
- * de los dos) y, por cantón alertado, sus factores detonantes, elementos
+ * Alerta de inundación por cantón con la lluvia pronosticada (WRF) de las
+ * próximas 12 y 24 h (umbrales del documento de la SNGR: alerta alta, moderada
+ * y baja; manda el nivel más alto de las dos) y, por cantón alertado, sus factores detonantes, elementos
  * expuestos, acciones preventivas y herramientas para la respuesta.
  */
 export function CantonAnalysisPanel({
@@ -67,28 +67,31 @@ export function CantonAnalysisPanel({
 
   return (
     <div className="space-y-3">
-      {/* Contadores: también filtran la lista por color (tocar de nuevo vuelve a rojo y amarillo). */}
-      <div className="grid grid-cols-3 gap-2">
-        {(["red", "yellow", "green"] as const).map((semaphore) => (
-          <button
-            key={semaphore}
-            type="button"
-            // Tocar de nuevo el mismo color vuelve a rojo y amarillo; la categoría se reinicia.
-            onClick={() => update({ color: color === semaphore ? "alerted" : semaphore, category: null })}
-            aria-pressed={color === semaphore}
-            className={cn(
-              "rounded-xl p-2 text-left ring-1 transition focus-visible:outline-2 focus-visible:outline-blue-600",
-              color === semaphore ? "bg-white ring-2" : "bg-white ring-slate-200 hover:ring-slate-300",
-            )}
-            style={color === semaphore ? { ["--tw-ring-color" as string]: SEMAPHORE_STYLES[semaphore].color } : undefined}
-          >
-            <span className="block text-xl font-semibold text-slate-900 tabular-nums">{counts[semaphore]}</span>
-            <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-              <SemaphoreDot semaphore={semaphore} />
-              {SEMAPHORE_STYLES[semaphore].label}
-            </span>
-          </button>
-        ))}
+      {/* Contadores por nivel de alerta: también filtran la lista (tocar de nuevo vuelve a alta y moderada). */}
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Cantones por nivel de alerta</p>
+        <div className="grid grid-cols-3 gap-2">
+          {(["red", "yellow", "green"] as const).map((semaphore) => (
+            <button
+              key={semaphore}
+              type="button"
+              // Tocar de nuevo el mismo nivel vuelve a alta y moderada; la categoría se reinicia.
+              onClick={() => update({ color: color === semaphore ? "alerted" : semaphore, category: null })}
+              aria-pressed={color === semaphore}
+              className={cn(
+                "rounded-xl p-2 text-left ring-1 transition focus-visible:outline-2 focus-visible:outline-blue-600",
+                color === semaphore ? "bg-white ring-2" : "bg-white ring-slate-200 hover:ring-slate-300",
+              )}
+              style={color === semaphore ? { ["--tw-ring-color" as string]: SEMAPHORE_STYLES[semaphore].color } : undefined}
+            >
+              <span className="block text-xl font-semibold text-slate-900 tabular-nums">{counts[semaphore]}</span>
+              <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <SemaphoreDot semaphore={semaphore} />
+                {SEMAPHORE_STYLES[semaphore].label}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
       <p className="text-[11px] text-slate-500">
         Lluvia pronosticada para las próximas 12 y 24 h
@@ -189,7 +192,7 @@ export function CantonAnalysisPanel({
         </>
       )}
 
-      <ThresholdsLegend />
+      <AlertLegend bands={snapshot.bands} />
       <p className="text-[11px] text-slate-500">
         Pronóstico del modelo WRF del INAMHI. Actualizado el {formatDateTime(snapshot.updatedAt)}, cada hora. Es apoyo a la
         decisión, no un aviso oficial.
@@ -199,41 +202,55 @@ export function CantonAnalysisPanel({
   );
 }
 
-/** Umbrales del documento en una tabla corta: color, lluvia pronosticada en 12 h y en 24 h. */
-function ThresholdsLegend() {
-  const rows = [
-    { semaphore: "red", h12: "30 mm o más", h24: "50 mm o más" },
-    { semaphore: "yellow", h12: "5 a 29,9 mm", h24: "10 a 49,9 mm" },
-    { semaphore: "green", h12: "menos de 5 mm", h24: "menos de 10 mm" },
-  ] as const;
+/** "30 a 69,9 mm", "140 mm o más", "menos de 0,1 mm". */
+function rangeText(from: number, next: number | undefined): string {
+  const mm = (value: number) => value.toLocaleString("es-EC", { maximumFractionDigits: 1 });
+  if (from === 0) return `menos de ${mm(next ?? 0)} mm`;
+  return next === undefined ? `${mm(from)} mm o más` : `${mm(from)} a ${mm(Math.round((next - 0.1) * 10) / 10)} mm`;
+}
+
+const ALERT_LEVELS: readonly Semaphore[] = ["red", "yellow", "green"];
+
+/**
+ * Leyenda de la alerta de inundación con la tabla del documento: una franja por
+ * nivel (alta, moderada, baja) con su lluvia de 12 y 24 h, y debajo cada
+ * categoría con sus potenciales consecuencias y acciones recomendadas.
+ */
+function AlertLegend({ bands }: { bands: readonly RainBand[] }) {
   return (
-    <section className="rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200/70">
-      <table className="w-full text-[11px]">
-        <caption className="mb-1 text-left font-semibold text-slate-600">¿Cómo se asigna el color?</caption>
-        <thead>
-          <tr className="text-left text-slate-400">
-            <th className="pb-1 font-medium">Color</th>
-            <th className="pb-1 font-medium">Lluvia en 12 h</th>
-            <th className="pb-1 font-medium">Lluvia en 24 h</th>
-          </tr>
-        </thead>
-        <tbody className="text-slate-700">
-          {rows.map((row) => (
-            <tr key={row.semaphore}>
-              <td className="py-0.5">
-                <span className="flex items-center gap-1.5">
-                  <SemaphoreDot semaphore={row.semaphore} />
-                  {SEMAPHORE_STYLES[row.semaphore].label}
-                </span>
-              </td>
-              <td className="py-0.5 tabular-nums">{row.h12}</td>
-              <td className="py-0.5 tabular-nums">{row.h24}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-1.5 text-[11px] text-slate-500">
-        Con la lluvia pronosticada, el cantón toma el color más alto de las dos. Los verdes no se listan.
+    <section className="space-y-2">
+      <h4 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Niveles de alerta</h4>
+      {ALERT_LEVELS.map((level) => {
+        const levelBands = bands.filter((band) => band.semaphore === level);
+        if (levelBands.length === 0) return null;
+        const lowest = levelBands[0];
+        const above = bands[bands.indexOf(levelBands[levelBands.length - 1]) + 1];
+        const style = SEMAPHORE_STYLES[level];
+        return (
+          <div key={level} className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+            <div className="px-2.5 py-1.5 text-white" style={{ backgroundColor: style.color }}>
+              <p className="text-xs font-bold tracking-wide uppercase">{style.alert}</p>
+              <p className="text-[10px] opacity-90">
+                12 h: {rangeText(lowest.from12h, above?.from12h)} · 24 h: {rangeText(lowest.from24h, above?.from24h)}
+              </p>
+            </div>
+            <ul className="divide-y divide-slate-100 bg-white">
+              {[...levelBands].reverse().map((band) => (
+                <li key={band.category} className="px-2.5 py-1.5 text-[11px]">
+                  <p className="font-semibold text-slate-800">{band.label}</p>
+                  <p className="text-slate-600">{band.consequences}</p>
+                  <p className="text-slate-500">
+                    <span className="font-medium">Acción:</span> {band.actions}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      <p className="text-[11px] text-slate-500">
+        Cada ventana (12 y 24 h) se clasifica con sus umbrales y el cantón toma el nivel más alto de las dos. Los cantones con
+        alerta baja no se listan.
       </p>
     </section>
   );
@@ -291,8 +308,13 @@ function CantonDetail({ canton }: { canton: CantonAnalysis }) {
   return (
     <div className="space-y-3 border-t border-slate-100 px-3 pt-2.5 pb-3 text-xs">
       <div className={cn("rounded-lg p-2", SEMAPHORE_STYLES[canton.semaphore].panelClass)}>
-        <p className="font-semibold">{canton.consequences}</p>
-        <p className="mt-0.5">{canton.actions}</p>
+        <p className="text-[10px] font-bold tracking-wide uppercase">
+          {SEMAPHORE_STYLES[canton.semaphore].alert} · {canton.categoryLabel}
+        </p>
+        <p className="mt-0.5 font-semibold">{canton.consequences}</p>
+        <p className="mt-0.5">
+          <span className="font-medium">Acción:</span> {canton.actions}
+        </p>
       </div>
 
       <RainSummary canton={canton} />

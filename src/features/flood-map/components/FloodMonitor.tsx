@@ -446,12 +446,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         </ResponsivePanel>
 
         <ResponsivePanel
-          title={eventsTab === "analysis" ? "Análisis por cantón" : "Eventos críticos"}
+          title={eventsTab === "analysis" ? "Alerta de inundación" : "Eventos críticos"}
           subtitle={
             eventsTab === "analysis"
               ? cantonAnalysis.snapshot
-                ? `Pronóstico de lluvia de 12 y 24 h · WRF · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
-                : "Pronóstico de lluvia de 12 y 24 h · WRF"
+                ? `Por cantón · lluvia pronosticada de 12 y 24 h (WRF) · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
+                : "Por cantón · lluvia pronosticada de 12 y 24 h (WRF)"
               : eventsError
                 ? "Sin conexión con el servidor de datos"
                 : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
@@ -479,7 +479,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               value={eventsTab}
               options={[
                 { value: "events", label: "Eventos" },
-                { value: "analysis", label: "Análisis por cantón" },
+                { value: "analysis", label: "Alerta de inundación" },
               ]}
               onChange={setEventsTab}
             />

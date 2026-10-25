@@ -2,7 +2,7 @@ import type { CantonAnalysis, RainCategory, Semaphore } from "./types";
 
 /** Filtros del análisis por cantón; se aplican igual a la lista y al mapa. */
 export interface CantonFilters {
-  /** "alerted" = rojo y amarillo (lo que se muestra al inicio). */
+  /** "alerted" = alerta alta y moderada (lo que se muestra al inicio). */
   color: Semaphore | "alerted";
   category: RainCategory | null;
   /** "" = todas. */
