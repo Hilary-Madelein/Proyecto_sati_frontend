@@ -211,6 +211,9 @@ function rangeText(from: number, next: number | undefined): string {
 
 const ALERT_LEVELS: readonly Semaphore[] = ["red", "yellow", "green"];
 
+/** "Extrema" → "Lluvia extrema": la categoría es de la lluvia, no de la alerta. */
+const rainLabel = (label: string) => `Lluvia ${label.toLowerCase()}`;
+
 /**
  * Leyenda de la alerta de inundación con la tabla del documento: una franja por
  * nivel (alta, moderada, baja) con su lluvia de 12 y 24 h, y debajo cada
@@ -237,7 +240,7 @@ function AlertLegend({ bands }: { bands: readonly RainBand[] }) {
             <ul className="divide-y divide-slate-100 bg-white">
               {[...levelBands].reverse().map((band) => (
                 <li key={band.category} className="px-2.5 py-1.5 text-[11px]">
-                  <p className="font-semibold text-slate-800">{band.label}</p>
+                  <p className="font-semibold text-slate-800">{rainLabel(band.label)}</p>
                   <p className="text-slate-600">{band.consequences}</p>
                   <p className="text-slate-500">
                     <span className="font-medium">Acción:</span> {band.actions}
@@ -286,7 +289,7 @@ function CantonRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-slate-900">{canton.name}</span>
           <span className="block truncate text-[11px] text-slate-500">
-            {canton.province} · {canton.categoryLabel.toLowerCase()}
+            {canton.province} · {rainLabel(canton.categoryLabel).toLowerCase()}
           </span>
         </span>
         {/* La lluvia pronosticada de la ventana que decidió el color. */}
@@ -309,7 +312,7 @@ function CantonDetail({ canton }: { canton: CantonAnalysis }) {
     <div className="space-y-3 border-t border-slate-100 px-3 pt-2.5 pb-3 text-xs">
       <div className={cn("rounded-lg p-2", SEMAPHORE_STYLES[canton.semaphore].panelClass)}>
         <p className="text-[10px] font-bold tracking-wide uppercase">
-          {SEMAPHORE_STYLES[canton.semaphore].alert} · {canton.categoryLabel}
+          {SEMAPHORE_STYLES[canton.semaphore].alert} · {rainLabel(canton.categoryLabel)}
         </p>
         <p className="mt-0.5 font-semibold">{canton.consequences}</p>
         <p className="mt-0.5">
@@ -437,7 +440,7 @@ function RainWindowTile({
     >
       <p className="text-[11px] text-slate-500">Próximas {window}</p>
       <p className="text-base font-semibold text-slate-900 tabular-nums">{mm === null ? "—" : formatMm(mm)}</p>
-      {category && <p className="text-[10px] text-slate-500">{CATEGORY_LABELS[category]}</p>}
+      {category && <p className="text-[10px] text-slate-500">{rainLabel(CATEGORY_LABELS[category])}</p>}
       {decides && <p className="mt-0.5 text-[10px] font-semibold text-slate-700">Define el color</p>}
     </div>
   );

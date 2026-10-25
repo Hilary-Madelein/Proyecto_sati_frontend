@@ -305,7 +305,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           }
           cantonGeometries={cantonGeometries}
           provincePreparedness={
-            showPreparedness && cantonAnalysis.snapshot && provinceGeometries
+            showPreparedness && cantonAnalysis.snapshot?.provinces && provinceGeometries
               ? { provinces: cantonAnalysis.snapshot.provinces, geometries: provinceGeometries }
               : null
           }
