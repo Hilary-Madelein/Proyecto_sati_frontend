@@ -3,9 +3,8 @@ import type {
   EventFilters,
   EventPeriod,
   EventSeverity,
-  FlashFloodProbability,
-  FluvialLevel,
-  HistoricalFrequency,
+  FloodHubGauge,
+  FloodHubSeverity,
   LatLngBounds,
   LayerVisibility,
   ObservedRainProduct,
@@ -41,10 +40,11 @@ export const MAP_PANES = {
   seaTemperature: { name: "seaTemperature", zIndex: 340 },
   observedRain: { name: "observedRain", zIndex: 345 },
   rain: { name: "rain", zIndex: 350 },
-  historical: { name: "historical", zIndex: 360 },
-  flash: { name: "flash", zIndex: 370 },
+  // Gestión del riesgo: polígonos debajo de los ríos; líneas y puntos encima.
+  riskAreas: { name: "riskAreas", zIndex: 365 },
+  riskLines: { name: "riskLines", zIndex: 385 },
+  riskPoints: { name: "riskPoints", zIndex: 395 },
   rivers: { name: "rivers", zIndex: 380 },
-  fluvial: { name: "fluvial", zIndex: 390 },
 } as const;
 
 // ── Lluvia pronosticada (WRF), día por día ──────────────────────────────
@@ -136,21 +136,28 @@ export const STATION_FORECAST_LABELS: Record<ForecastDay, string> = {
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   riverNetwork: false,
   riverAlerts: true,
-  fluvial: false,
-  flash: false,
-  historical: false,
+  floodHub: false,
 };
 
-// ── Inundaciones fluviales (simuladas) ──────────────────────────────────
-export const FLUVIAL_LEVELS: Record<FluvialLevel, { label: string; color: string }> = {
-  extremo: { label: "Extremo", color: "#7a0a0a" },
-  peligro: { label: "Peligro", color: "#ee1c1c" },
-  advertencia: { label: "Advertencia", color: "#f5a00b" },
-  normal: { label: "Normal", color: "#2fbf2f" },
-  "sin-datos": { label: "Sin datos", color: "#8c8c8c" },
+// ── Google Flood Hub ────────────────────────────────────────────────────
+/** Niveles de Flood Hub con los colores de su sitio. */
+export const FLOOD_HUB_SEVERITIES: Record<FloodHubSeverity, { label: string; color: string; sizePx: number }> = {
+  extreme: { label: "Extremo", color: "#7e22ce", sizePx: 16 },
+  severe: { label: "Severo", color: "#dc2626", sizePx: 15 },
+  above_normal: { label: "Sobre lo normal", color: "#f59e0b", sizePx: 14 },
+  no_flooding: { label: "Sin inundación", color: "#94a3b8", sizePx: 10 },
+  unknown: { label: "Sin dato", color: "#cbd5e1", sizePx: 10 },
 };
 
-export const FLUVIAL_LEVEL_ORDER: FluvialLevel[] = ["extremo", "peligro", "advertencia", "normal", "sin-datos"];
+/** Niveles con aviso, los únicos que se dibujan (de mayor a menor). */
+export const FLOOD_HUB_FLAGGED_ORDER: FloodHubSeverity[] = ["extreme", "severe", "above_normal"];
+
+export const FLOOD_HUB_TRENDS: Record<FloodHubGauge["trend"], string> = {
+  rise: "Subiendo",
+  fall: "Bajando",
+  no_change: "Estable",
+  unknown: "Sin dato",
+};
 
 // ── Caudales (GEOGLOWS) ─────────────────────────────────────────────────
 /** Capa vectorial de la red de ríos en el backend. */
@@ -182,24 +189,6 @@ export const HYDROGRAPH_COLORS = {
   highRes: "#eb6834",
   antecedent: "#1baf7a",
 } as const;
-
-export const FLASH_FLOOD_PROBABILITIES: Record<
-  FlashFloodProbability,
-  { label: string; fill: string; stroke: string }
-> = {
-  "muy-probable": { label: "Muy probable", fill: "#f8a3a3", stroke: "#e23b3b" },
-  probable: { label: "Probable", fill: "#fdc98a", stroke: "#f39a2b" },
-};
-
-export const FLASH_FLOOD_ORDER: FlashFloodProbability[] = ["muy-probable", "probable"];
-
-export const HISTORICAL_FREQUENCIES: Record<HistoricalFrequency, { label: string; color: string }> = {
-  p5: { label: "5% del tiempo", color: "#8e14c4" },
-  p1: { label: "1% del tiempo", color: "#d665f0" },
-  p05: { label: "0,5% del tiempo", color: "#ebc3f5" },
-};
-
-export const HISTORICAL_FREQUENCY_ORDER: HistoricalFrequency[] = ["p5", "p1", "p05"];
 
 // ── Eventos críticos ────────────────────────────────────────────────────
 /**
@@ -316,56 +305,26 @@ export interface PlannedLayer {
   icon: PlannedLayerIcon;
 }
 
-/** Capas previstas de cada componente, en el orden en que se muestran (aún sin fuente de datos). */
+/**
+ * Capas previstas de cada componente que aún no tienen datos que se puedan leer.
+ * Las que ya tienen fuente están en RISK_LAYER_STYLES (risk-layers.ts).
+ */
 export const PLANNED_LAYERS: Record<RiskComponentId, readonly PlannedLayer[]> = {
-  amenaza: [
-    {
-      id: "mass-movements",
-      title: "Movimientos de masa",
-      description: "Deslizamientos y zonas susceptibles.",
-      icon: "mountain",
-    },
-    {
-      id: "rve-critical-points",
-      title: "Puntos críticos en la Red Vial Estatal",
-      description: "Tramos de la RVE con problemas recurrentes.",
-      icon: "alert",
-    },
-  ],
-  exposicion: [
-    { id: "rve", title: "Red Vial Estatal (RVE)", description: "Vías del Estado que pueden quedar afectadas.", icon: "map" },
-    { id: "bridges", title: "Puentes", description: "Puentes de la red vial.", icon: "map" },
-    { id: "schools", title: "Centros de educación", description: "Escuelas y colegios.", icon: "pin" },
-    { id: "health-centers", title: "Centros médicos", description: "Hospitales y centros de salud.", icon: "pin" },
-  ],
+  amenaza: [],
+  exposicion: [],
   preparacion: [
-    { id: "machinery", title: "Maquinaria distribuida a nivel nacional", description: "Dónde está la maquinaria disponible.", icon: "pin" },
-    { id: "shelters", title: "Albergues destinados a atención", description: "Albergues habilitados para la emergencia.", icon: "users" },
-    { id: "rve-preventive-works", title: "Trabajos preventivos en la RVE", description: "Obras preventivas en la Red Vial Estatal.", icon: "shield" },
     {
       id: "microenterprises",
       title: "Microempresas distribuidas a nivel nacional",
-      description: "Microempresas de mantenimiento vial y su ubicación.",
+      description: "Microempresas de mantenimiento vial y su ubicación. Falta el servicio.",
       icon: "users",
-    },
-    {
-      id: "microenterprises-loja",
-      title: "Seguimiento de microempresas en Loja",
-      description: "Avance de las microempresas de la provincia de Loja.",
-      icon: "users",
-    },
-    {
-      id: "el-nino-road-projects",
-      title: "Proyectos viales asociados al fenómeno de El Niño",
-      description: "Proyectos para reducir el impacto de El Niño en las vías.",
-      icon: "shield",
     },
   ],
   respuesta: [
     {
       id: "rve-recovery",
       title: "Trabajos para recuperar la transitabilidad en la RVE",
-      description: "Intervenciones para reabrir las vías afectadas.",
+      description: "El servicio compartido solo permite llenar el formulario; falta su vista de resultados.",
       icon: "refresh",
     },
   ],

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/icons";
 import type { PlannedLayer, PlannedLayerIcon } from "../../constants";
 
-const ICONS: Record<PlannedLayerIcon, (props: { className?: string }) => ReactNode> = {
+export const PLANNED_LAYER_ICONS: Record<PlannedLayerIcon, (props: { className?: string }) => ReactNode> = {
   waves: WavesIcon,
   mountain: MountainIcon,
   alert: AlertTriangleIcon,
@@ -25,7 +25,7 @@ const ICONS: Record<PlannedLayerIcon, (props: { className?: string }) => ReactNo
 
 /** Capa prevista sin fuente de datos todavía: ocupa su lugar en la pestaña, sin interruptor. */
 export function PlannedLayerCard({ layer }: { layer: PlannedLayer }) {
-  const Icon = ICONS[layer.icon];
+  const Icon = PLANNED_LAYER_ICONS[layer.icon];
   return (
     <li className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-3">
       <IconTile className="bg-slate-100 text-slate-400">

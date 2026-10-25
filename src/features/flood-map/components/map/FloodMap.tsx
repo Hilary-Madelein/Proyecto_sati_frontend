@@ -11,26 +11,27 @@ import {
   RAIN_FORECAST_OPACITY,
   SEA_TEMPERATURE_OPACITY,
 } from "../../constants";
+import type { RiskLayerStyle } from "../../risk-layers";
 import type {
   DailyRainForecast,
   FloodMapData,
   HazardEvent,
   LayerVisibility,
   ObservedAccumulatedRain,
+  RiskLayerData,
   SeaTemperatureAnomaly,
   SelectedRiver,
   WeatherStationsSnapshot,
 } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
-import { FlashFloodLayer } from "./FlashFloodLayer";
-import { FluvialStationsLayer } from "./FluvialStationsLayer";
-import { HistoricalFloodLayer } from "./HistoricalFloodLayer";
+import { FloodHubLayer } from "./FloodHubLayer";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
+import { RiskFeatureLayer } from "./RiskFeatureLayer";
 import { RiverNetworkLayer } from "./RiverNetworkLayer";
 import { WeatherStationsLayer } from "./WeatherStationsLayer";
 
@@ -47,6 +48,8 @@ export interface FloodMapProps {
   seaTemperature: SeaTemperatureAnomaly | null;
   /** Lluvia medida en las estaciones del INAMHI; null = sin capa. */
   weatherStations: WeatherStationsSnapshot | null;
+  /** Capas de gestión del riesgo encendidas y con datos, en el orden en que se dibujan. */
+  riskLayers: Array<{ style: RiskLayerStyle; data: RiskLayerData }>;
   onRainLoadingChange: (loading: boolean) => void;
   onObservedRainLoadingChange: (loading: boolean) => void;
   onSeaLoadingChange: (loading: boolean) => void;
@@ -74,6 +77,7 @@ export default function FloodMap({
   observedRain,
   seaTemperature,
   weatherStations,
+  riskLayers,
   onRainLoadingChange,
   onObservedRainLoadingChange,
   onSeaLoadingChange,
@@ -133,21 +137,15 @@ export default function FloodMap({
           />
         </Pane>
       )}
-      {layers.historical && (
-        <Pane name={MAP_PANES.historical.name} style={{ zIndex: MAP_PANES.historical.zIndex }}>
-          <HistoricalFloodLayer zones={data.historicalZones} />
-        </Pane>
-      )}
-      {layers.flash && (
-        <Pane name={MAP_PANES.flash.name} style={{ zIndex: MAP_PANES.flash.zIndex }}>
-          <FlashFloodLayer zones={data.flashFloodZones} />
-        </Pane>
-      )}
-      {layers.fluvial && (
-        <Pane name={MAP_PANES.fluvial.name} style={{ zIndex: MAP_PANES.fluvial.zIndex }}>
-          <FluvialStationsLayer stations={data.fluvialStations} />
-        </Pane>
-      )}
+      {/* Panes fijos (vacíos si no hay capas): cada capa elige el suyo según su geometría. */}
+      <Pane name={MAP_PANES.riskAreas.name} style={{ zIndex: MAP_PANES.riskAreas.zIndex }} />
+      <Pane name={MAP_PANES.riskLines.name} style={{ zIndex: MAP_PANES.riskLines.zIndex }} />
+      <Pane name={MAP_PANES.riskPoints.name} style={{ zIndex: MAP_PANES.riskPoints.zIndex }} />
+      {riskLayers.map(({ style, data }) => (
+        <RiskFeatureLayer key={style.id} style={style} data={data} />
+      ))}
+      {/* Marcadores en el panel de Leaflet: su popup queda encima de todo. */}
+      {layers.floodHub && data.floodHub && <FloodHubLayer snapshot={data.floodHub} />}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
       {weatherStations && <WeatherStationsLayer snapshot={weatherStations} rain={data.rain} />}
       {layers.riverNetwork && (

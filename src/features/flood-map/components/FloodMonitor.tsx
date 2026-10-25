@@ -13,7 +13,6 @@ import {
   DEFAULT_EVENT_FILTERS,
   DEFAULT_LAYER_VISIBILITY,
   DEFAULT_RISK_COMPONENT,
-  PLANNED_LAYERS,
   RISK_COMPONENTS,
   DEFAULT_FORECAST_DAY,
   FORECAST_DAY_LABELS,
@@ -23,7 +22,9 @@ import {
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
+import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
+import { RISK_LAYER_STYLES } from "../risk-layers";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -47,9 +48,8 @@ import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { RISK_COMPONENT_ICONS, RiskComponentBar } from "./navigation/RiskComponentBar";
 import { ActiveLayersBar } from "./panels/ActiveLayersBar";
-import { RiversSection, SimulatedFloodSection } from "./panels/FloodLayersSection";
-import { PlannedLayerList } from "./panels/PlannedLayers";
-import { SectionHeading } from "./panels/SectionHeading";
+import { FloodHubSection, RiversSection } from "./panels/FloodLayersSection";
+import { RiskLayersSection } from "./panels/RiskLayersSection";
 import { ObservedRainSection } from "./panels/ObservedRainSection";
 import { RainForecastSection } from "./panels/RainForecastSection";
 import { SeaTemperatureSection } from "./panels/SeaTemperatureSection";
@@ -94,6 +94,9 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [riverTarget, setRiverTarget] = useState<RiverTarget | null>(null);
 
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYER_VISIBILITY);
+  // Capas de gestión del riesgo (servicios de ArcGIS y GeoJSON propios): apagadas al inicio, se piden al encenderlas.
+  const [riskLayersOn, setRiskLayersOn] = useState<ReadonlySet<string>>(() => new Set());
+  const riskLayerState = useRiskLayers([...riskLayersOn]);
   // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
   // pero las encendidas de los demás siguen en el mapa (así se cruza la información).
   const [riskTab, setRiskTab] = useState<RiskComponentId>(DEFAULT_RISK_COMPONENT);
@@ -156,11 +159,20 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     showStations && { key: "stations", label: "Lluvia en estaciones", component: "amenaza" as const, turnOff: () => setShowStations(false) },
     layers.riverNetwork && { key: "riverNetwork", label: "Red de ríos", component: "amenaza" as const, turnOff: () => toggleLayer("riverNetwork", false) },
     layers.riverAlerts && { key: "riverAlerts", label: "Alertas por caudal", component: "amenaza" as const, turnOff: () => toggleLayer("riverAlerts", false) },
-    layers.historical && { key: "historical", label: "Inundaciones históricas", component: "amenaza" as const, turnOff: () => toggleLayer("historical", false) },
-    layers.fluvial && { key: "fluvial", label: "Inundaciones fluviales", component: "amenaza" as const, turnOff: () => toggleLayer("fluvial", false) },
-    layers.flash && { key: "flash", label: "Inundaciones repentinas", component: "amenaza" as const, turnOff: () => toggleLayer("flash", false) },
+    layers.floodHub && { key: "floodHub", label: "Flood Hub", component: "amenaza" as const, turnOff: () => toggleLayer("floodHub", false) },
     showSea && { key: "sea", label: "Temperatura del mar", component: "amenaza" as const, turnOff: () => setShowSea(false) },
+    ...RISK_LAYER_STYLES.filter((layer) => riskLayersOn.has(layer.id)).map((layer) => ({
+      key: `risk:${layer.id}`,
+      label: layer.title,
+      component: layer.component,
+      turnOff: () => toggleRiskLayer(layer.id, false),
+    })),
   ].filter((layer) => layer !== false);
+  // Se dibujan en el orden del catálogo, con los datos ya recibidos.
+  const visibleRiskLayers = RISK_LAYER_STYLES.flatMap((style) => {
+    const data = riskLayersOn.has(style.id) ? riskLayerState(style.id).data : null;
+    return data ? [{ style, data }] : [];
+  });
   const activeCounts = Object.fromEntries(
     RISK_COMPONENTS.map((item) => [item.id, activeLayers.filter((layer) => layer.component === item.id).length]),
   ) as Record<RiskComponentId, number>;
@@ -195,6 +207,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const toggleLayer = (layer: FloodLayerId, enabled: boolean) =>
     setLayers((current) => ({ ...current, [layer]: enabled }));
 
+  const toggleRiskLayer = (id: string, enabled: boolean) =>
+    setRiskLayersOn((current) => {
+      const next = new Set(current);
+      if (enabled) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
   const selectEvent = (id: string) => {
     setSelectedEventId(id);
     setFocusRequest((n) => n + 1);
@@ -215,6 +235,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           observedRain={observedRain}
           seaTemperature={showSea ? data.seaTemperature : null}
           weatherStations={showStations ? stations.snapshot : null}
+          riskLayers={visibleRiskLayers}
           onRainLoadingChange={setRainLoading}
           onObservedRainLoadingChange={setObservedRainLoading}
           onSeaLoadingChange={setSeaLoading}
@@ -288,11 +309,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   alertDayIndex={alertDayIndex}
                   onAlertDayChange={setAlertDayIndex}
                 />
-                <SimulatedFloodSection data={data} layers={layers} onToggleLayer={toggleLayer} />
-                <section>
-                  <SectionHeading>Otras amenazas</SectionHeading>
-                  <PlannedLayerList layers={PLANNED_LAYERS.amenaza} />
-                </section>
+                <FloodHubSection data={data} layers={layers} onToggleLayer={toggleLayer} />
+                <RiskLayersSection component="amenaza" enabled={riskLayersOn} onToggle={toggleRiskLayer} stateOf={riskLayerState} />
                 <SeaTemperatureSection
                   sea={data.seaTemperature}
                   visible={showSea}
@@ -301,14 +319,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 />
               </div>
             ) : (
-              <section>
-                <SectionHeading>Capas</SectionHeading>
-                <PlannedLayerList layers={PLANNED_LAYERS[riskTab]} />
+              <div>
+                <RiskLayersSection component={riskTab} enabled={riskLayersOn} onToggle={toggleRiskLayer} stateOf={riskLayerState} />
                 <p className="mt-3 text-[11px] text-slate-500">
-                  Estas capas se agregarán cuando estén sus datos. Lo que enciendas en cualquier componente se ve junto en el mapa,
-                  para cruzar la información.
+                  Lo que enciendas en cualquier componente se ve junto en el mapa, para cruzar la información.
                 </p>
-              </section>
+              </div>
             )}
           </div>
         </ResponsivePanel>

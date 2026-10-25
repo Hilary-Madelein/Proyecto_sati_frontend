@@ -103,18 +103,35 @@ export interface SeaPointValue {
   anomaly: number | null;
 }
 
-// ── Inundaciones fluviales (simuladas hasta conectar su fuente) ─────────
-export type FluvialLevel = "extremo" | "peligro" | "advertencia" | "normal" | "sin-datos";
+// ── Google Flood Hub (vía backend) ──────────────────────────────────────
+/** Nivel de inundación que pronostica Flood Hub en un punto. */
+export type FloodHubSeverity = "unknown" | "no_flooding" | "above_normal" | "severe" | "extreme";
+export type FloodHubTrend = "rise" | "fall" | "no_change" | "unknown";
 
-export interface FluvialStation {
+/** Punto de pronóstico de Flood Hub (una cuenca) con su último estado (GET /flood-hub). */
+export interface FloodHubGauge {
   id: string;
-  name: string;
-  river: string;
-  province: string;
-  position: LatLng;
-  level: FluvialLevel;
-  /** Caudal en m³/s; null cuando la estación no reporta. */
-  flowM3s: number | null;
+  lat: number;
+  lng: number;
+  severity: FloodHubSeverity;
+  trend: FloodHubTrend;
+  /** Google verificó la calidad del modelo en este punto. */
+  verified: boolean;
+  issuedAt: string | null;
+  /** Ventana del pronóstico a la que se refiere el nivel. */
+  forecastFrom: string | null;
+  forecastTo: string | null;
+}
+
+export interface FloodHubSnapshot {
+  fetchedAt: string;
+  issuedAt: string | null;
+  attribution: string;
+  isStale: boolean;
+  /** Puntos por encima de lo normal, severos o extremos. */
+  flaggedCount: number;
+  /** Primero los de mayor severidad. */
+  gauges: FloodHubGauge[];
 }
 
 // ── Caudales (GEOGLOWS · Hydroviewer del INAMHI) ────────────────────────
@@ -185,28 +202,6 @@ export interface SelectedRiver {
   riverId: number;
   /** Alerta del tramo, si tiene. */
   alert: RiverAlert | null;
-}
-
-// ── Inundaciones repentinas (24h) ───────────────────────────────────────
-export type FlashFloodProbability = "muy-probable" | "probable";
-
-export interface FlashFloodZone {
-  id: string;
-  name: string;
-  province: string;
-  bounds: LatLngBounds;
-  probability: FlashFloodProbability;
-}
-
-// ── Inundaciones históricas ─────────────────────────────────────────────
-/** Porcentaje del tiempo en que la zona ha estado inundada: 5 %, 1 % o 0,5 %. */
-export type HistoricalFrequency = "p5" | "p1" | "p05";
-
-export interface HistoricalFloodZone {
-  id: string;
-  name: string;
-  frequency: HistoricalFrequency;
-  polygon: LatLng[];
 }
 
 // ── Eventos (SNGR, vía backend) ─────────────────────────────────────────
@@ -284,12 +279,7 @@ export interface EventsFeed {
 
 // ── Agregados ───────────────────────────────────────────────────────────
 export interface FloodMapData {
-  // Capas aún sin fuente real: datos simulados.
-  fluvialStations: FluvialStation[];
-  flashFloodZones: FlashFloodZone[];
-  historicalZones: HistoricalFloodZone[];
-
-  // Datos reales del backend.
+  // Datos del backend.
   eventsFeed: EventsFeed;
   /** Null si el backend no pudo informar la lluvia pronosticada. */
   rain: RainForecastAvailability | null;
@@ -299,9 +289,11 @@ export interface FloodMapData {
   seaTemperature: SeaTemperatureAnomaly | null;
   /** Null si no se pudieron cargar las alertas de ríos. */
   riverAlerts: RiverAlertsSnapshot | null;
+  /** Null si no se pudo cargar el pronóstico de Google Flood Hub. */
+  floodHub: FloodHubSnapshot | null;
 }
 
-export type FloodLayerId = "riverNetwork" | "riverAlerts" | "fluvial" | "flash" | "historical";
+export type FloodLayerId = "riverNetwork" | "riverAlerts" | "floodHub";
 export type LayerVisibility = Record<FloodLayerId, boolean>;
 
 /** Lluvia de una capa activa en un punto del mapa (GET .../value). `mm` es null fuera del Ecuador o sin dato. */
@@ -349,6 +341,29 @@ export type StationRainLevel = "none" | "light" | "moderate" | "heavy" | "veryHe
 
 // ── Componentes de la gestión del riesgo (pestañas del panel de capas) ──
 export type RiskComponentId = "amenaza" | "exposicion" | "preparacion" | "respuesta";
+
+/** Entidad GeoJSON de una capa de gestión del riesgo (puntos, líneas o polígonos en WGS84). */
+export interface RiskFeature {
+  type: "Feature";
+  geometry: GeoJSON.Geometry | null;
+  properties: Record<string, string | number | boolean | null>;
+}
+
+/** Capa de gestión del riesgo tal como la entrega el backend (GET /risk-layers/:id). */
+export interface RiskLayerData {
+  id: string;
+  title: string;
+  attribution: string;
+  fetchedAt: string;
+  /** Última edición en el servicio de origen (ArcGIS), si la informa. */
+  sourceUpdatedAt: string | null;
+  /** True si el servicio falló y el backend entrega su última descarga buena. */
+  isStale: boolean;
+  /** Entidades del origen sin ubicación válida (sin coordenadas o fuera del Ecuador), que no se dibujan. */
+  omitted: number;
+  type: "FeatureCollection";
+  features: RiskFeature[];
+}
 
 /** Capa encendida en el mapa, de cualquier pestaña (para la franja "En el mapa"). */
 export interface ActiveLayer {
