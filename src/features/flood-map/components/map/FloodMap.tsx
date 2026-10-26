@@ -40,6 +40,7 @@ import { FloodHubLayer } from "./FloodHubLayer";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
+import { MapLimits } from "./MapLimits";
 import { ProvinceBoundaries } from "./ProvinceBoundaries";
 import { ProvincePreparednessLayer } from "./ProvincePreparednessLayer";
 import { RainPointPopup } from "./RainPointPopup";
@@ -141,8 +142,9 @@ export default function FloodMap({
     <MapContainer
       bounds={MAP_CONFIG.initialBounds}
       boundsOptions={boundsOptions}
-      maxBounds={MAP_CONFIG.maxBounds}
       minZoom={MAP_CONFIG.minZoom}
+      // Zoom en pasos de 1/4: con enteros, Ecuador continental queda chico en el encuadre inicial.
+      zoomSnap={0.25}
       maxZoom={MAP_CONFIG.maxZoom}
       zoomControl={false}
       preferCanvas
@@ -160,6 +162,7 @@ export default function FloodMap({
         </Pane>
       )}
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
+      <MapLimits homeOptions={boundsOptions} />
       <MapControls homeOptions={boundsOptions} basemap={basemap} onBasemapChange={setBasemap} />
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
@@ -251,6 +254,7 @@ export default function FloodMap({
 function getInitialBoundsOptions(): FitBoundsOptions {
   const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
   return isDesktop
-    ? { paddingTopLeft: [64, 16], paddingBottomRight: [410, 16] }
+    ? // Corrido a la izquierda (misma suma, mismo zoom): el panel tapa la Amazonía peruana y no la costa.
+      { paddingTopLeft: [284, 16], paddingBottomRight: [190, 16] }
     : { padding: [16, 16] };
 }

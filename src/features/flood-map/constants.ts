@@ -25,9 +25,10 @@ export const MAP_CONFIG = {
     [-5.1, -81.1],
     [1.5, -75.2],
   ] as LatLngBounds,
+  /** Ecuador con Galápagos (hasta ~92° O); al este no pasa mucho de la frontera. */
   maxBounds: [
-    [-9, -88],
-    [5, -68],
+    [-6.5, -93.5],
+    [3, -74],
   ] as LatLngBounds,
   minZoom: 5,
   maxZoom: 18,
