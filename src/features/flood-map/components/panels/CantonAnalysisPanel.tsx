@@ -223,6 +223,10 @@ function AlertLegend({ bands }: { bands: readonly RainBand[] }) {
   return (
     <section className="space-y-2">
       <h4 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Niveles de alerta</h4>
+      <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 ring-1 ring-amber-200">
+        <span className="font-semibold">Sistema en validación.</span> Los umbrales de lluvia y los niveles de alerta están sujetos a
+        validación y pueden cambiar.
+      </p>
       {ALERT_LEVELS.map((level) => {
         const levelBands = bands.filter((band) => band.semaphore === level);
         if (levelBands.length === 0) return null;
