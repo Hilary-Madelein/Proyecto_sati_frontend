@@ -585,6 +585,24 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       ],
     },
   },
+  {
+    id: "deployed-road-equipment",
+    title: "Equipo caminero desplegado",
+    description: "Excavadoras atendiendo emergencias viales.",
+    component: "respuesta",
+    section: "Vías",
+    icon: "pin",
+    geometry: "point",
+    color: "#ca8a04",
+    popup: {
+      titleField: "Tipo_maquinaria",
+      fallbackTitle: "Equipo caminero",
+      fields: [
+        { field: "DPA_DESCAN", label: "Cantón" },
+        { field: "DPA_DESPRO", label: "Provincia" },
+      ],
+    },
+  },
 ];
 
 /** Radio de los puntos sueltos según el zoom: más chicos a escala nacional. */
