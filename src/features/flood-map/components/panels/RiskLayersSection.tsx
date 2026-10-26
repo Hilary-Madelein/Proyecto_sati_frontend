@@ -125,7 +125,15 @@ function RiskLayerRow({
           {data && layer.classify && (
             <ul className="grid grid-cols-2 gap-x-4 gap-y-2">
               {legendOf(layer, data.features).map((item) => (
-                <LegendItem key={item.label} label={item.label} color={item.color} borderColor={item.color} shape={legendShape(layer)} count={item.count} />
+                <LegendItem
+                  key={item.label}
+                  label={item.label}
+                  color={item.color}
+                  borderColor={item.color}
+                  shape={legendShape(layer)}
+                  count={item.count}
+                  dashed={item.dashed}
+                />
               ))}
             </ul>
           )}
@@ -165,7 +173,12 @@ function legendOf(layer: RiskLayerStyle, features: readonly RiskFeature[]) {
     if (match) counts.set(match.label, (counts.get(match.label) ?? 0) + 1);
     else other++;
   }
-  const items = (layer.classify?.classes ?? []).map((item) => ({ label: item.label, color: item.color, count: counts.get(item.label) ?? 0 }));
-  if (other > 0) items.push({ label: layer.classify?.otherLabel ?? "Otro", color: layer.color, count: other });
+  const items = (layer.classify?.classes ?? []).map((item) => ({
+    label: item.label,
+    color: item.color,
+    count: counts.get(item.label) ?? 0,
+    dashed: item.dashed,
+  }));
+  if (other > 0) items.push({ label: layer.classify?.otherLabel ?? "Otro", color: layer.color, count: other, dashed: undefined });
   return items;
 }

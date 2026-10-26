@@ -471,6 +471,9 @@ export interface ProvincePreparedness {
   code: string;
   name: string;
   counts: Record<PreparednessIndicator, number>;
+  /** Área de la provincia (km²) y km de Red Vial Estatal: los denominadores de las tasas. Opcionales para backends anteriores. */
+  areaKm2?: number;
+  rveKm?: number;
   scores: Record<PreparednessIndicator, number>;
   index: number;
   level: PreparednessLevel;
@@ -486,9 +489,15 @@ export interface CantonAnalysisSnapshot {
   counts: Record<Semaphore, number> & { noData: number };
   /** Del más al menos afectado. */
   cantons: CantonAnalysis[];
-  /** Tabla del documento, de menor a mayor categoría (para la leyenda). */
-  bands: RainBand[];
+  /**
+   * Tabla del documento, de menor a mayor categoría (para la leyenda). Opcional,
+   * como lo demás que se agregó después: un backend publicado antes que este
+   * frontend no lo manda, y el panel no debe caerse.
+   */
+  bands?: RainBand[];
   /** Índice de preparación de las 24 provincias, de la más a la menos preparada. */
-  provinces: ProvincePreparedness[];
+  provinces?: ProvincePreparedness[];
+  /** Peso de cada indicador del índice de preparación (suman 1). */
+  preparednessWeights?: Record<PreparednessIndicator, number>;
   sources: { name: string; ok: boolean; detail: string }[];
 }

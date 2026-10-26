@@ -14,6 +14,8 @@ export interface RiskClass {
   color: string;
   /** Valores del campo (sin distinguir mayúsculas) que caen en esta clase. */
   values: readonly string[];
+  /** Líneas punteadas y más tenues: entidades que se muestran pero no cuentan (p. ej. en el índice de preparación). */
+  dashed?: boolean;
 }
 
 export interface RiskPopupField {
@@ -336,7 +338,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
   {
     id: "machinery",
     title: "Maquinaria distribuida a nivel nacional",
-    description: "Maquinaria y vehículos del MTOP, según su estado.",
+    description: "Maquinaria y vehículos del MIT, según su estado.",
     component: "preparacion",
     section: "Recursos",
     icon: "pin",
@@ -412,8 +414,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
   ),
   {
     id: "mtop-camps",
-    title: "Campamentos del MTOP",
-    description: "Campamentos registrados por el MTOP.",
+    title: "Campamentos del MIT",
+    description: "Áreas de apoyo a obras viales del MIT: bodegas, maquinaria y talleres.",
     component: "preparacion",
     section: "Recursos",
     icon: "map",
@@ -421,7 +423,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     color: "#475569",
     popup: {
       titleField: "",
-      fallbackTitle: "Campamento del MTOP",
+      fallbackTitle: "Campamento del MIT",
       fields: [
         { field: "provincia", label: "Provincia" },
         { field: "EditDate", label: "Actualizado", format: "date" },
@@ -459,12 +461,16 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "shield",
     geometry: "line",
     color: NEUTRAL,
+    // El backend marca cuáles cuentan en el índice de preparación (Estado_indice): las demás
+    // (por contratar, obras que no son viales y registros repetidos) van punteadas.
     classify: {
-      field: "Estado_actual",
+      field: "Estado_indice",
       classes: [
         { label: "En ejecución", color: "#2563eb", values: ["EN EJECUCIÓN"] },
         { label: "Finalizada", color: GOOD, values: ["FINALIZADO"] },
-        { label: "Por contratar", color: "#a855f7", values: ["POR CONTRATAR", "POR ADJUDICAR"] },
+        { label: "Por contratar", color: "#a855f7", values: ["POR CONTRATAR"], dashed: true },
+        { label: "Obra no vial", color: "#94a3b8", values: ["OBRA NO VIAL"], dashed: true },
+        { label: "Registro repetido", color: "#cbd5e1", values: ["REGISTRO REPETIDO"], dashed: true },
       ],
     },
     popup: {
@@ -521,7 +527,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
   {
     id: "road-adverse-events",
     title: "Eventos adversos en vías",
-    description: "Derrumbes, socavones y otros eventos que atiende el MTOP.",
+    description: "Derrumbes, socavones y otros eventos que atiende el MIT.",
     component: "respuesta",
     section: "Vías",
     icon: "alert",
@@ -560,7 +566,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
   {
     id: "rve-recovery",
     title: "Trabajos para recuperar la transitabilidad",
-    description: "Trabajos del MTOP para reabrir o mantener las vías afectadas.",
+    description: "Trabajos del MIT para reabrir o mantener las vías afectadas.",
     component: "respuesta",
     section: "Vías",
     icon: "refresh",

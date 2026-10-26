@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import { GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import { MAP_PANES } from "../../constants";
 import { identifyRiskFeatures, type RiskHit } from "../../risk-identify";
-import { riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
+import { riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
 import { escapeHtml, titleOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 import { ClusteredRiskPoints } from "./ClusteredRiskPoints";
@@ -87,7 +87,7 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
           if (group) groups.current.set(style.id, group);
           else groups.current.delete(style.id);
         }}
-        data={data as unknown as GeoJSON.FeatureCollection}
+        data={drawOrder(style, data)}
         pane={MAP_PANES.risk.name}
         // El lienzo va en el estilo: GeoJSON lo aplica a cada línea o zona antes de agregarla al mapa.
         style={(feature) => ({ ...pathStyle(style, feature as unknown as RiskFeature), renderer })}
@@ -119,8 +119,19 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
   });
 }
 
+/** Las entidades punteadas (las que no cuentan) se dibujan primero: si una coincide con otra, queda encima la que cuenta. */
+function drawOrder(style: RiskLayerStyle, data: RiskLayerData): GeoJSON.FeatureCollection {
+  const dashed = (feature: RiskFeature) => riskClassOf(style, feature)?.dashed === true;
+  const features = [...data.features.filter(dashed), ...data.features.filter((feature) => !dashed(feature))];
+  return { ...data, features } as unknown as GeoJSON.FeatureCollection;
+}
+
 function pathStyle(style: RiskLayerStyle, feature: RiskFeature): L.PathOptions {
   const color = riskColorOf(style, feature);
-  if (style.geometry === "line") return { color, weight: 3, opacity: 0.9, bubblingMouseEvents: false };
+  if (style.geometry === "line") {
+    return riskClassOf(style, feature)?.dashed
+      ? { color, weight: 2.5, opacity: 0.8, dashArray: "4 6", bubblingMouseEvents: false }
+      : { color, weight: 3, opacity: 0.9, bubblingMouseEvents: false };
+  }
   return { color, weight: 1, opacity: 0.8, fillColor: color, fillOpacity: 0.35, bubblingMouseEvents: false };
 }

@@ -431,6 +431,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 {riskTab === "preparacion" && (
                   <PreparednessSection
                     provinces={cantonAnalysis.snapshot?.provinces ?? null}
+                    weights={cantonAnalysis.snapshot?.preparednessWeights ?? null}
                     error={cantonAnalysis.error}
                     isLoading={cantonAnalysis.isLoading}
                     visible={showPreparedness}

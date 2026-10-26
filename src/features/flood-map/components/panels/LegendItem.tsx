@@ -11,9 +11,11 @@ interface LegendItemProps {
   /** Solo "diamond": lado en px (como en el mapa) y si va hueco. */
   sizePx?: number;
   hollow?: boolean;
+  /** Solo "square": borde punteado y sin relleno (como las líneas punteadas del mapa). */
+  dashed?: boolean;
 }
 
-export function LegendItem({ label, color, borderColor, shape = "circle", count, sizePx, hollow }: LegendItemProps) {
+export function LegendItem({ label, color, borderColor, shape = "circle", count, sizePx, hollow, dashed }: LegendItemProps) {
   return (
     <li className="flex items-center gap-2 text-xs text-slate-600">
       {shape === "diamond" && sizePx ? (
@@ -36,10 +38,11 @@ export function LegendItem({ label, color, borderColor, shape = "circle", count,
             "shrink-0",
             shape === "circle" && "size-3 rounded-full",
             shape === "square" && "size-3 rounded-sm border-2",
+            shape === "square" && dashed && "border-dashed",
             // Un poco más chico: girado ocupa lo mismo que los otros.
             shape === "diamond" && "mx-px size-2.5 rotate-45 rounded-[2px]",
           )}
-          style={{ backgroundColor: color, borderColor }}
+          style={{ backgroundColor: shape === "square" && dashed ? "transparent" : color, borderColor }}
         />
       )}
       <span className="min-w-0 flex-1 truncate">{label}</span>

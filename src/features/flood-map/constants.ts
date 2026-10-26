@@ -225,9 +225,17 @@ export const PREPAREDNESS_LEVEL_STYLES: Record<PreparednessLevel, { label: strin
 /** Lo que cuenta cada indicador del índice de preparación. */
 export const PREPAREDNESS_INDICATOR_LABELS: Record<PreparednessIndicator, string> = {
   shelters: "Alojamientos calificados",
-  camps: "Campamentos del MTOP",
+  camps: "Campamentos del MIT",
   preventiveActions: "Acciones preventivas realizadas",
   roadProjects: "Proyectos viales en ejecución o terminados",
+};
+
+/** Con qué se divide cada conteo del índice de preparación: el área de la provincia o sus km de Red Vial Estatal. */
+export const PREPAREDNESS_RATES: Record<PreparednessIndicator, { by: "area" | "rve"; unit: string }> = {
+  shelters: { by: "area", unit: "km²" },
+  camps: { by: "rve", unit: "km de vía" },
+  preventiveActions: { by: "rve", unit: "km de vía" },
+  roadProjects: { by: "rve", unit: "km de vía" },
 };
 
 export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; alert: string; color: string; panelClass: string }> = {

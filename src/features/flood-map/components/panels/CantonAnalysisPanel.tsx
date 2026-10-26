@@ -192,7 +192,7 @@ export function CantonAnalysisPanel({
         </>
       )}
 
-      <AlertLegend bands={snapshot.bands} />
+      {snapshot.bands && snapshot.bands.length > 0 && <AlertLegend bands={snapshot.bands} />}
       <p className="text-[11px] text-slate-500">
         Pronóstico del modelo WRF del INAMHI. Actualizado el {formatDateTime(snapshot.updatedAt)}, cada hora. Es apoyo a la
         decisión, no un aviso oficial.
@@ -374,9 +374,9 @@ function CantonDetail({ canton }: { canton: CantonAnalysis }) {
           <Stat value={response.shelters} label="Alojamientos temporales" note={response.sheltersActive > 0 && `${response.sheltersActive} activos`} />
         )}
         {response.machinery > 0 && (
-          <Stat value={`${response.machineryOperational} de ${response.machinery}`} label="Maquinaria operativa" note="MTOP" />
+          <Stat value={`${response.machineryOperational} de ${response.machinery}`} label="Maquinaria operativa" note="MIT" />
         )}
-        {response.camps > 0 && <Stat value={response.camps} label="Campamentos del MTOP" />}
+        {response.camps > 0 && <Stat value={response.camps} label="Campamentos del MIT" />}
         {response.recoveryWorks > 0 && <Stat value={response.recoveryWorks} label="Trabajos de transitabilidad" />}
         {response.roadEventsOpen > 0 && <Stat value={response.roadEventsOpen} label="Eventos en vías por atender" />}
       </Section>

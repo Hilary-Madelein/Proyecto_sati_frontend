@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
-import { PREPAREDNESS_INDICATOR_LABELS, PREPAREDNESS_LEVEL_STYLES } from "../../constants";
+import { PREPAREDNESS_INDICATOR_LABELS, PREPAREDNESS_LEVEL_STYLES, PREPAREDNESS_RATES } from "../../constants";
 import type { PreparednessIndicator, PreparednessLevel, ProvincePreparedness } from "../../types";
 import { Notice } from "./RainForecastSection";
 import { SectionHeading } from "./SectionHeading";
@@ -9,6 +9,8 @@ import { SectionHeading } from "./SectionHeading";
 interface PreparednessSectionProps {
   /** Las 24 provincias, de la más a la menos preparada; null mientras se calcula. */
   provinces: ProvincePreparedness[] | null;
+  /** Peso de cada indicador (suman 1); null si el backend no lo informa. */
+  weights: Record<PreparednessIndicator, number> | null;
   error: string | null;
   isLoading: boolean;
   /** Pintar las provincias con su nivel en el mapa. */
@@ -19,14 +21,24 @@ interface PreparednessSectionProps {
 const LEVELS: readonly PreparednessLevel[] = ["very-high", "high", "medium", "low", "very-low"];
 const INDICATORS: readonly PreparednessIndicator[] = ["shelters", "camps", "preventiveActions", "roadProjects"];
 const formatIndex = (value: number) => value.toLocaleString("es-EC", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const formatKm = (value: number) => Math.round(value).toLocaleString("es-EC");
+
+/** Cada cuánto hay uno: "1 cada 32 km²" o "1 cada 172 km de vía"; null si el backend no manda el área ni la red vial. */
+function rateText(province: ProvincePreparedness, indicator: PreparednessIndicator): string | null {
+  const { by, unit } = PREPAREDNESS_RATES[indicator];
+  const size = by === "area" ? province.areaKm2 : province.rveKm;
+  const count = province.counts[indicator];
+  if (size === undefined || count === 0) return null;
+  return `1 cada ${formatKm(size / count)} ${unit}`;
+}
 
 /**
  * Índice Simplificado de Preparación Provincial frente al Fenómeno de El Niño
  * (ISPP-FEN): al encenderlo, las provincias se pintan en el mapa y se ve el
  * ranking de las 24 con su semáforo de cinco niveles y, al elegir una, los
- * cuatro indicadores con su conteo y su puntuación.
+ * cuatro indicadores con su conteo y su tasa (por área o por km de vía).
  */
-export function PreparednessSection({ provinces, error, isLoading, visible, onVisibleChange }: PreparednessSectionProps) {
+export function PreparednessSection({ provinces, weights, error, isLoading, visible, onVisibleChange }: PreparednessSectionProps) {
   const [openCode, setOpenCode] = useState<string | null>(null);
 
   return (
@@ -83,7 +95,7 @@ export function PreparednessSection({ provinces, error, isLoading, visible, onVi
               ))}
             </ol>
 
-            <Legend />
+            <Legend weights={weights} />
           </div>
         )}
       </div>
@@ -127,11 +139,16 @@ function ProvinceRow({
               <dd className="order-first text-sm font-semibold text-slate-900 tabular-nums">
                 {province.counts[indicator].toLocaleString("es-EC")}
               </dd>
+              {province.counts[indicator] > 0 && rateText(province, indicator) && (
+                <dd className="text-[10px] text-slate-500 tabular-nums">{rateText(province, indicator)}</dd>
+              )}
             </div>
           ))}
           <p className="col-span-2 text-[10px] text-slate-500">
-            Nivel: <strong className="font-semibold text-slate-700">{style.label}</strong> · índice {formatIndex(province.index)} de 100 (promedio de las
-            cuatro puntuaciones).
+            Nivel: <strong className="font-semibold text-slate-700">{style.label}</strong> · índice {formatIndex(province.index)} de 100.
+            {province.areaKm2 !== undefined &&
+              province.rveKm !== undefined &&
+              ` Área ${formatKm(province.areaKm2)} km² · Red Vial Estatal ${formatKm(province.rveKm)} km.`}
           </p>
         </dl>
       )}
@@ -139,14 +156,32 @@ function ProvinceRow({
   );
 }
 
-function Legend() {
+const percent = (weight: number) => `${Math.round(weight * 100)} %`;
+
+function Legend({ weights }: { weights: Record<PreparednessIndicator, number> | null }) {
   return (
     <div className="space-y-1.5 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 ring-1 ring-slate-200/70">
       <p className="font-semibold">¿Cómo se calcula?</p>
       <p>
-        Cada indicador pesa 25 %: alojamientos calificados por la SNGR, campamentos del MTOP, acciones preventivas realizadas y
-        proyectos viales en ejecución o terminados. Cada conteo se compara con la provincia que más tiene (100) y el índice es el
-        promedio.
+        Cada conteo se divide por el tamaño de la provincia: los alojamientos por su área y los campamentos, acciones
+        preventivas y proyectos viales por los km de Red Vial Estatal que tiene. Esa tasa se compara con la provincia de tasa más
+        alta (100) y se multiplica por su peso; el índice es la suma.
+        {weights && " Pesos:"}
+      </p>
+      {weights && (
+        <ul className="space-y-0.5">
+          {INDICATORS.map((indicator) => (
+            <li key={indicator} className="flex justify-between gap-2">
+              <span>{PREPAREDNESS_INDICATOR_LABELS[indicator]}</span>
+              <span className="font-semibold tabular-nums">{percent(weights[indicator])}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-slate-500">
+        Cada registro cuenta en la provincia que indica la institución. Alojamientos: todos los registrados por la SNGR
+        (albergues y campamentos calificados). Acciones preventivas: las ya iniciadas. Obras viales: en ejecución o terminadas,
+        sin contar dos veces la misma obra.
       </p>
       <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5">
         {LEVELS.map((level) => (
