@@ -53,6 +53,7 @@ import type {
   SelectedRiver,
 } from "../types";
 import { RainLegend } from "./map/RainLegend";
+import { RiverAlertLegend } from "./map/RiverAlertLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { CantonAnalysisPanel } from "./panels/CantonAnalysisPanel";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
@@ -328,10 +329,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onSelectEvent={selectEvent}
         />
         {/* Leyendas de las capas visibles, una debajo de la otra. */}
-        {(rainLegends.length > 0 || (showSea && data.seaTemperature)) && (
+        {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
           <div className="absolute top-4 left-16 z-1000 flex w-56 flex-col gap-2">
             <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
             {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
+            {layers.riverAlerts && data.riverAlerts && <RiverAlertLegend snapshot={data.riverAlerts} dayIndex={alertDayIndex} />}
           </div>
         )}
 
