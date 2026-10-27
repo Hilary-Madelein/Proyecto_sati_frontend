@@ -16,7 +16,7 @@ import {
 import type { RiskHit } from "../../risk-identify";
 import type { RiskLayerStyle } from "../../risk-layers";
 import type {
-  CantonAnalysis,
+  ParishAlert,
   DailyRainForecast,
   FloodMapData,
   HazardEvent,
@@ -31,12 +31,10 @@ import type {
 } from "../../types";
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
-import type { CantonGeometry } from "../../hooks/useCantonGeometries";
 import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
-import { CantonHighlight } from "./CantonHighlight";
-import { CantonSemaphoreLayer } from "./CantonSemaphoreLayer";
 import { FeatureHighlight } from "./FeatureHighlight";
 import { FloodHubLayer } from "./FloodHubLayer";
+import { ParishAlertLayer } from "./ParishAlertLayer";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
@@ -71,16 +69,14 @@ export interface FloodMapProps {
   riskFeatureZoomRequest: number;
   /** Tasa de lluvia IMERG (NASA) de la última media hora. */
   showImerg: boolean;
-  /** Cantón elegido en el análisis por cantón: se resalta y se encuadra. */
-  selectedCanton: CantonAnalysis | null;
-  /** Semáforo de todos los cantones (con la pestaña del análisis abierta); null = no se dibuja. */
-  cantonSemaphore: { cantons: CantonAnalysis[]; updatedAt: string } | null;
-  /** Contornos de los cantones por código DPA (null mientras se cargan). */
-  cantonGeometries: ReadonlyMap<string, CantonGeometry> | null;
+  /** Parroquias en alerta del filtro (con la pestaña de la alerta abierta); null = no se dibujan. */
+  parishAlerts: ParishAlert[] | null;
+  /** Parroquia elegida en el panel: se resalta y el mapa va hacia ella. */
+  selectedParish: ParishAlert | null;
   /** Índice de preparación provincial pintado en el mapa; null = no se dibuja. */
   provincePreparedness: { provinces: ProvincePreparedness[]; geometries: ReadonlyMap<string, ProvinceGeometry> } | null;
-  /** Se tocó en el mapa un cantón del semáforo. */
-  onCantonClick: (canton: CantonAnalysis) => void;
+  /** Se tocó en el mapa el punto de una parroquia en alerta. */
+  onParishClick: (parish: ParishAlert) => void;
   /** Opacidad de cada capa de imagen (deslizadores del panel). */
   opacity: OverlayOpacity;
   onRainLoadingChange: (loading: boolean) => void;
@@ -115,11 +111,10 @@ export default function FloodMap({
   selectedRiskFeature,
   riskFeatureZoomRequest,
   showImerg,
-  selectedCanton,
-  cantonSemaphore,
-  cantonGeometries,
+  parishAlerts,
+  selectedParish,
   provincePreparedness,
-  onCantonClick,
+  onParishClick,
   opacity,
   onRainLoadingChange,
   onObservedRainLoadingChange,
@@ -208,15 +203,7 @@ export default function FloodMap({
       {provincePreparedness && (
         <ProvincePreparednessLayer provinces={provincePreparedness.provinces} geometries={provincePreparedness.geometries} />
       )}
-      {cantonSemaphore && cantonGeometries && (
-        <CantonSemaphoreLayer
-          cantons={cantonSemaphore.cantons}
-          geometries={cantonGeometries}
-          updatedAt={cantonSemaphore.updatedAt}
-          onCantonClick={onCantonClick}
-        />
-      )}
-      {selectedCanton && <CantonHighlight canton={selectedCanton} geometry={cantonGeometries?.get(selectedCanton.code) ?? null} />}
+      {parishAlerts && <ParishAlertLayer parishes={parishAlerts} selected={selectedParish} onParishClick={onParishClick} />}
       {/* Marcadores en el panel de Leaflet: su popup queda encima de todo. */}
       {layers.floodHub && data.floodHub && <FloodHubLayer snapshot={data.floodHub} />}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}

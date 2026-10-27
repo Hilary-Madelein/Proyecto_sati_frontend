@@ -78,13 +78,6 @@ export type BasemapId = keyof typeof BASEMAPS;
  * simplificados a ~200 m: 25 polígonos, ~300 KB (~90 KB comprimido). Archivo fijo.
  */
 export const PROVINCE_BOUNDARIES_URL = "/data/provincias-ecuador.geojson";
-
-/**
- * Contornos de los 224 cantones del INEC (capa "Cantones del Ecuador" de ArcGIS),
- * simplificados a ~200 m (~670 KB, ~175 KB comprimido), con su código DPA para
- * unirlos al análisis por cantón. Archivo fijo.
- */
-export const CANTON_BOUNDARIES_URL = "/data/cantones-ecuador.geojson";
 export const DEFAULT_BASEMAP: BasemapId = "light";
 
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */
@@ -240,8 +233,9 @@ export const PREPAREDNESS_RATES: Record<PreparednessIndicator, { by: "area" | "r
 };
 
 export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; alert: string; color: string; panelClass: string }> = {
-  // Se nombra por el nivel de alerta, no por el color (rojo = alta, amarillo = moderada, verde = baja).
-  red: { label: "Alta", alert: "Alerta alta", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
+  // Se nombra por el nivel de alerta, no por el color (rojo = muy alta, naranja = alta, amarillo = moderada, verde = baja).
+  red: { label: "Muy alta", alert: "Alerta muy alta", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },
+  orange: { label: "Alta", alert: "Alerta alta", color: "#f97316", panelClass: "bg-orange-50 text-orange-900 ring-1 ring-orange-600/20" },
   yellow: { label: "Moderada", alert: "Alerta moderada", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
   green: { label: "Baja", alert: "Alerta baja", color: "#16a34a", panelClass: "bg-green-50 text-green-900 ring-1 ring-green-600/20" },
 };

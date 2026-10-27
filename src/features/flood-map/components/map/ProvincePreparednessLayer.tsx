@@ -1,7 +1,7 @@
 "use client";
 
 import { GeoJSON, Pane } from "react-leaflet";
-import { normalizeName } from "../../canton-filters";
+import { normalizeName } from "../../parish-filters";
 import { PREPAREDNESS_LEVEL_STYLES } from "../../constants";
 import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
 import type { ProvincePreparedness } from "../../types";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { normalizeName } from "../canton-filters";
+import { normalizeName } from "../parish-filters";
 import { PROVINCE_BOUNDARIES_URL } from "../constants";
 
 export type ProvinceGeometry = GeoJSON.Polygon | GeoJSON.MultiPolygon;

@@ -24,9 +24,8 @@ import {
 } from "../constants";
 import { useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
-import { DEFAULT_CANTON_FILTERS, filterCantons, type CantonFilters } from "../canton-filters";
+import { DEFAULT_PARISH_FILTERS, filterParishes, type ParishFilters } from "../parish-filters";
 import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
-import { useCantonGeometries } from "../hooks/useCantonGeometries";
 import { useProvinceGeometries } from "../hooks/useProvinceGeometries";
 import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
@@ -36,7 +35,7 @@ import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
   ActiveLayer,
-  CantonAnalysis,
+  ParishAlert,
   EventFilters,
   OverlayOpacity,
   RiskComponentId,
@@ -55,7 +54,7 @@ import type {
 import { RainLegend } from "./map/RainLegend";
 import { RiverAlertLegend } from "./map/RiverAlertLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
-import { CantonAnalysisPanel } from "./panels/CantonAnalysisPanel";
+import { ParishAlertPanel } from "./panels/ParishAlertPanel";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { RISK_COMPONENT_ICONS, RiskComponentBar } from "./navigation/RiskComponentBar";
 import { ActiveLayersBar } from "./panels/ActiveLayersBar";
@@ -145,17 +144,16 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [mobileSheet, setMobileSheet] = useState<PanelId | null>(null);
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const [eventFilters, setEventFilters] = useState<EventFilters>(DEFAULT_EVENT_FILTERS);
-  // Segunda pestaña del panel de eventos: semáforo de lluvia de 12 h por cantón.
+  // Segunda pestaña del panel de eventos: alerta de inundación por parroquia (lluvia de 12 y 24 h).
   const [eventsTab, setEventsTab] = useState<"events" | "analysis">("events");
   // Índice de preparación provincial (pestaña Preparación): viene en el mismo análisis, y se pide al encenderlo.
   const [showPreparedness, setShowPreparedness] = useState(false);
   const cantonAnalysis = useCantonAnalysis(eventsTab === "analysis" || showPreparedness);
   const provinceGeometries = useProvinceGeometries(showPreparedness);
-  const [selectedCanton, setSelectedCanton] = useState<CantonAnalysis | null>(null);
-  // Filtros del análisis: la lista y el mapa muestran los mismos cantones.
-  const [cantonFilters, setCantonFilters] = useState<CantonFilters>(DEFAULT_CANTON_FILTERS);
-  const cantonSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
-  const cantonGeometries = useCantonGeometries(eventsTab === "analysis");
+  const [selectedParish, setSelectedParish] = useState<ParishAlert | null>(null);
+  // Filtros de la alerta: la lista y el mapa muestran las mismas parroquias.
+  const [parishFilters, setParishFilters] = useState<ParishFilters>(DEFAULT_PARISH_FILTERS);
+  const alertSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
 
   const { events, fetchedAt, error: eventsError } = data.eventsFeed;
   // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
@@ -281,7 +279,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FloodMap
           data={data}
-          visibleEvents={filteredEvents}
+          // Con la alerta de inundación abierta, el mapa muestra solo sus parroquias (sin los eventos de la SNGR).
+          visibleEvents={eventsTab === "analysis" ? [] : filteredEvents}
           layers={layers}
           rainForecast={rainForecast}
           observedRain={observedRain}
@@ -297,22 +296,16 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           selectedRiskFeature={featureDetail.selected}
           riskFeatureZoomRequest={featureDetail.zoomRequest}
           showImerg={showImerg}
-          selectedCanton={eventsTab === "analysis" ? selectedCanton : null}
-          cantonSemaphore={
-            cantonSnapshot && {
-              cantons: filterCantons(cantonSnapshot.cantons, cantonFilters).listed,
-              updatedAt: cantonSnapshot.updatedAt,
-            }
-          }
-          cantonGeometries={cantonGeometries}
+          parishAlerts={alertSnapshot ? filterParishes(alertSnapshot.parishes ?? [], parishFilters).listed : null}
+          selectedParish={eventsTab === "analysis" ? selectedParish : null}
           provincePreparedness={
             showPreparedness && cantonAnalysis.snapshot?.provinces && provinceGeometries
               ? { provinces: cantonAnalysis.snapshot.provinces, geometries: provinceGeometries }
               : null
           }
-          onCantonClick={(canton) => {
-            // La ficha está en el panel del análisis: se abre si estaba cerrado.
-            setSelectedCanton(canton);
+          onParishClick={(parish) => {
+            // La ficha está en el panel de la alerta: se abre si estaba cerrado.
+            setSelectedParish(parish);
             if (window.matchMedia("(min-width: 1024px)").matches) openDesktopPanel("events");
             else openMobileSheet("events");
           }}
@@ -453,8 +446,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           subtitle={
             eventsTab === "analysis"
               ? cantonAnalysis.snapshot
-                ? `Por cantón · lluvia pronosticada de 12 y 24 h (WRF) · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
-                : "Por cantón · lluvia pronosticada de 12 y 24 h (WRF)"
+                ? `Próximas 12 y 24 h · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
+                : "Próximas 12 y 24 h"
               : eventsError
                 ? "Sin conexión con el servidor de datos"
                 : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
@@ -500,14 +493,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               expanded={eventsExpanded}
             />
           ) : (
-            <CantonAnalysisPanel
+            <ParishAlertPanel
               snapshot={cantonAnalysis.snapshot}
               error={cantonAnalysis.error}
               isLoading={cantonAnalysis.isLoading}
-              selectedCode={selectedCanton?.code ?? null}
-              onSelect={setSelectedCanton}
-              filters={cantonFilters}
-              onFiltersChange={setCantonFilters}
+              selectedCode={selectedParish?.code ?? null}
+              onSelect={setSelectedParish}
+              filters={parishFilters}
+              onFiltersChange={setParishFilters}
             />
           )}
         </ResponsivePanel>
