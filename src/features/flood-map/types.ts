@@ -394,14 +394,14 @@ export interface OverlayOpacity {
   sea: number;
 }
 
-// ── Análisis por cantón (lluvia pronosticada de 12 y 24 h, vía backend) ─
-export type Semaphore = "green" | "yellow" | "red";
+// ── Alerta de inundación por parroquia (lluvia pronosticada de 12 y 24 h, vía backend) ─
+export type Semaphore = "green" | "yellow" | "orange" | "red";
 /** Ventana que decidió el color (S = máx(S12h, S24h)). */
 export type RainWindow = "12h" | "24h";
 /** Categoría de lluvia del documento, de menor a mayor. */
 export type RainCategory = "minima" | "ligera" | "moderada" | "fuerte" | "intensa" | "torrencial" | "extrema";
 
-/** Un cantón con su semáforo y lo que hay en él (GET /canton-analysis). */
+/** Un cantón con lo que hay en él: detonantes, expuestos y recursos (GET /canton-analysis). */
 export interface CantonAnalysis {
   code: string;
   name: string;
@@ -409,15 +409,6 @@ export interface CantonAnalysis {
   /** Región del INEC (Costa, Sierra, Amazonía, Región Insular). */
   region: string | null;
   center: LatLng;
-  semaphore: Semaphore;
-  category: RainCategory;
-  categoryLabel: string;
-  consequences: string;
-  actions: string;
-  /** Lluvia pronosticada por el WRF en el cantón (percentil 90): próximas 12 h y día 1 de la corrida (24 h). */
-  forecast: { mm12h: number | null; mm24h: number | null; category12h: RainCategory | null; category24h: RainCategory | null };
-  /** Ventana que decidió el color; null si no hay pronóstico. */
-  decidedBy: RainWindow | null;
   triggers: {
     riverAlerts: number;
     riverMaxLevel: number;
@@ -479,15 +470,36 @@ export interface ProvincePreparedness {
   level: PreparednessLevel;
 }
 
+/** Alerta de una parroquia: el pronóstico de 12 y 24 h en su punto, tal cual, con los umbrales del documento. */
+export interface ParishAlert {
+  code: string;
+  name: string;
+  canton: string;
+  /** Código del cantón en `cantons` (sus detonantes, elementos expuestos y recursos). */
+  cantonCode: string;
+  province: string;
+  kind: "cabecera" | "rural" | "urbana";
+  /** Punto de la parroquia, dentro de su territorio: ahí se lee el pronóstico. */
+  point: LatLng;
+  semaphore: Semaphore;
+  category: RainCategory;
+  categoryLabel: string;
+  forecast: { mm12h: number | null; mm24h: number | null; category12h: RainCategory | null; category24h: RainCategory | null };
+  /** Ventana que decidió el nivel; null si no hay pronóstico en el punto. */
+  decidedBy: RainWindow | null;
+}
+
 export interface CantonAnalysisSnapshot {
   updatedAt: string;
   forecastRun: string | null;
   /** Ventanas del pronóstico usadas (null si la corrida no las tenía). */
   forecast12h: { from: string; to: string } | null;
   forecast24h: { from: string; to: string } | null;
-  /** Por color; los cantones sin pronóstico van aparte, no como verdes. */
+  /** Parroquias por nivel; las sin pronóstico van aparte, no como verdes. */
   counts: Record<Semaphore, number> & { noData: number };
-  /** Del más al menos afectado. */
+  /** Parroquias en alerta alta o moderada, de la más a la menos afectada (las demás solo se cuentan). Opcional: un backend anterior no lo manda. */
+  parishes?: ParishAlert[];
+  /** Cantones con su contexto (sin nivel de alerta propio). */
   cantons: CantonAnalysis[];
   /**
    * Tabla del documento, de menor a mayor categoría (para la leyenda). Opcional,
