@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { PLANNED_LAYERS } from "../../constants";
 import type { RiskLayerState } from "../../hooks/useRiskLayers";
-import { RISK_LAYER_STYLES, RISK_PERIOD_OPTIONS, riskClassOf, type RiskLayerStyle, type RiskPeriodMonths } from "../../risk-layers";
+import { RISK_LAYER_STYLES, RISK_PERIOD_OPTIONS, riskClassOf, riskPeriodLabel, type RiskLayerStyle, type RiskPeriodDays } from "../../risk-layers";
 import type { RiskComponentId, RiskFeature } from "../../types";
 import { LegendItem } from "./LegendItem";
 import { PLANNED_LAYER_ICONS, PlannedLayerList } from "./PlannedLayers";
@@ -18,9 +18,9 @@ interface RiskLayersSectionProps {
   onToggle: (id: string, enabled: boolean) => void;
   /** Estado de la capa con sus datos ya filtrados (su parte y su periodo). */
   stateOf: (layer: RiskLayerStyle) => RiskLayerState;
-  /** Periodo de las capas con fecha (meses; null = todos). */
-  periodOf: (layer: RiskLayerStyle) => RiskPeriodMonths;
-  onPeriodChange: (id: string, months: RiskPeriodMonths) => void;
+  /** Periodo de las capas con fecha (días; null = todos). */
+  periodOf: (layer: RiskLayerStyle) => RiskPeriodDays;
+  onPeriodChange: (id: string, days: RiskPeriodDays) => void;
 }
 
 /**
@@ -48,7 +48,7 @@ export function RiskLayersSection({ component, enabled, onToggle, stateOf, perio
                   onVisibleChange={(value) => onToggle(layer.id, value)}
                   state={stateOf(layer)}
                   period={periodOf(layer)}
-                  onPeriodChange={(months) => onPeriodChange(layer.id, months)}
+                  onPeriodChange={(days) => onPeriodChange(layer.id, days)}
                 />
               ))}
           </ul>
@@ -76,8 +76,8 @@ function RiskLayerRow({
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
   state: RiskLayerState;
-  period: RiskPeriodMonths;
-  onPeriodChange: (months: RiskPeriodMonths) => void;
+  period: RiskPeriodDays;
+  onPeriodChange: (days: RiskPeriodDays) => void;
 }) {
   const Icon = PLANNED_LAYER_ICONS[layer.icon];
   const { data, error, isLoading } = state;
@@ -115,11 +115,11 @@ function RiskLayerRow({
               name={`${layer.id}-period`}
               label="Periodo"
               value={String(period ?? "all")}
-              options={RISK_PERIOD_OPTIONS.map((months) => ({
-                value: String(months ?? "all"),
-                label: months ? `${months} meses` : "Todos",
+              options={RISK_PERIOD_OPTIONS.map((days) => ({
+                value: String(days ?? "all"),
+                label: riskPeriodLabel(days),
               }))}
-              onChange={(value) => onPeriodChange(value === "all" ? null : (Number(value) as RiskPeriodMonths))}
+              onChange={(value) => onPeriodChange(value === "all" ? null : (Number(value) as RiskPeriodDays))}
             />
           )}
           {data && layer.classify && (
@@ -156,8 +156,8 @@ function countLabel(layer: RiskLayerStyle, count: number): string {
   return `${count.toLocaleString("es-EC")} ${unit}`;
 }
 
-function periodLabel(months: RiskPeriodMonths): string {
-  return months ? `últimos ${months} meses` : "todos";
+function periodLabel(days: RiskPeriodDays): string {
+  return days ? `últimos ${riskPeriodLabel(days)}` : "todos";
 }
 
 function legendShape(layer: RiskLayerStyle): "circle" | "square" {
