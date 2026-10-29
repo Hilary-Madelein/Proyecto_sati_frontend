@@ -44,14 +44,22 @@ export interface RiskLayerStyle {
    * los albergues de los alojamientos temporales): se pide una vez y se filtra aquí.
    */
   subsetOf?: { id: string; field: string; values: readonly string[] };
-  /** Capa con fecha: muestra solo los últimos meses (se eligen en el panel; null = todos). */
-  period?: { field: string; defaultMonths: RiskPeriodMonths };
+  /**
+   * Capa con fecha: muestra solo los últimos días (se eligen en el panel; null = todos).
+   * Con `endField` (trabajos con inicio y fin): los que estuvieron en curso en esos días.
+   */
+  period?: { field: string; endField?: string; defaultDays: RiskPeriodDays };
   popup: { titleField: string; fallbackTitle: string; fields: readonly RiskPopupField[] };
 }
 
-/** Meses hacia atrás que muestra una capa con fecha; null = todos. */
-export type RiskPeriodMonths = 3 | 6 | 12 | null;
-export const RISK_PERIOD_OPTIONS: readonly RiskPeriodMonths[] = [3, 6, 12, null];
+/** Días hacia atrás que muestra una capa con fecha; null = todos. */
+export type RiskPeriodDays = 3 | 7 | 30 | 90 | null;
+export const RISK_PERIOD_OPTIONS: readonly RiskPeriodDays[] = [3, 7, 30, 90, null];
+
+/** "3 días", "3 meses" o "Todos". */
+export function riskPeriodLabel(days: RiskPeriodDays): string {
+  return days === null ? "Todos" : days % 30 === 0 && days > 30 ? `${days / 30} meses` : `${days} días`;
+}
 
 const GOOD = "#16a34a";
 const FAIR = "#d97706";
@@ -532,8 +540,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "alert",
     geometry: "point",
-    // El servicio guarda eventos desde 2015: por defecto, solo los recientes.
-    period: { field: "fecha_en_que_ocurri_el_evento", defaultMonths: 3 },
+    // El servicio guarda eventos desde 2015: por defecto, solo los de los últimos 3 días.
+    period: { field: "fecha_en_que_ocurri_el_evento", defaultDays: 3 },
     color: NEUTRAL,
     classify: {
       field: "circulaci_n",
@@ -571,6 +579,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "refresh",
     geometry: "point",
+    // Por defecto, los trabajos en curso en los últimos 3 días (los terminados antes quedan en "Todos").
+    period: { field: "fecha_de_inicio", endField: "fecha_fin", defaultDays: 3 },
     color: "#0f766e",
     popup: {
       titleField: "descripci_n_de_trabaj",
@@ -635,24 +645,31 @@ const views = new WeakMap<RiskLayerData, Map<string, RiskLayerData>>();
  * guarda por descarga, así cada filtro conserva su identidad entre renders
  * (los clusters no se recalculan) y `view` cambia cuando cambia el filtro.
  */
-export function riskLayerView(style: RiskLayerStyle, data: RiskLayerData, months: RiskPeriodMonths): RiskLayerData {
+export function riskLayerView(style: RiskLayerStyle, data: RiskLayerData, days: RiskPeriodDays): RiskLayerData {
   const { subsetOf, period } = style;
-  if (!subsetOf && !(period && months)) return data;
-  const view = `${style.id}:${period ? (months ?? "todos") : ""}`;
+  if (!subsetOf && !(period && days)) return data;
+  const view = `${style.id}:${period ? (days ?? "todos") : ""}`;
   let cache = views.get(data);
   if (!cache) views.set(data, (cache = new Map()));
   let result = cache.get(view);
   if (!result) {
-    const cutoff = period && months ? new Date() : null;
-    cutoff?.setMonth(cutoff.getMonth() - (months ?? 0));
+    const now = Date.now();
+    const cutoff = period && days ? now - days * 24 * 60 * 60 * 1000 : null;
     const features = data.features.filter((feature) => {
       if (subsetOf) {
         const value = feature.properties[subsetOf.field];
         if (typeof value !== "string" || !subsetOf.values.includes(value.trim().toUpperCase())) return false;
       }
-      if (cutoff && period) {
-        const time = Date.parse(String(feature.properties[period.field] ?? ""));
-        if (Number.isNaN(time) || time < cutoff.getTime()) return false;
+      if (cutoff !== null && period) {
+        const start = Date.parse(String(feature.properties[period.field] ?? ""));
+        if (Number.isNaN(start)) return false;
+        if (period.endField) {
+          // En curso en algún momento del lapso: empezó antes de ahora y terminó después del corte.
+          const end = Date.parse(String(feature.properties[period.endField] ?? ""));
+          if (start > now || Number.isNaN(end) || end < cutoff) return false;
+        } else if (start < cutoff) {
+          return false;
+        }
       }
       return true;
     });

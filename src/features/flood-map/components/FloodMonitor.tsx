@@ -30,7 +30,7 @@ import { useProvinceGeometries } from "../hooks/useProvinceGeometries";
 import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
-import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodMonths } from "../risk-layers";
+import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodDays } from "../risk-layers";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -119,8 +119,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     ...new Set(RISK_LAYER_STYLES.filter((style) => riskLayersOn.has(style.id)).map(riskDataId)),
   ]);
   // Periodo elegido en las capas con fecha (si no se eligió, el de la capa).
-  const [riskPeriods, setRiskPeriods] = useState<Record<string, RiskPeriodMonths>>({});
-  const periodOf = (style: RiskLayerStyle) => (style.id in riskPeriods ? riskPeriods[style.id] : (style.period?.defaultMonths ?? null));
+  const [riskPeriods, setRiskPeriods] = useState<Record<string, RiskPeriodDays>>({});
+  const periodOf = (style: RiskLayerStyle) => (style.id in riskPeriods ? riskPeriods[style.id] : (style.period?.defaultDays ?? null));
   /** Estado de la capa con sus datos ya filtrados (su parte y su periodo). */
   const riskViewState = (style: RiskLayerStyle) => {
     const state = riskLayerState(riskDataId(style));
@@ -401,7 +401,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   onToggle={toggleRiskLayer}
                   stateOf={riskViewState}
                   periodOf={periodOf}
-                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                  onPeriodChange={(id, days) => setRiskPeriods((current) => ({ ...current, [id]: days }))}
                 />
                 <SeaTemperatureSection
                   sea={data.seaTemperature}
@@ -420,7 +420,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   onToggle={toggleRiskLayer}
                   stateOf={riskViewState}
                   periodOf={periodOf}
-                  onPeriodChange={(id, months) => setRiskPeriods((current) => ({ ...current, [id]: months }))}
+                  onPeriodChange={(id, days) => setRiskPeriods((current) => ({ ...current, [id]: days }))}
                 />
                 {/* Al final de Preparación, después de sus capas. */}
                 {riskTab === "preparacion" && (
