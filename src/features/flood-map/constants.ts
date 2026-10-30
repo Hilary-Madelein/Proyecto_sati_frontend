@@ -410,14 +410,7 @@ export interface PlannedLayer {
 export const PLANNED_LAYERS: Record<RiskComponentId, readonly PlannedLayer[]> = {
   amenaza: [],
   exposicion: [],
-  preparacion: [
-    {
-      id: "microenterprises",
-      title: "Microempresas distribuidas a nivel nacional",
-      description: "Microempresas de mantenimiento vial y su ubicación. Falta el servicio.",
-      icon: "users",
-    },
-  ],
+  preparacion: [],
   respuesta: [],
 };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AlertTriangleIcon, MapPinIcon, RefreshIcon, ShieldIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, HistoryIcon, MapPinIcon, RefreshIcon, ShieldIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { RISK_COMPONENTS } from "../../constants";
 import type { RiskComponentId } from "../../types";
@@ -26,17 +26,20 @@ interface RiskComponentBarProps {
   onSelect: (value: RiskComponentId) => void;
   /** Capas encendidas de cada componente. */
   activeCounts: Record<RiskComponentId, number>;
+  /** Abre la línea de tiempo de acciones del MIT (botón a la derecha, en escritorio; en celular está en la barra inferior). */
+  onOpenTimeline: () => void;
 }
 
 /**
  * Navegación principal de la herramienta: Amenaza · Exposición · Preparación ·
  * Respuesta. Elegir uno muestra sus capas en el panel de capas; las capas ya
  * encendidas de los demás siguen en el mapa, así se cruzan entre componentes.
+ * A la derecha, la línea de tiempo de acciones.
  */
-export function RiskComponentBar({ value, onSelect, activeCounts }: RiskComponentBarProps) {
+export function RiskComponentBar({ value, onSelect, activeCounts, onOpenTimeline }: RiskComponentBarProps) {
   return (
     <nav aria-label="Componentes de la gestión del riesgo" className="relative z-1200 shrink-0 border-b border-slate-200 bg-white shadow-sm">
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-2 py-1.5 sm:px-4 sm:py-2">
+      <div className="mx-auto flex max-w-[84rem] items-center gap-4 px-2 py-1.5 sm:px-4 sm:py-2">
         <p className="hidden shrink-0 text-[11px] leading-tight font-semibold tracking-wider text-slate-500 uppercase xl:block">
           Gestión
           <br />
@@ -93,6 +96,18 @@ export function RiskComponentBar({ value, onSelect, activeCounts }: RiskComponen
             );
           })}
         </ul>
+        <span aria-hidden="true" className="hidden h-9 w-px shrink-0 bg-slate-200 lg:block" />
+        <button
+          type="button"
+          onClick={onOpenTimeline}
+          title="Acciones preventivas y de respuesta del MIT, con fotos"
+          className="group hidden shrink-0 items-center gap-2 rounded-xl px-2 py-2 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 lg:flex"
+        >
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white shadow-sm shadow-emerald-700/30">
+            <HistoryIcon className="size-4" />
+          </span>
+          <span className="text-sm font-semibold whitespace-nowrap">Línea de tiempo</span>
+        </button>
       </div>
     </nav>
   );
