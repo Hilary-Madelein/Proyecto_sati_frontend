@@ -6,7 +6,7 @@ import { CircleMarker, Marker, Tooltip, useMap, useMapEvents } from "react-leafl
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
 import { MAP_PANES } from "../../constants";
 import { riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
-import { titleOf } from "../../risk-popup";
+import { tooltipOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 
 /** Hasta este zoom se agrupa; desde el siguiente (escala de ciudad) se ven todos los puntos sueltos. */
@@ -149,7 +149,7 @@ export function ClusteredRiskPoints({ style, data, renderer, onFeatureClick, onS
             bubblingMouseEvents={false}
             eventHandlers={{ click: (event) => onFeatureClick(feature, event.latlng) }}
           >
-            <Tooltip direction="top">{titleOf(style, feature)}</Tooltip>
+            <Tooltip direction="top">{tooltipOf(style, feature)}</Tooltip>
           </CircleMarker>
         );
       })}

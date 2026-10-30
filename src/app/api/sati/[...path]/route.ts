@@ -16,7 +16,7 @@ const TIMEOUT_MS = 60_000;
  * navegador recibe "gzip" sobre datos ya descomprimidos falla con "Decoding
  * failed" (pasa en producción, donde Render comprime las respuestas).
  */
-const PASSTHROUGH_HEADERS = ["content-type", "cache-control"];
+const PASSTHROUGH_HEADERS = ["content-type", "cache-control", "etag"];
 
 /** Estados HTTP que no llevan cuerpo. */
 const NO_BODY_STATUS = new Set([204, 304]);
@@ -30,10 +30,20 @@ export async function GET(request: NextRequest, { params }: RouteContext<"/api/s
   const { path } = await params;
   const target = `${baseUrl}/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;
 
+  const headers: Record<string, string> = { accept: request.headers.get("accept") ?? "*/*" };
+  // Con la ETag de la respuesta anterior, el backend responde 304 si no cambió (las capas grandes no se transfieren de nuevo).
+  // `fetch` agrega "Cache-Control: no-cache" a las peticiones condicionales y con eso el
+  // backend (Express) nunca responde 304; un Cache-Control propio lo evita.
+  const etag = request.headers.get("if-none-match");
+  if (etag) {
+    headers["if-none-match"] = etag;
+    headers["cache-control"] = "max-age=0";
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(target, {
-      headers: { accept: request.headers.get("accept") ?? "*/*" },
+      headers,
       cache: "no-store",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -41,12 +51,12 @@ export async function GET(request: NextRequest, { params }: RouteContext<"/api/s
     return Response.json({ message: connectionErrorMessage(error, baseUrl) }, { status: 502 });
   }
 
-  const headers = new Headers();
+  const responseHeaders = new Headers();
   for (const name of PASSTHROUGH_HEADERS) {
     const value = upstream.headers.get(name);
-    if (value) headers.set(name, value);
+    if (value) responseHeaders.set(name, value);
   }
-  return new Response(NO_BODY_STATUS.has(upstream.status) ? null : upstream.body, { status: upstream.status, headers });
+  return new Response(NO_BODY_STATUS.has(upstream.status) ? null : upstream.body, { status: upstream.status, headers: responseHeaders });
 }
 
 function connectionErrorMessage(error: unknown, baseUrl: string): string {
