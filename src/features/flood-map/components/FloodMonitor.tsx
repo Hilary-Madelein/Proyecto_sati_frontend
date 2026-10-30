@@ -565,8 +565,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         />
 
         {/*
-          Eventos por día, a todo lo ancho de su franja. Celular y tablet: arriba, entre
-          los controles del mapa y el borde (plegado al inicio, en la esquina derecha).
+          Eventos por día (plegado al inicio), a todo lo ancho de su franja. Celular y
+          tablet: arriba, entre los controles del mapa y el borde (plegado, en la esquina derecha).
           Escritorio: abajo, desde el panel de eventos (o su botón) hasta el panel de
           capas (o el borde, si está cerrado: 4 + 95 + 4 = 103).
         */}

@@ -28,17 +28,15 @@ const SEVERITY_NAMES: Record<EventSeverity, [string, string]> = {
  * Recuadro flotante sobre el mapa: cuántos eventos registró la SNGR cada día de
  * los últimos 30 (abiertos y cerrados). Abierto ocupa todo el ancho de su
  * franja (`className` la ubica); plegado es un botón, en la esquina de la
- * franja. Al inicio está abierto en pantallas anchas y plegado en las demás
- * (ahí taparía el mapa); después manda lo que elija la persona.
+ * franja. Al inicio está plegado, para dejar el mapa libre.
  */
 export function EventsPerDayWidget({ className }: { className?: string }) {
-  // "auto" = abierto solo en pantallas anchas (con CSS, sin medir la pantalla).
-  const [open, setOpen] = useState<"auto" | boolean>("auto");
+  const [open, setOpen] = useState(false);
   const { data } = useEventsPerDay(DAYS);
   if (!data) return null;
 
-  const showCard = open === "auto" ? "hidden xl:block" : open ? "block" : "hidden";
-  const showButton = open === "auto" ? "xl:hidden" : open ? "hidden" : "";
+  const showCard = open ? "block" : "hidden";
+  const showButton = open ? "hidden" : "";
 
   return (
     // La franja no captura clics: así el mapa sigue usable al lado del botón plegado.
