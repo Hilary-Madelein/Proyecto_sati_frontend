@@ -7,7 +7,8 @@ import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { FloatingButton } from "@/components/ui/FloatingButton";
 import { IconTile } from "@/components/ui/IconTile";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { CircleDotIcon, LayersIcon } from "@/components/ui/icons";
+import { CircleDotIcon, HistoryIcon, LayersIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import {
   DATA_REFRESH_MS,
@@ -31,6 +32,7 @@ import { useFeatureDetail } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
 import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodDays } from "../risk-layers";
+import { ACTION_LAYER_IDS, timelineActions, type TimelineAction } from "../action-timeline";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -54,6 +56,8 @@ import type {
 import { RainLegend } from "./map/RainLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { ParishAlertPanel } from "./panels/ParishAlertPanel";
+import { ActionsTimelineDialog } from "./timeline/ActionsTimelineDialog";
+import { EventsPerDayWidget } from "./panels/EventsPerDayWidget";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
 import { RISK_COMPONENT_ICONS, RiskComponentBar } from "./navigation/RiskComponentBar";
 import { ActiveLayersBar } from "./panels/ActiveLayersBar";
@@ -113,9 +117,21 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYER_VISIBILITY);
   // Capas de gestión del riesgo (servicios de ArcGIS y GeoJSON propios): apagadas al inicio, se piden al encenderlas.
   const [riskLayersOn, setRiskLayersOn] = useState<ReadonlySet<string>>(() => new Set());
+  // Línea de tiempo de las acciones preventivas y de respuesta del MIT (ventana aparte), y la
+  // acción que se ubica en ella al abrirla desde su ficha en el mapa.
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [timelineFocus, setTimelineFocus] = useState<string | null>(null);
+  const openTimeline = (focusKey: string | null = null) => {
+    setTimelineFocus(focusKey);
+    setShowTimeline(true);
+  };
   // Varias capas pueden salir de la misma del backend (p. ej. albergues y campamentos): se pide una vez.
+  // Con la línea de tiempo abierta se piden también las dos capas de acciones.
   const riskLayerState = useRiskLayers([
-    ...new Set(RISK_LAYER_STYLES.filter((style) => riskLayersOn.has(style.id)).map(riskDataId)),
+    ...new Set([
+      ...RISK_LAYER_STYLES.filter((style) => riskLayersOn.has(style.id)).map(riskDataId),
+      ...(showTimeline ? ACTION_LAYER_IDS : []),
+    ]),
   ]);
   // Periodo elegido en las capas con fecha (si no se eligió, el de la capa).
   const [riskPeriods, setRiskPeriods] = useState<Record<string, RiskPeriodDays>>({});
@@ -153,6 +169,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Filtros de la alerta: la lista y el mapa muestran las mismas parroquias.
   const [parishFilters, setParishFilters] = useState<ParishFilters>(DEFAULT_PARISH_FILTERS);
   const alertSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
+  const actionStates = ACTION_LAYER_IDS.map((id) => riskLayerState(id));
+  const timeline = showTimeline ? timelineActions(Object.fromEntries(ACTION_LAYER_IDS.map((id, i) => [id, actionStates[i].data]))) : [];
 
   const { events, fetchedAt, error: eventsError } = data.eventsFeed;
   // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
@@ -264,6 +282,22 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       return next;
     });
 
+  /**
+   * "Ver en el mapa" de una acción de la línea de tiempo: se cierra la ventana, se
+   * enciende su capa y se abre su detalle (con todas sus fotos), acercando el mapa.
+   */
+  const showActionOnMap = (action: TimelineAction) => {
+    const style = RISK_LAYER_STYLES.find((item) => item.id === action.layerId);
+    const data = riskLayerState(action.layerId).data;
+    if (!style || !data) return;
+    setShowTimeline(false);
+    toggleRiskLayer(action.layerId, true);
+    setRiverTarget(null);
+    setMobileSheet(null);
+    featureDetail.open([{ key: action.key, style, data, feature: action.feature }]);
+    featureDetail.zoomToSelected();
+  };
+
   const selectEvent = (id: string) => {
     setSelectedEventId(id);
     setFocusRequest((n) => n + 1);
@@ -273,7 +307,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
 
   return (
     <div className="flex size-full flex-col">
-      <RiskComponentBar value={riskTab} onSelect={selectRiskComponent} activeCounts={activeCounts} />
+      <RiskComponentBar value={riskTab} onSelect={selectRiskComponent} activeCounts={activeCounts} onOpenTimeline={() => openTimeline()} />
       {/* El mapa y todo lo que flota sobre él se ubican respecto de esta área, debajo de la barra. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FloodMap
@@ -509,11 +543,37 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onNext={featureDetail.next}
           onPrevious={featureDetail.previous}
           onZoom={featureDetail.zoomToSelected}
+          onShowInTimeline={(hit) => openTimeline(hit.key)}
         />
 
         <RiverPanel
           target={riverTarget}
           onClose={() => setRiverTarget(null)}
+        />
+
+        <ActionsTimelineDialog
+          open={showTimeline}
+          onClose={() => setShowTimeline(false)}
+          actions={timeline}
+          layers={ACTION_LAYER_IDS.map((id, i) => ({ id, fetchedAt: actionStates[i].data?.fetchedAt ?? null }))}
+          isLoading={actionStates.some((state) => state.isLoading)}
+          error={actionStates.find((state) => state.error)?.error ?? null}
+          onShowOnMap={showActionOnMap}
+          focusKey={timelineFocus}
+        />
+
+        {/*
+          Eventos por día, a todo lo ancho de su franja. Celular y tablet: arriba, entre
+          los controles del mapa y el borde (plegado al inicio, en la esquina derecha).
+          Escritorio: abajo, desde el panel de eventos (o su botón) hasta el panel de
+          capas (o el borde, si está cerrado: 4 + 95 + 4 = 103).
+        */}
+        <EventsPerDayWidget
+          className={cn(
+            "absolute top-3 right-3 left-16 z-1000 lg:top-auto lg:bottom-6",
+            desktopPanels.events ? "lg:left-98" : "lg:left-60",
+            desktopPanels.layers ? "lg:right-103" : "lg:right-4",
+          )}
         />
 
         {/* Escritorio: botones para reabrir los paneles cerrados. */}
@@ -546,6 +606,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               <CircleDotIcon className="size-4 text-red-600" />
               Eventos
               <CountBadge count={criticalCount} />
+            </MobileBarButton>
+            <span aria-hidden="true" className="my-1.5 w-px bg-slate-200" />
+            <MobileBarButton onClick={() => openTimeline()}>
+              <HistoryIcon className="size-4 text-emerald-700" />
+              Acciones
             </MobileBarButton>
           </nav>
         )}

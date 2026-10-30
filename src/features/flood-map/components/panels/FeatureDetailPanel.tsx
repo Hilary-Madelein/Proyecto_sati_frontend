@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { IconTile } from "@/components/ui/IconTile";
-import { ChevronDownIcon, MapPinIcon, SearchIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, HistoryIcon, MapPinIcon, SearchIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
+import { ACTION_LAYER_IDS } from "../../action-timeline";
 import { RISK_COMPONENTS } from "../../constants";
+import type { RiskHit } from "../../risk-identify";
 import type { FeatureDetailState } from "../../hooks/useFeatureDetail";
 import { rowsOf, titleOf } from "../../risk-popup";
 import type { RiskAttachment } from "../../types";
@@ -16,6 +18,8 @@ interface FeatureDetailPanelProps {
   onNext: () => void;
   onPrevious: () => void;
   onZoom: () => void;
+  /** Abre la línea de tiempo con esta acción ubicada (solo en las acciones preventivas y de respuesta del MIT). */
+  onShowInTimeline: (hit: RiskHit) => void;
 }
 
 /**
@@ -23,7 +27,7 @@ interface FeatureDetailPanelProps {
  * riesgo encendidas: "‹ 1 de N ›", "Acercar", las fotos del servicio de origen
  * y los datos de la entidad. En celular es una hoja inferior, como los demás paneles.
  */
-export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom }: FeatureDetailPanelProps) {
+export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom, onShowInTimeline }: FeatureDetailPanelProps) {
   const hit = state?.hits[state.index];
   if (!state || !hit) return null;
   const total = state.hits.length;
@@ -70,14 +74,26 @@ export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom 
               </button>
             </div>
           )}
-          <button
-            type="button"
-            onClick={onZoom}
-            className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
-          >
-            <SearchIcon className="size-3.5" />
-            Acercar
-          </button>
+          <div className="ml-auto flex gap-2">
+            {ACTION_LAYER_IDS.includes(hit.style.id) && (
+              <button
+                type="button"
+                onClick={() => onShowInTimeline(hit)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-700/25 transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+              >
+                <HistoryIcon className="size-3.5" />
+                Línea de tiempo
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onZoom}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+            >
+              <SearchIcon className="size-3.5" />
+              Acercar
+            </button>
+          </div>
         </div>
 
         <h3 className="text-base font-semibold text-slate-900">{titleOf(hit.style, hit.feature)}</h3>
