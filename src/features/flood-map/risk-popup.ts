@@ -12,6 +12,32 @@ export function titleOf(style: RiskLayerStyle, feature: RiskFeature): string {
   return value === null || value === undefined || value === "" ? style.popup.fallbackTitle : String(value);
 }
 
+/** Largo máximo del título en el aviso flotante: el texto completo está en el panel de detalle. */
+const TOOLTIP_MAX_CHARS = 80;
+
+/** El texto cortado en la última palabra que entra, con "…". */
+function shorten(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.\-–]+$/, "")}…`;
+}
+
+/**
+ * Texto del aviso al pasar el mouse: el título, corto, con el código de la vía
+ * delante ("E35 · Tramo …"): el de la propia línea (labelField, p. ej. la RVE, o
+ * CODIGO_DE_VIA de los proyectos viales) o el de la vía más cercana que calcula
+ * el backend para los puntos (Via_RVE).
+ */
+export function tooltipOf(style: RiskLayerStyle, feature: RiskFeature): string {
+  const { properties } = feature;
+  const code = [style.labelField ? properties[style.labelField] : null, properties.Via_RVE, properties.CODIGO_DE_VIA].find(
+    (value): value is string => typeof value === "string" && value.trim() !== "",
+  );
+  const title = shorten(titleOf(style, feature), TOOLTIP_MAX_CHARS);
+  return code ? `${code.trim()} · ${title}` : title;
+}
+
 /** Datos de una entidad para el panel de detalle, ya con formato; sin los vacíos. */
 export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: string; value: string }[] {
   return style.popup.fields.flatMap((field) => {
@@ -21,7 +47,7 @@ export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: st
 }
 
 /** Valores que los formularios guardan cuando no hay dato. */
-const EMPTY_VALUES = new Set(["", "NO APLICABLE", "N/A"]);
+const EMPTY_VALUES = new Set(["", "NO APLICABLE", "N/A", "NA"]);
 
 function formatValue(field: RiskPopupField, value: string | number | boolean | null | undefined): string | null {
   if (value === null || value === undefined || EMPTY_VALUES.has(String(value).trim().toUpperCase())) return null;

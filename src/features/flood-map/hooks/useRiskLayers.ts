@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { satiClientGet } from "@/lib/api/sati-client";
-import { DATA_REFRESH_MS } from "../constants";
+import { RISK_LAYERS_REFRESH_MS } from "../constants";
 import type { RiskLayerData } from "../types";
 
 export interface RiskLayerState {
@@ -15,9 +15,11 @@ const EMPTY: RiskLayerState = { data: null, error: null, isLoading: false };
 
 /**
  * Datos de las capas de gestión del riesgo encendidas. Cada capa se pide al
- * encenderla y, mientras siga encendida, se vuelve a pedir cada DATA_REFRESH_MS
- * (el backend la guarda en caché y consulta el servicio de origen solo cuando vence).
- * Al apagarla se conservan sus datos: volver a encenderla es inmediato.
+ * encenderla y, mientras siga encendida, se vuelve a pedir cada
+ * RISK_LAYERS_REFRESH_MS: así se ven las ediciones en ArcGIS (un estado que
+ * cambia, registros nuevos) sin recargar la página. Si la capa no cambió (misma
+ * descarga del backend) no se vuelve a dibujar. Al apagarla se conservan sus
+ * datos: volver a encenderla es inmediato.
  */
 export function useRiskLayers(enabledIds: readonly string[]) {
   const [states, setStates] = useState<Record<string, RiskLayerState>>({});
@@ -37,7 +39,12 @@ export function useRiskLayers(enabledIds: readonly string[]) {
       satiClientGet<RiskLayerData>(`/risk-layers/${id}`, undefined, controller.signal)
         .then((data) => {
           loadedAt.current.set(id, Date.now());
-          update(id, { data, error: null, isLoading: false });
+          setStates((current) => {
+            const previous = current[id]?.data;
+            // La misma descarga del backend: se conservan los datos que ya están dibujados.
+            const same = previous?.fetchedAt === data.fetchedAt && previous.isStale === data.isStale;
+            return { ...current, [id]: { ...EMPTY, ...current[id], data: same ? previous : data, error: null, isLoading: false } };
+          });
         })
         .catch((reason: Error) => {
           update(id, { error: reason.name === "AbortError" ? null : reason.message, isLoading: false });
@@ -45,11 +52,11 @@ export function useRiskLayers(enabledIds: readonly string[]) {
     };
     const loadDue = () => {
       for (const id of ids) {
-        if (Date.now() - (loadedAt.current.get(id) ?? 0) >= DATA_REFRESH_MS) load(id);
+        if (Date.now() - (loadedAt.current.get(id) ?? 0) >= RISK_LAYERS_REFRESH_MS) load(id);
       }
     };
     loadDue();
-    const interval = setInterval(loadDue, DATA_REFRESH_MS / 5);
+    const interval = setInterval(loadDue, RISK_LAYERS_REFRESH_MS / 4);
     return () => {
       controller.abort();
       clearInterval(interval);

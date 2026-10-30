@@ -49,6 +49,8 @@ export interface RiskLayerStyle {
    * Con `endField` (trabajos con inicio y fin): los que estuvieron en curso en esos días.
    */
   period?: { field: string; endField?: string; defaultDays: RiskPeriodDays };
+  /** Campo que se escribe sobre las líneas en el mapa, como letrero (p. ej. "E35"). */
+  labelField?: string;
   popup: { titleField: string; fallbackTitle: string; fields: readonly RiskPopupField[] };
 }
 
@@ -136,6 +138,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       titleField: "Nomenclatura",
       fallbackTitle: "Punto crítico",
       fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
         { field: "Ubicación", label: "Ubicación" },
         { field: "Tipo_de_amenaza", label: "Amenaza" },
         { field: "Zonal", label: "Zonal" },
@@ -154,6 +157,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "map",
     geometry: "line",
     color: NEUTRAL,
+    labelField: "CODIGO_DE_VIA",
     classify: {
       field: "ESTADO",
       classes: [
@@ -208,6 +212,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       titleField: "NOMBRE_DEL_PUENTE",
       fallbackTitle: "Puente",
       fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
         { field: "ESTADO", label: "Estado" },
         { field: "TIPO", label: "Tipo" },
         { field: "LONGITUD_m", label: "Longitud (m)", format: "number" },
@@ -344,82 +349,56 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
 
   // ── Preparación ──────────────────────────────────────────────────────────
   {
-    id: "machinery",
-    title: "Maquinaria distribuida a nivel nacional",
-    description: "Maquinaria y vehículos del MIT, según su estado.",
+    id: "machinery-by-province",
+    title: "Maquinaria pesada por provincia",
+    description: "Inventario de maquinaria del MIT en cada provincia: el número es cuántos equipos tiene.",
     component: "preparacion",
     section: "Recursos",
     icon: "pin",
     geometry: "point",
-    color: NEUTRAL,
+    color: "#a16207",
+    // Todos los equipos de una provincia están en el mismo punto: el grupo muestra cuántos son.
     cluster: true,
-    classify: {
-      field: "estado",
-      classes: [
-        { label: "Operativa", color: GOOD, values: ["OPERATIVA S/N"] },
-        { label: "Operativa con falla", color: FAIR, values: ["OPERATIVA CON FALLA"] },
-        { label: "En reparación", color: "#ea580c", values: ["MAQUINARIA EN REPARACIÓN"] },
-        { label: "Parada", color: BAD, values: ["MAQUINARIA PARADA - REQUIERE RE"] },
-        { label: "De baja", color: "#94a3b8", values: ["BAJA"] },
-      ],
-      otherLabel: "Sin estado",
-    },
     popup: {
-      titleField: "tipo_de_maquinaria_y_veh_culo",
-      fallbackTitle: "Maquinaria",
+      titleField: "TIPO",
+      fallbackTitle: "Equipo del MIT",
       fields: [
-        { field: "estado", label: "Estado" },
-        { field: "marca", label: "Marca" },
-        { field: "modelo", label: "Modelo" },
-        { field: "a_o", label: "Año", format: "plain" },
-        { field: "descripci_n_de_falla", label: "Falla" },
-        { field: "descripci_n_de_fallas_cr_ticas", label: "Fallas críticas" },
-        { field: "tiempo_estimado_de_reparaci_n_d", label: "Reparación (días)", format: "number" },
-        { field: "hor_metro", label: "Horómetro (h)", format: "number" },
-        { field: "kilometraje_actual", label: "Kilometraje", format: "number" },
-        { field: "posee_matr_cula_institucional", label: "Matrícula institucional" },
-        { field: "posee_seguro_vigente", label: "Seguro vigente" },
-        { field: "provincia", label: "Provincia" },
-        { field: "provincia_donde_opera", label: "Opera en" },
-        { field: "zonal", label: "Zonal" },
-        { field: "fecha", label: "Fecha del registro", format: "date" },
-        { field: "EditDate", label: "Actualizado", format: "date" },
+        { field: "MARCA", label: "Marca" },
+        { field: "MODELO", label: "Modelo" },
+        { field: "AÑO", label: "Año", format: "plain" },
+        { field: "REGISTRO", label: "Registro" },
+        { field: "CHASIS", label: "Chasis" },
+        { field: "MOTOR", label: "Motor" },
+        { field: "DPA_DESPRO", label: "Provincia" },
+        { field: "ZONAL", label: "Zonal" },
       ],
     },
   },
-  // Albergues y campamentos son la misma capa de la SNGR (alojamientos temporales),
-  // separada por modalidad para encenderlos por separado.
-  ...(
-    [
-      { id: "shelters-albergues", title: "Albergues para la población", modality: "ALBERGUE", color: "#7c3aed" },
-      { id: "shelters-campamentos", title: "Campamentos para la población", modality: "CAMPAMENTO", color: "#c026d3" },
-    ] as const
-  ).map(
-    ({ id, title, modality, color }): RiskLayerStyle => ({
-      id,
-      title,
-      description: `${modality === "ALBERGUE" ? "Albergues" : "Campamentos"} para la población afectada, calificados por la SNGR.`,
-      component: "preparacion",
-      section: "Recursos",
-      icon: "users",
-      geometry: "point",
-      color,
-      cluster: true,
-      subsetOf: { id: "shelters", field: "MODALIDAD", values: [modality] },
-      popup: {
-        titleField: "NOMBRE_DEL_ALOJAMIENTO",
-        fallbackTitle: modality === "ALBERGUE" ? "Albergue" : "Campamento",
-        fields: [
-          { field: "ESTADO", label: "Estado" },
-          { field: "CATEGORÍA", label: "Categoría" },
-          { field: "SECTOR", label: "Sector" },
-          { field: "PARROQUIA", label: "Parroquia" },
-          { field: "CANTON", label: "Cantón" },
-          { field: "PROVINCIA", label: "Provincia" },
-        ],
-      },
-    }),
-  ),
+  // Alojamientos temporales de la SNGR: albergues y campamentos juntos, en un color; el detalle dice cuál es.
+  {
+    id: "shelters",
+    title: "Alojamientos temporales",
+    description: "Albergues y campamentos para la población afectada, calificados por la SNGR.",
+    component: "preparacion",
+    section: "Recursos",
+    icon: "users",
+    geometry: "point",
+    color: "#7c3aed",
+    cluster: true,
+    popup: {
+      titleField: "NOMBRE_DEL_ALOJAMIENTO",
+      fallbackTitle: "Alojamiento temporal",
+      fields: [
+        { field: "MODALIDAD", label: "Modalidad" },
+        { field: "ESTADO", label: "Estado" },
+        { field: "CATEGORÍA", label: "Categoría" },
+        { field: "SECTOR", label: "Sector" },
+        { field: "PARROQUIA", label: "Parroquia" },
+        { field: "CANTON", label: "Cantón" },
+        { field: "PROVINCIA", label: "Provincia" },
+      ],
+    },
+  },
   {
     id: "mtop-camps",
     title: "Campamentos del MIT",
@@ -433,30 +412,41 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       titleField: "",
       fallbackTitle: "Campamento del MIT",
       fields: [
-        { field: "provincia", label: "Provincia" },
-        { field: "EditDate", label: "Actualizado", format: "date" },
+        { field: "Via_RVE", label: "Vía (RVE)" },
+        { field: "DPA_DESCAN", label: "Cantón" },
+        { field: "DPA_DESPRO", label: "Provincia" },
+        { field: "Zonal", label: "Zonal" },
+        { field: "ESTADO", label: "Estado" },
       ],
     },
   },
   {
     id: "rve-preventive-works",
     title: "Acciones preventivas",
-    description: "Trabajos preventivos en vías y cauces.",
+    description: "Trabajos preventivos del MIT en vías y cauces.",
     component: "preparacion",
     section: "Trabajos y obras",
     icon: "shield",
     geometry: "point",
     color: "#15803d",
     popup: {
-      titleField: "descripci_n_de_la_acci_n_preven",
+      titleField: "Acciones",
       fallbackTitle: "Acción preventiva",
       fields: [
-        { field: "fecha_de_inicio", label: "Inicio", format: "date" },
+        { field: "Via_RVE", label: "Vía (RVE)" },
+        { field: "nombre_via", label: "Tramo" },
+        { field: "tip_activid", label: "Tipo" },
+        { field: "det_prev", label: "Detalle" },
+        { field: "fecha_inicio", label: "Inicio", format: "date" },
         { field: "fecha_fin", label: "Fin", format: "date" },
-        { field: "maquinaria", label: "Maquinaria" },
-        { field: "instituciones_involucradas", label: "Instituciones" },
-        { field: "cant_n", label: "Cantón" },
-        { field: "provincia", label: "Provincia" },
+        { field: "Maquinaria", label: "Maquinaria" },
+        { field: "persnl_operd_maq", label: "Operadores de maquinaria", format: "plain" },
+        { field: "persnl_microempresas", label: "Microempresas", format: "plain" },
+        { field: "persnl_tecnico", label: "Personal técnico" },
+        { field: "Instituciones", label: "Instituciones" },
+        { field: "descanto", label: "Cantón" },
+        { field: "despro", label: "Provincia" },
+        { field: "zonal_2", label: "Zonal" },
       ],
     },
   },
@@ -470,7 +460,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     geometry: "line",
     color: NEUTRAL,
     // El backend marca cuáles cuentan en el índice de preparación (Estado_indice): las demás
-    // (por contratar, obras que no son viales y registros repetidos) van punteadas.
+    // (por contratar y obras que no son viales) van punteadas; los registros repetidos no llegan.
     classify: {
       field: "Estado_indice",
       classes: [
@@ -478,7 +468,6 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { label: "Finalizada", color: GOOD, values: ["FINALIZADO"] },
         { label: "Por contratar", color: "#a855f7", values: ["POR CONTRATAR"], dashed: true },
         { label: "Obra no vial", color: "#94a3b8", values: ["OBRA NO VIAL"], dashed: true },
-        { label: "Registro repetido", color: "#cbd5e1", values: ["REGISTRO REPETIDO"], dashed: true },
       ],
     },
     popup: {
@@ -555,6 +544,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       titleField: "tipo_de_evento",
       fallbackTitle: "Evento adverso",
       fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
         { field: "fecha_en_que_ocurri_el_evento", label: "Fecha", format: "date" },
         { field: "circulaci_n", label: "Circulación" },
         { field: "situaci_n_del_evento", label: "Situación" },
@@ -586,12 +576,44 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       titleField: "descripci_n_de_trabaj",
       fallbackTitle: "Trabajo de transitabilidad",
       fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
         { field: "fecha_de_inicio", label: "Inicio", format: "date" },
         { field: "fecha_fin", label: "Fin", format: "date" },
         { field: "maquinaria", label: "Maquinaria" },
         { field: "instituciones_involucradas", label: "Instituciones" },
         { field: "cant_n", label: "Cantón" },
         { field: "provincia", label: "Provincia" },
+      ],
+    },
+  },
+  {
+    id: "mit-response-actions",
+    title: "Acciones de respuesta",
+    description: "Respuesta del MIT ante eventos en las vías: despeje de derrumbes, variantes, taludes, etc.",
+    component: "respuesta",
+    section: "Vías",
+    icon: "refresh",
+    geometry: "point",
+    color: "#b45309",
+    popup: {
+      titleField: "Acciones",
+      fallbackTitle: "Acción de respuesta",
+      fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
+        { field: "nombre_via", label: "Tramo" },
+        { field: "Evento", label: "Evento" },
+        { field: "fecha_inicio", label: "Inicio", format: "date" },
+        { field: "fecha_fin", label: "Fin", format: "date" },
+        { field: "Origen_maquinaria", label: "Maquinaria de" },
+        { field: "Maquinaria_MIT", label: "Maquinaria del MIT" },
+        { field: "Maquinaria_otras", label: "Maquinaria de otras entidades" },
+        { field: "total_maquinaria_respt", label: "Máquinas en total", format: "plain" },
+        { field: "persnl_operd_maq", label: "Operadores de maquinaria", format: "plain" },
+        { field: "persnl_microempresas", label: "Microempresas", format: "plain" },
+        { field: "persnl_tecnico", label: "Personal técnico" },
+        { field: "descanto", label: "Cantón" },
+        { field: "despro", label: "Provincia" },
+        { field: "zonal_2", label: "Zonal" },
       ],
     },
   },
@@ -608,8 +630,54 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
       titleField: "Tipo_maquinaria",
       fallbackTitle: "Equipo caminero",
       fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
         { field: "DPA_DESCAN", label: "Cantón" },
         { field: "DPA_DESPRO", label: "Provincia" },
+      ],
+    },
+  },
+  {
+    id: "machinery",
+    title: "Maquinaria distribuida a nivel nacional",
+    description: "Maquinaria y vehículos del MIT, según su estado.",
+    component: "respuesta",
+    section: "Vías",
+    icon: "pin",
+    geometry: "point",
+    color: NEUTRAL,
+    cluster: true,
+    classify: {
+      field: "estado",
+      classes: [
+        { label: "Operativa", color: GOOD, values: ["OPERATIVA S/N"] },
+        { label: "Operativa con falla", color: FAIR, values: ["OPERATIVA CON FALLA"] },
+        { label: "En reparación", color: "#ea580c", values: ["MAQUINARIA EN REPARACIÓN"] },
+        { label: "Parada", color: BAD, values: ["MAQUINARIA PARADA - REQUIERE RE"] },
+        { label: "De baja", color: "#94a3b8", values: ["BAJA"] },
+      ],
+      otherLabel: "Sin estado",
+    },
+    popup: {
+      titleField: "tipo_de_maquinaria_y_veh_culo",
+      fallbackTitle: "Maquinaria",
+      fields: [
+        { field: "Via_RVE", label: "Vía (RVE)" },
+        { field: "estado", label: "Estado" },
+        { field: "marca", label: "Marca" },
+        { field: "modelo", label: "Modelo" },
+        { field: "a_o", label: "Año", format: "plain" },
+        { field: "descripci_n_de_falla", label: "Falla" },
+        { field: "descripci_n_de_fallas_cr_ticas", label: "Fallas críticas" },
+        { field: "tiempo_estimado_de_reparaci_n_d", label: "Reparación (días)", format: "number" },
+        { field: "hor_metro", label: "Horómetro (h)", format: "number" },
+        { field: "kilometraje_actual", label: "Kilometraje", format: "number" },
+        { field: "posee_matr_cula_institucional", label: "Matrícula institucional" },
+        { field: "posee_seguro_vigente", label: "Seguro vigente" },
+        { field: "provincia", label: "Provincia" },
+        { field: "provincia_donde_opera", label: "Opera en" },
+        { field: "zonal", label: "Zonal" },
+        { field: "fecha", label: "Fecha del registro", format: "date" },
+        { field: "EditDate", label: "Actualizado", format: "date" },
       ],
     },
   },
@@ -641,9 +709,8 @@ export function riskDataId(style: RiskLayerStyle): string {
 const views = new WeakMap<RiskLayerData, Map<string, RiskLayerData>>();
 
 /**
- * Lo que se dibuja de una capa: solo su parte (subsetOf) y su periodo. Se
- * guarda por descarga, así cada filtro conserva su identidad entre renders
- * (los clusters no se recalculan) y `view` cambia cuando cambia el filtro.
+ * Lo que se dibuja de una capa: solo su parte (subsetOf) y su periodo. Se guarda
+ * por descarga y combinación para no volver a filtrar en cada render.
  */
 export function riskLayerView(style: RiskLayerStyle, data: RiskLayerData, days: RiskPeriodDays): RiskLayerData {
   const { subsetOf, period } = style;

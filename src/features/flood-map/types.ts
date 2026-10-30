@@ -433,8 +433,8 @@ export interface CantonAnalysis {
   response: {
     shelters: number;
     sheltersActive: number;
-    machinery: number;
-    machineryOperational: number;
+    /** Maquinaria pesada del MIT en la provincia del cantón (el inventario es por provincia). */
+    provinceMachinery: number;
     camps: number;
     roadEventsOpen: number;
     recoveryWorks: number;

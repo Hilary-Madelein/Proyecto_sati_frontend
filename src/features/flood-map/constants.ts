@@ -356,6 +356,13 @@ export const EVENTS_PAGE_SIZE = 10;
 /** Cada cuánto se vuelven a pedir los datos con la página abierta. */
 export const DATA_REFRESH_MS = 5 * 60 * 1000;
 
+/**
+ * Cada cuánto se vuelven a pedir las capas de gestión del riesgo encendidas. El
+ * backend las vuelve a descargar apenas cambian en ArcGIS; si no cambiaron
+ * responde 304 y no se transfieren de nuevo.
+ */
+export const RISK_LAYERS_REFRESH_MS = 60 * 1000;
+
 // ── Componentes de la gestión del riesgo ────────────────────────────────
 /**
  * Pestañas del panel de capas. Solo organizan el panel: cada capa se enciende

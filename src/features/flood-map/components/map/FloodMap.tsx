@@ -35,6 +35,7 @@ import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
 import { FeatureHighlight } from "./FeatureHighlight";
 import { FloodHubLayer } from "./FloodHubLayer";
 import { ParishAlertLayer } from "./ParishAlertLayer";
+import { RiskLineLabels } from "./RiskLineLabels";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
@@ -95,6 +96,22 @@ export interface FloodMapProps {
 }
 
 /**
+ * Con zoom fraccionado (zoomSnap 1/4) el navegador escala las teselas y sus
+ * bordes se pisan a medias; Leaflet las mezcla con `mix-blend-mode: plus-lighter`,
+ * que suma los colores donde se pisan, y quedan líneas blancas en la cuadrícula.
+ * En el mapa base (opaco) cada tesela se agranda 1 px y se mezcla normal: la de
+ * al lado la tapa sin sumar. Solo en el mapa base: en capas semitransparentes
+ * el solape se vería más oscuro.
+ */
+const COVER_TILE_SEAMS = {
+  tileloadstart: ({ tile }: L.TileEvent) => {
+    tile.style.width = `${parseFloat(tile.style.width) + 1}px`;
+    tile.style.height = `${parseFloat(tile.style.height) + 1}px`;
+    tile.style.mixBlendMode = "normal";
+  },
+};
+
+/**
  * Mapa Leaflet. Depende de `window`, por eso se carga solo en el navegador
  * (ver `dynamic(..., { ssr: false })` en FloodMonitor).
  */
@@ -150,6 +167,7 @@ export default function FloodMap({
         url={BASEMAPS[basemap].url}
         maxNativeZoom={BASEMAPS[basemap].maxNativeZoom}
         attribution={BASEMAPS[basemap].attribution}
+        eventHandlers={COVER_TILE_SEAMS}
       />
       {BASEMAPS[basemap].labelsUrl && (
         <Pane name={MAP_PANES.basemapLabels.name} style={{ zIndex: MAP_PANES.basemapLabels.zIndex, pointerEvents: "none" }}>
@@ -199,6 +217,7 @@ export default function FloodMap({
       {/* Pane fijo (vacío si no hay capas) con el lienzo compartido de las capas de gestión del riesgo. */}
       <Pane name={MAP_PANES.risk.name} style={{ zIndex: MAP_PANES.risk.zIndex }} />
       <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={onRiskFeaturesSelect} />
+      <RiskLineLabels layers={riskLayers} />
       {selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
       {provincePreparedness && (
         <ProvincePreparednessLayer provinces={provincePreparedness.provinces} geometries={provincePreparedness.geometries} />
