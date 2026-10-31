@@ -565,15 +565,17 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         />
 
         {/*
-          Eventos por día (plegado al inicio), a todo lo ancho de su franja. Celular y
-          tablet: arriba, entre los controles del mapa y el borde (plegado, en la esquina derecha).
+          Eventos por día (plegado al inicio), a todo lo ancho de su franja.
+          Celular y tablet: abajo, sobre la barra de Capas · Eventos · Acciones (arriba
+          taparía las leyendas del mapa); se oculta mientras hay una hoja abierta.
           Escritorio: abajo, desde el panel de eventos (o su botón) hasta el panel de
           capas (o el borde, si está cerrado: 4 + 95 + 4 = 103).
         */}
         <EventsPerDayWidget
           until={fetchedAt}
           className={cn(
-            "absolute top-3 right-3 left-16 z-1000 lg:top-auto lg:bottom-6",
+            "absolute right-3 bottom-24 left-3 z-1000 lg:bottom-6",
+            (mobileSheet !== null || riverTarget !== null || featureDetail.state !== null) && "max-lg:hidden",
             desktopPanels.events ? "lg:left-98" : "lg:left-60",
             desktopPanels.layers ? "lg:right-103" : "lg:right-4",
           )}

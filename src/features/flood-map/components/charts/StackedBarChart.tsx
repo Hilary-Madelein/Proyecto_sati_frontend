@@ -157,7 +157,13 @@ export function StackedBarChart({
                 <line x1={x} x2={x + barWidth} y1={baseline + 4} y2={baseline + 4} className="stroke-blue-600" strokeWidth={2} strokeLinecap="round" />
               )}
               {axisLabel && (
-                <text x={center} y={height - 4} textAnchor="middle" className="fill-slate-500 text-[10px]">
+                // En los extremos, alineado al borde: centrado se saldría del gráfico ("31 oc").
+                <text
+                  x={index === bars.length - 1 ? width - PAD.x : index === 0 ? PAD.x : center}
+                  y={height - 4}
+                  textAnchor={index === bars.length - 1 ? "end" : index === 0 ? "start" : "middle"}
+                  className="fill-slate-500 text-[10px]"
+                >
                   {axisLabel}
                 </text>
               )}

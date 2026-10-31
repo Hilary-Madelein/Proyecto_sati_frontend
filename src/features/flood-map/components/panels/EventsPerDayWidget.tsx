@@ -123,12 +123,9 @@ export function EventsPerDayWidget({
           }}
           // La fecha en que termina el bloque, una por semana contando desde el último (hoy).
           axisLabelOf={(index) => ((DAYS - 1 - index) % 7 === 0 ? formatDayMonth(data.days[index].end) : null)}
-          // En celular el recuadro está arriba del mapa: el cuadro del día sale por debajo (arriba lo taparía la barra).
-          tooltipClassName="top-0 -translate-y-[105%] max-lg:top-full max-lg:translate-y-1"
         />
         <p className="mt-1 text-[10px] text-slate-400">
-          Como en el panel de eventos, cada columna son 24 h contadas hacia atrás desde su hora de consulta: la última son sus «últimas
-          24 h». Estado de hoy en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de eventos los oculta).
+          Según el día que ocurrieron y su estado hoy en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de eventos los oculta).
         </p>
       </section>
     </div>
