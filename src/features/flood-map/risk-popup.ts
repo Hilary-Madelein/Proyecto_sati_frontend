@@ -1,4 +1,4 @@
-import { formatCalendarDate, formatDayMonth } from "@/lib/format";
+import { formatCalendarDate, formatDateTime, formatDayMonth } from "@/lib/format";
 import type { RiskLayerStyle, RiskPopupField } from "./risk-layers";
 import type { RiskFeature } from "./types";
 
@@ -39,11 +39,26 @@ export function tooltipOf(style: RiskLayerStyle, feature: RiskFeature): string {
 }
 
 /** Datos de una entidad para el panel de detalle, ya con formato; sin los vacíos. */
-export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: string; value: string }[] {
+export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: string; value: string; section?: string }[] {
   return style.popup.fields.flatMap((field) => {
     const value = formatValue(field, feature.properties[field.field]);
-    return value === null ? [] : [{ label: field.label, value }];
+    return value === null ? [] : [{ label: field.label, value, section: field.section }];
   });
+}
+
+/**
+ * Las filas de la ficha agrupadas por su sección (las seguidas con la misma
+ * sección van juntas); las secciones sin ningún dato no aparecen. Sin secciones,
+ * un solo grupo sin título.
+ */
+export function sectionsOf(style: RiskLayerStyle, feature: RiskFeature): { title: string | null; rows: { label: string; value: string }[] }[] {
+  const groups: { title: string | null; rows: { label: string; value: string }[] }[] = [];
+  for (const { section, ...row } of rowsOf(style, feature)) {
+    const last = groups.at(-1);
+    if (last && last.title === (section ?? null)) last.rows.push(row);
+    else groups.push({ title: section ?? null, rows: [row] });
+  }
+  return groups;
 }
 
 /** Valores que los formularios guardan cuando no hay dato. */
@@ -68,6 +83,7 @@ function formatValue(field: RiskPopupField, value: string | number | boolean | n
   const text = String(value);
   // Puede traer varias fechas separadas por ";" (p. ej. una alcantarilla con varios reportes).
   if (field.format === "date") return text.split(";").map((part) => formatDate(part.trim())).join(", ");
+  if (field.format === "datetime" && !Number.isNaN(Date.parse(text))) return formatDateTime(text);
   return text;
 }
 

@@ -7,7 +7,7 @@ import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { FloatingButton } from "@/components/ui/FloatingButton";
 import { IconTile } from "@/components/ui/IconTile";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { CircleDotIcon, HistoryIcon, LayersIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, CircleDotIcon, HistoryIcon, LayersIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -33,6 +33,7 @@ import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
 import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodDays } from "../risk-layers";
 import { ACTION_LAYER_IDS, timelineActions, type TimelineAction } from "../action-timeline";
+import { DEFAULT_CLOSURE_FILTERS, filterClosures, ROAD_CLOSURES_LAYER_ID, type ClosureFilters } from "../road-closures";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -41,6 +42,7 @@ import type {
   EventFilters,
   OverlayOpacity,
   RiskComponentId,
+  RiskFeature,
   FloodLayerId,
   FloodMapData,
   LayerVisibility,
@@ -57,6 +59,7 @@ import { RainLegend } from "./map/RainLegend";
 import { RiverAlertLegend } from "./map/RiverAlertLegend";
 import { SeaTemperatureLegend } from "./map/SeaTemperatureLegend";
 import { ParishAlertPanel } from "./panels/ParishAlertPanel";
+import { RoadClosuresPanel } from "./panels/RoadClosuresPanel";
 import { ActionsTimelineDialog } from "./timeline/ActionsTimelineDialog";
 import { EventsPerDayWidget } from "./panels/EventsPerDayWidget";
 import { CriticalEventsPanel, EventsExpandButton } from "./panels/CriticalEventsPanel";
@@ -126,12 +129,16 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     setTimelineFocus(focusKey);
     setShowTimeline(true);
   };
+  // Pestañas del panel de eventos: eventos de la SNGR, alerta de inundación por parroquia
+  // (lluvia de 12 y 24 h) y cierres viales (reportes de novedad vial del MIT).
+  const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("events");
   // Varias capas pueden salir de la misma del backend (p. ej. albergues y campamentos): se pide una vez.
-  // Con la línea de tiempo abierta se piden también las dos capas de acciones.
+  // Con la línea de tiempo abierta se piden también las dos capas de acciones; con la pestaña de cierres, la de cierres.
   const riskLayerState = useRiskLayers([
     ...new Set([
       ...RISK_LAYER_STYLES.filter((style) => riskLayersOn.has(style.id)).map(riskDataId),
       ...(showTimeline ? ACTION_LAYER_IDS : []),
+      ...(eventsTab === "closures" ? [ROAD_CLOSURES_LAYER_ID] : []),
     ]),
   ]);
   // Periodo elegido en las capas con fecha (si no se eligió, el de la capa).
@@ -160,8 +167,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [mobileSheet, setMobileSheet] = useState<PanelId | null>(null);
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const [eventFilters, setEventFilters] = useState<EventFilters>(DEFAULT_EVENT_FILTERS);
-  // Segunda pestaña del panel de eventos: alerta de inundación por parroquia (lluvia de 12 y 24 h).
-  const [eventsTab, setEventsTab] = useState<"events" | "analysis">("events");
   // Índice de preparación provincial (pestaña Preparación): viene en el mismo análisis, y se pide al encenderlo.
   const [showPreparedness, setShowPreparedness] = useState(false);
   const cantonAnalysis = useCantonAnalysis(eventsTab === "analysis" || showPreparedness);
@@ -170,6 +175,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Filtros de la alerta: la lista y el mapa muestran las mismas parroquias.
   const [parishFilters, setParishFilters] = useState<ParishFilters>(DEFAULT_PARISH_FILTERS);
   const alertSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
+  // Cierres viales: los filtros del panel se aplican también a lo que se dibuja en el mapa.
+  const [closureFilters, setClosureFilters] = useState<ClosureFilters>(DEFAULT_CLOSURE_FILTERS);
+  const closuresState = riskLayerState(ROAD_CLOSURES_LAYER_ID);
+  // Referencia del periodo: la hora de la descarga (no el reloj), así la lista y el mapa coinciden.
+  const closuresNow = Date.parse(closuresState.data?.fetchedAt ?? data.eventsFeed.fetchedAt);
   const actionStates = ACTION_LAYER_IDS.map((id) => riskLayerState(id));
   const timeline = showTimeline ? timelineActions(Object.fromEntries(ACTION_LAYER_IDS.map((id, i) => [id, actionStates[i].data]))) : [];
 
@@ -237,7 +247,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Se dibujan en el orden del catálogo, con los datos ya recibidos.
   const visibleRiskLayers = RISK_LAYER_STYLES.flatMap((style) => {
     const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
-    return data ? [{ style, data }] : [];
+    if (!data) return [];
+    // Con la pestaña de cierres abierta, el mapa muestra los mismos reportes que su lista.
+    if (style.id === ROAD_CLOSURES_LAYER_ID && eventsTab === "closures") {
+      const features = filterClosures(data.features, closureFilters, closuresNow);
+      return [{ style, data: { ...data, features, view: `closures:${JSON.stringify(closureFilters)}` } }];
+    }
+    return [{ style, data }];
   });
   const activeCounts = Object.fromEntries(
     RISK_COMPONENTS.map((item) => [item.id, activeLayers.filter((layer) => layer.component === item.id).length]),
@@ -299,6 +315,23 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     featureDetail.zoomToSelected();
   };
 
+  /** Al abrir la pestaña de cierres se enciende su capa, para verlos en el mapa (y poder tocarlos). */
+  const changeEventsTab = (tab: typeof eventsTab) => {
+    setEventsTab(tab);
+    if (tab === "closures") toggleRiskLayer(ROAD_CLOSURES_LAYER_ID, true);
+  };
+
+  /** Un reporte de la lista de cierres: se acerca el mapa y se abre su ficha completa. */
+  const selectClosure = (feature: RiskFeature) => {
+    const style = RISK_LAYER_STYLES.find((item) => item.id === ROAD_CLOSURES_LAYER_ID);
+    if (!style || !closuresState.data) return;
+    toggleRiskLayer(ROAD_CLOSURES_LAYER_ID, true);
+    setRiverTarget(null);
+    setMobileSheet(null);
+    featureDetail.open([{ key: `${ROAD_CLOSURES_LAYER_ID}:${feature.id}`, style, data: closuresState.data, feature }]);
+    featureDetail.zoomToSelected();
+  };
+
   const selectEvent = (id: string) => {
     setSelectedEventId(id);
     setFocusRequest((n) => n + 1);
@@ -314,7 +347,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         <FloodMap
           data={data}
           // Con la alerta de inundación abierta, el mapa muestra solo sus parroquias (sin los eventos de la SNGR).
-          visibleEvents={eventsTab === "analysis" ? [] : filteredEvents}
+          visibleEvents={eventsTab === "events" ? filteredEvents : []}
           layers={layers}
           rainForecast={rainForecast}
           observedRain={observedRain}
@@ -476,9 +509,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         </ResponsivePanel>
 
         <ResponsivePanel
-          title={eventsTab === "analysis" ? "Alerta de inundación" : "Eventos críticos"}
+          title={eventsTab === "analysis" ? "Alerta de inundación" : eventsTab === "closures" ? "Cierres viales" : "Eventos críticos"}
           subtitle={
-            eventsTab === "analysis"
+            eventsTab === "closures"
+              ? `MIT · reportes de novedad vial${closuresState.data ? ` · ${formatDateTime(closuresState.data.fetchedAt)}` : ""}`
+              : eventsTab === "analysis"
               ? cantonAnalysis.snapshot
                 ? `Próximas 12 y 24 h · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
                 : "Próximas 12 y 24 h"
@@ -486,7 +521,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 ? "Sin conexión con el servidor de datos"
                 : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
           }
-          icon={<PulsingAlertIcon />}
+          icon={
+            eventsTab === "closures" ? (
+              <IconTile className="bg-orange-600 text-white shadow-sm shadow-orange-600/30">
+                <AlertTriangleIcon className="size-4.5" />
+              </IconTile>
+            ) : (
+              <PulsingAlertIcon />
+            )
+          }
           mobileOpen={mobileSheet === "events"}
           desktopOpen={desktopPanels.events}
           onClose={() => closePanel("events")}
@@ -510,8 +553,9 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               options={[
                 { value: "events", label: "Eventos" },
                 { value: "analysis", label: "Alerta de inundación" },
+                { value: "closures", label: "Cierres viales" },
               ]}
-              onChange={setEventsTab}
+              onChange={changeEventsTab}
             />
           </div>
           {eventsTab === "events" ? (
@@ -525,6 +569,17 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               selectedId={selectedEventId}
               onSelect={selectEvent}
               expanded={eventsExpanded}
+            />
+          ) : eventsTab === "closures" ? (
+            <RoadClosuresPanel
+              data={closuresState.data}
+              error={closuresState.error}
+              isLoading={closuresState.isLoading}
+              filters={closureFilters}
+              onFiltersChange={setClosureFilters}
+              now={closuresNow}
+              selectedKey={featureDetail.selected?.style.id === ROAD_CLOSURES_LAYER_ID ? featureDetail.selected.key : null}
+              onSelect={selectClosure}
             />
           ) : (
             <ParishAlertPanel

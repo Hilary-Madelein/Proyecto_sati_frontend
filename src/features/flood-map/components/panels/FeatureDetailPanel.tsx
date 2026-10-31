@@ -9,7 +9,7 @@ import { ACTION_LAYER_IDS } from "../../action-timeline";
 import { RISK_COMPONENTS } from "../../constants";
 import type { RiskHit } from "../../risk-identify";
 import type { FeatureDetailState } from "../../hooks/useFeatureDetail";
-import { rowsOf, titleOf } from "../../risk-popup";
+import { sectionsOf, titleOf } from "../../risk-popup";
 import type { RiskAttachment } from "../../types";
 
 interface FeatureDetailPanelProps {
@@ -32,7 +32,7 @@ export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom,
   if (!state || !hit) return null;
   const total = state.hits.length;
   const component = RISK_COMPONENTS.find((item) => item.id === hit.style.component)?.label;
-  const rows = rowsOf(hit.style, hit.feature);
+  const sections = sectionsOf(hit.style, hit.feature);
   const objectId = hit.feature.id;
 
   return (
@@ -102,16 +102,20 @@ export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom,
           <FeaturePhotos key={hit.key} layerId={hit.style.id} objectId={objectId} />
         )}
 
-        {rows.length > 0 && (
-          <dl className="overflow-hidden rounded-xl ring-1 ring-slate-200">
-            {rows.map((row) => (
-              <div key={row.label} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-3 py-2 text-xs odd:bg-slate-50">
-                <dt className="text-slate-500">{row.label}</dt>
-                <dd className="font-medium break-words text-slate-900">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
+        {/* Los datos, por secciones si la capa las tiene (p. ej. las del reporte de novedad vial del MIT). */}
+        {sections.map((section) => (
+          <section key={section.title ?? "datos"} className="space-y-1.5">
+            {section.title && <h4 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">{section.title}</h4>}
+            <dl className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+              {section.rows.map((row) => (
+                <div key={row.label} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-3 py-2 text-xs odd:bg-slate-50">
+                  <dt className="text-slate-500">{row.label}</dt>
+                  <dd className="font-medium break-words text-slate-900">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
       </div>
     </ResponsivePanel>
   );

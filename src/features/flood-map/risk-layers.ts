@@ -1,4 +1,5 @@
 import type { PlannedLayerIcon } from "./constants";
+import { ROAD_CONDITIONS } from "./road-closures";
 import type { RiskComponentId, RiskFeature, RiskLayerData } from "./types";
 
 /*
@@ -21,8 +22,10 @@ export interface RiskClass {
 export interface RiskPopupField {
   field: string;
   label: string;
-  /** "plain": número tal cual, sin separador de miles (p. ej. un año). */
-  format?: "date" | "number" | "percent" | "money" | "hectares" | "plain";
+  /** "plain": número tal cual, sin separador de miles (p. ej. un año). "datetime": fecha y hora de Ecuador. */
+  format?: "date" | "datetime" | "number" | "percent" | "money" | "hectares" | "plain";
+  /** Título de la sección de la ficha en la que va (los campos seguidos con la misma sección se agrupan bajo ella). */
+  section?: string;
 }
 
 export interface RiskLayerStyle {
@@ -39,6 +42,8 @@ export interface RiskLayerStyle {
   classify?: { field: string; classes: readonly RiskClass[]; otherLabel?: string };
   /** Puntos agrupados en clusters a escala regional (inventarios con miles de puntos o muchos en el mismo sitio). */
   cluster?: boolean;
+  /** Puntos más grandes que los de las demás capas (p. ej. 1.8): capas con pocos puntos importantes, como los cierres viales. */
+  pointScale?: number;
   /**
    * Parte de otra capa del backend que se muestra como capa propia (p. ej. solo
    * los albergues de los alojamientos temporales): se pide una vez y se filtra aquí.
@@ -558,6 +563,50 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { field: "observaciones", label: "Observaciones" },
         { field: "provincia", label: "Provincia" },
         { field: "zonal", label: "Zonal" },
+      ],
+    },
+  },
+  {
+    id: "road-closures",
+    title: "Cierres viales",
+    description: "Reportes de novedad vial del MIT: cierres y pasos restringidos, con su estado y acciones.",
+    component: "respuesta",
+    section: "Vías",
+    icon: "alert",
+    geometry: "point",
+    color: "#64748b",
+    // Son pocos y cada uno es una vía cortada o restringida: que se vean a escala nacional.
+    pointScale: 1.8,
+    classify: {
+      field: "cond_via",
+      // Los valores se comparan en mayúsculas (ver riskClassOf).
+      classes: ROAD_CONDITIONS.map((condition) => ({ label: condition.label, color: condition.color, values: [condition.label.toUpperCase()] })),
+      otherLabel: "Sin condición",
+    },
+    // Con las secciones del "Reporte de novedad vial" del MIT, en su orden.
+    popup: {
+      titleField: "Causa",
+      fallbackTitle: "Novedad vial",
+      fields: [
+        { section: "1. Ubicación", field: "despro", label: "Provincia" },
+        { section: "1. Ubicación", field: "descanto", label: "Cantón" },
+        { section: "1. Ubicación", field: "zonal", label: "Zonal" },
+        { section: "1. Ubicación", field: "Via_RVE", label: "Ruta RVE" },
+        { section: "1. Ubicación", field: "nombre_via", label: "Tramo vial" },
+        { section: "2. Estado de la vía", field: "cond_via", label: "Condición" },
+        { section: "2. Estado de la vía", field: "Causa", label: "Causa" },
+        { section: "2. Estado de la vía", field: "descrip_afec", label: "Descripción de la afectación" },
+        { section: "3. Acciones de atención", field: "acc_ejecutadas", label: "Acciones ejecutadas" },
+        { section: "3. Acciones de atención", field: "acc_ejecucion", label: "Acciones en ejecución" },
+        { section: "3. Acciones de atención", field: "acc_prevista", label: "Acciones previstas" },
+        { section: "3. Acciones de atención", field: "maq_perso", label: "Maquinaria y personal desplegado" },
+        { section: "4. Tiempo estimado de habilitación", field: "fecha_estim_hab", label: "Hora estimada", format: "datetime" },
+        { section: "4. Tiempo estimado de habilitación", field: "dias_transcurridos", label: "Días transcurridos", format: "plain" },
+        { section: "4. Tiempo estimado de habilitación", field: "horas_transcurridas", label: "Horas transcurridas", format: "plain" },
+        { section: "4. Tiempo estimado de habilitación", field: "condicionantes", label: "Condicionantes" },
+        { section: "5. Comunicación y coordinación", field: "ciudada_comu", label: "Ciudadanía informada" },
+        { section: "5. Comunicación y coordinación", field: "Instituciones", label: "Instituciones articuladas" },
+        { section: "Actualización", field: "fecha_actua", label: "Fecha y hora de actualización", format: "datetime" },
       ],
     },
   },

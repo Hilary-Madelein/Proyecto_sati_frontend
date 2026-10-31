@@ -46,9 +46,10 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
   useMapEvents({
     zoomend: () => {
       const radius = riskPointRadius(map.getZoom());
-      for (const group of groups.current.values()) {
+      for (const [id, group] of groups.current) {
+        const scale = layers.find(({ style }) => style.id === id)?.style.pointScale ?? 1;
         group.eachLayer((layer) => {
-          if (layer instanceof L.CircleMarker) layer.setRadius(radius);
+          if (layer instanceof L.CircleMarker) layer.setRadius(radius * scale);
         });
       }
     },
@@ -95,9 +96,9 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
           L.circleMarker(latlng, {
             pane: MAP_PANES.risk.name,
             renderer,
-            radius: riskPointRadius(map.getZoom()),
+            radius: riskPointRadius(map.getZoom()) * (style.pointScale ?? 1),
             color: "#ffffff",
-            weight: 1,
+            weight: style.pointScale ? 1.5 : 1,
             fillColor: riskColorOf(style, feature as unknown as RiskFeature),
             fillOpacity: 0.95,
             bubblingMouseEvents: false,
@@ -132,6 +133,11 @@ function pathStyle(style: RiskLayerStyle, feature: RiskFeature): L.PathOptions {
     return riskClassOf(style, feature)?.dashed
       ? { color, weight: 2.5, opacity: 0.8, dashArray: "4 6", bubblingMouseEvents: false }
       : { color, weight: 3, opacity: 0.9, bubblingMouseEvents: false };
+  }
+  // Puntos: relleno sólido con borde blanco, como se crean en pointToLayer (GeoJSON aplica este estilo también a ellos,
+  // y con el de las zonas se veían pálidos).
+  if (style.geometry === "point") {
+    return { color: "#ffffff", weight: style.pointScale ? 1.5 : 1, opacity: 1, fillColor: color, fillOpacity: 0.95, bubblingMouseEvents: false };
   }
   return { color, weight: 1, opacity: 0.8, fillColor: color, fillOpacity: 0.35, bubblingMouseEvents: false };
 }

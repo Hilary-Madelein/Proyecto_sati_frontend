@@ -259,7 +259,7 @@ export function CriticalEventsPanel({
   );
 }
 
-function FilterSelect({
+export function FilterSelect({
   label,
   value,
   onChange,
