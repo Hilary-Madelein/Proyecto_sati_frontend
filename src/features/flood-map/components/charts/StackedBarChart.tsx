@@ -38,6 +38,7 @@ export function StackedBarChart({
   height,
   label,
   titleOf,
+  subtitleOf,
   axisLabelOf,
   selected = null,
   onSelect,
@@ -50,6 +51,8 @@ export function StackedBarChart({
   label: string;
   /** Título del periodo en el cuadro y para lectores de pantalla, p. ej. "Semana del 26 oct". */
   titleOf: (key: string) => string;
+  /** Línea bajo el título en el cuadro, más tenue (p. ej. el rango de horas del periodo). */
+  subtitleOf?: (key: string) => string;
   /** Texto bajo la columna (solo en algunas, para no amontonar), o null. */
   axisLabelOf: (index: number) => string | null;
   selected?: string | null;
@@ -173,7 +176,8 @@ export function StackedBarChart({
           // Medio ancho del cuadro (w-52 = 208 px) de margen, para que no se salga por los lados.
           style={{ left: Math.min(Math.max(PAD.x + slot * (activeIndex + 0.5), 104), width - 104) }}
         >
-          <p className="mb-1 font-semibold text-slate-700">{titleOf(active.key)}</p>
+          <p className={cn("font-semibold text-slate-700", !subtitleOf && "mb-1")}>{titleOf(active.key)}</p>
+          {subtitleOf && <p className="mb-1 text-[11px] text-slate-400">{subtitleOf(active.key)}</p>}
           {/* De arriba hacia abajo, como se ven apiladas en la columna. */}
           {[...series].reverse().map((item) => (
             <p key={item.key} className="flex items-center gap-1.5 text-slate-500">

@@ -46,10 +46,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Eventos registrados por la SNGR en bloques de 24 h contados hacia atrás desde
  * `until`, en los grupos del panel de eventos (GET /events/summary, `byLast24h`):
- * solo las cifras, no la lista de eventos. Con `until` = la hora de la consulta
- * del panel, el último bloque son sus "últimas 24 h", y los últimos 3 y 7 suman
- * sus "últimos 3 y 7 días". Se vuelve a pedir cuando cambia `until` (cada vez que
- * se actualiza el panel).
+ * solo las cifras, no la lista de eventos. Es la misma lógica del panel de
+ * eventos: con `until` = su hora de consulta, el último bloque son sus "últimas
+ * 24 h", y los últimos 3 y 7 suman sus "últimos 3 y 7 días". Se vuelve a pedir
+ * cuando cambia `until` (cada vez que se actualiza el panel).
  */
 export function useEventsPerDay(days: number, until: string) {
   const [data, setData] = useState<EventsPerDay | null>(null);

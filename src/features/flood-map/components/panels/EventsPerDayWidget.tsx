@@ -39,7 +39,7 @@ export function EventsPerDayWidget({
   until,
   className,
 }: {
-  /** Hora de la consulta del panel de eventos: las columnas son bloques de 24 h hacia atrás desde ella. */
+  /** Hora de la consulta del panel de eventos: las columnas son bloques de 24 h hacia atrás desde ella, como en el panel. */
   until: string;
   className?: string;
 }) {
@@ -111,20 +111,24 @@ export function EventsPerDayWidget({
           series={SERIES}
           height={112}
           label={`Eventos registrados cada día de los últimos ${DAYS}`}
-          // El último bloque son las "últimas 24 h" del panel; los demás, de hora a hora.
+          // La fecha en que termina el bloque, como en el eje (p. ej. "sábado 31 oct").
           titleOf={(key) => {
             const row = data.days.find((item) => String(item.index) === key);
-            if (!row || row.index === 0) return "Últimas 24 h";
-            return `${formatDateTime(row.start)} – ${formatDateTime(row.end)}`;
+            return row ? endDayLabel(row.end) : "";
           }}
-          // Una fecha por semana, contando desde hoy hacia atrás (la última columna es hoy).
-          axisLabelOf={(index) => ((DAYS - 1 - index) % 7 === 0 ? (index === DAYS - 1 ? "24 h" : formatDayMonth(data.days[index].end)) : null)}
+          // Bajo la fecha, las 24 h exactas del bloque, para cotejar con el panel.
+          subtitleOf={(key) => {
+            const row = data.days.find((item) => String(item.index) === key);
+            return row ? `Del ${formatDateTime(row.start)} al ${formatDateTime(row.end)}` : "";
+          }}
+          // La fecha en que termina el bloque, una por semana contando desde el último (hoy).
+          axisLabelOf={(index) => ((DAYS - 1 - index) % 7 === 0 ? formatDayMonth(data.days[index].end) : null)}
           // En celular el recuadro está arriba del mapa: el cuadro del día sale por debajo (arriba lo taparía la barra).
           tooltipClassName="top-0 -translate-y-[105%] max-lg:top-full max-lg:translate-y-1"
         />
         <p className="mt-1 text-[10px] text-slate-400">
-          Cada columna son 24 h, contadas hacia atrás desde la hora del panel de eventos: la última son sus «últimas 24 h». Estado de hoy
-          en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de eventos los oculta).
+          Como en el panel de eventos, cada columna son 24 h contadas hacia atrás desde su hora de consulta: la última son sus «últimas
+          24 h». Estado de hoy en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de eventos los oculta).
         </p>
       </section>
     </div>
@@ -137,4 +141,12 @@ function openSeverities(counts: SeverityCounts): string {
     const count = counts[severity] ?? 0;
     return count > 0 ? [`${count} ${SEVERITY_NAMES[severity][count === 1 ? 0 : 1]}`] : [];
   }).join(" · ");
+}
+
+const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+/** "sábado 31 oct": el día (en Ecuador) en que termina un bloque de 24 h. */
+function endDayLabel(end: string): string {
+  const local = new Date(Date.parse(end) - 5 * 60 * 60 * 1000);
+  return `${WEEKDAYS[local.getUTCDay()]} ${formatDayMonth(end)}`;
 }
