@@ -42,6 +42,8 @@ export interface RiskLayerStyle {
   classify?: { field: string; classes: readonly RiskClass[]; otherLabel?: string };
   /** Puntos agrupados en clusters a escala regional (inventarios con miles de puntos o muchos en el mismo sitio). */
   cluster?: boolean;
+  /** false = no se lista en el panel de su pestaña (se muestra desde otro lado, p. ej. los cierres viales desde su pestaña). */
+  listed?: boolean;
   /** Puntos más grandes que los de las demás capas (p. ej. 1.8): capas con pocos puntos importantes, como los cierres viales. */
   pointScale?: number;
   /**
@@ -575,6 +577,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     icon: "alert",
     geometry: "point",
     color: "#64748b",
+    // Se ve desde la pestaña "Cierres viales" del panel de eventos, no en la lista de Respuesta.
+    listed: false,
     // Son pocos y cada uno es una vía cortada o restringida: que se vean a escala nacional.
     pointScale: 1.8,
     classify: {

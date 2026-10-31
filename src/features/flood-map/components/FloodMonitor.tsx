@@ -150,7 +150,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     return state.data ? { ...state, data: riskLayerView(style, state.data, periodOf(style)) } : state;
   };
   // Panel de detalle al tocar una entidad de esas capas.
-  const featureDetail = useFeatureDetail([...riskLayersOn]);
+  // Los cierres viales no se encienden como capa: se ven con su pestaña abierta.
+  const featureDetail = useFeatureDetail([...riskLayersOn, ...(eventsTab === "closures" ? [ROAD_CLOSURES_LAYER_ID] : [])]);
   // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
   // pero las encendidas de los demás siguen en el mapa (así se cruza la información).
   const [riskTab, setRiskTab] = useState<RiskComponentId>(DEFAULT_RISK_COMPONENT);
@@ -246,14 +247,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   ].filter((layer) => layer !== false);
   // Se dibujan en el orden del catálogo, con los datos ya recibidos.
   const visibleRiskLayers = RISK_LAYER_STYLES.flatMap((style) => {
-    const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
-    if (!data) return [];
-    // Con la pestaña de cierres abierta, el mapa muestra los mismos reportes que su lista.
-    if (style.id === ROAD_CLOSURES_LAYER_ID && eventsTab === "closures") {
+    // Los cierres viales: solo con su pestaña abierta, y los mismos reportes que su lista.
+    if (style.id === ROAD_CLOSURES_LAYER_ID) {
+      const data = eventsTab === "closures" ? closuresState.data : null;
+      if (!data) return [];
       const features = filterClosures(data.features, closureFilters, closuresNow);
       return [{ style, data: { ...data, features, view: `closures:${JSON.stringify(closureFilters)}` } }];
     }
-    return [{ style, data }];
+    const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
+    return data ? [{ style, data }] : [];
   });
   const activeCounts = Object.fromEntries(
     RISK_COMPONENTS.map((item) => [item.id, activeLayers.filter((layer) => layer.component === item.id).length]),
@@ -315,17 +317,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     featureDetail.zoomToSelected();
   };
 
-  /** Al abrir la pestaña de cierres se enciende su capa, para verlos en el mapa (y poder tocarlos). */
-  const changeEventsTab = (tab: typeof eventsTab) => {
-    setEventsTab(tab);
-    if (tab === "closures") toggleRiskLayer(ROAD_CLOSURES_LAYER_ID, true);
-  };
 
   /** Un reporte de la lista de cierres: se acerca el mapa y se abre su ficha completa. */
   const selectClosure = (feature: RiskFeature) => {
     const style = RISK_LAYER_STYLES.find((item) => item.id === ROAD_CLOSURES_LAYER_ID);
     if (!style || !closuresState.data) return;
-    toggleRiskLayer(ROAD_CLOSURES_LAYER_ID, true);
     setRiverTarget(null);
     setMobileSheet(null);
     featureDetail.open([{ key: `${ROAD_CLOSURES_LAYER_ID}:${feature.id}`, style, data: closuresState.data, feature }]);
@@ -555,7 +551,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 { value: "analysis", label: "Alerta de inundación" },
                 { value: "closures", label: "Cierres viales" },
               ]}
-              onChange={changeEventsTab}
+              onChange={setEventsTab}
             />
           </div>
           {eventsTab === "events" ? (

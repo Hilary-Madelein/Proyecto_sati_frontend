@@ -28,7 +28,7 @@ interface RiskLayersSectionProps {
  * por sección, y al final las previstas que aún no tienen datos.
  */
 export function RiskLayersSection({ component, enabled, onToggle, stateOf, periodOf, onPeriodChange }: RiskLayersSectionProps) {
-  const layers = RISK_LAYER_STYLES.filter((layer) => layer.component === component);
+  const layers = RISK_LAYER_STYLES.filter((layer) => layer.component === component && layer.listed !== false);
   const sections = [...new Set(layers.map((layer) => layer.section))];
   const planned = PLANNED_LAYERS[component];
 
