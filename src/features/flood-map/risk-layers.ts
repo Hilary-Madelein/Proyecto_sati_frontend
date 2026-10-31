@@ -562,31 +562,6 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     },
   },
   {
-    id: "rve-recovery",
-    title: "Trabajos para recuperar la transitabilidad",
-    description: "Trabajos del MIT para reabrir o mantener las vías afectadas.",
-    component: "respuesta",
-    section: "Vías",
-    icon: "refresh",
-    geometry: "point",
-    // Por defecto, los trabajos en curso en los últimos 3 días (los terminados antes quedan en "Todos").
-    period: { field: "fecha_de_inicio", endField: "fecha_fin", defaultDays: 3 },
-    color: "#0f766e",
-    popup: {
-      titleField: "descripci_n_de_trabaj",
-      fallbackTitle: "Trabajo de transitabilidad",
-      fields: [
-        { field: "Via_RVE", label: "Vía (RVE)" },
-        { field: "fecha_de_inicio", label: "Inicio", format: "date" },
-        { field: "fecha_fin", label: "Fin", format: "date" },
-        { field: "maquinaria", label: "Maquinaria" },
-        { field: "instituciones_involucradas", label: "Instituciones" },
-        { field: "cant_n", label: "Cantón" },
-        { field: "provincia", label: "Provincia" },
-      ],
-    },
-  },
-  {
     id: "mit-response-actions",
     title: "Acciones de respuesta",
     description: "Respuesta del MIT ante eventos en las vías: despeje de derrumbes, variantes, taludes, etc.",

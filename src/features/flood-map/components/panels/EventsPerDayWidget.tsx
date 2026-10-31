@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDownIcon, CircleDotIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { formatCalendarDate } from "@/lib/format";
+import { formatDateTime, formatDayMonth } from "@/lib/format";
 import { SEVERITY_ORDER } from "../../constants";
 import { useEventsPerDay } from "../../hooks/useEventsPerDay";
 import type { SeverityCounts } from "../../hooks/useEventsPerDay";
@@ -12,7 +12,6 @@ import { SeriesLegend, StackedBarChart, type ChartSeries } from "../charts/Stack
 
 /** Días que muestra el gráfico, hasta hoy. */
 const DAYS = 30;
-const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 /**
  * Cada día en los grupos del panel de eventos, de abajo hacia arriba: cerrados,
  * abiertos sin afectaciones y abiertos con afectaciones (los que muestra el
@@ -36,9 +35,16 @@ const SEVERITY_NAMES: Record<EventSeverity, [string, string]> = {
  * franja (`className` la ubica); plegado es un botón, en la esquina de la
  * franja. Al inicio está plegado, para dejar el mapa libre.
  */
-export function EventsPerDayWidget({ className }: { className?: string }) {
+export function EventsPerDayWidget({
+  until,
+  className,
+}: {
+  /** Hora de la consulta del panel de eventos: las columnas son bloques de 24 h hacia atrás desde ella. */
+  until: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
-  const { data } = useEventsPerDay(DAYS);
+  const { data } = useEventsPerDay(DAYS, until);
   if (!data) return null;
 
   const showCard = open ? "block" : "hidden";
@@ -97,7 +103,7 @@ export function EventsPerDayWidget({ className }: { className?: string }) {
 
         <StackedBarChart
           bars={data.days.map((row) => ({
-            key: row.day,
+            key: String(row.index),
             values: { open: row.open, withoutDamage: row.withoutDamage, closed: row.closed },
             // Severidad de los abiertos con afectaciones (como en el panel): "1 crítico · 6 moderados".
             details: row.open > 0 ? [`De los abiertos: ${openSeverities(row.openBySeverity)}`] : [],
@@ -105,15 +111,20 @@ export function EventsPerDayWidget({ className }: { className?: string }) {
           series={SERIES}
           height={112}
           label={`Eventos registrados cada día de los últimos ${DAYS}`}
-          titleOf={(day) => `${WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()]} ${formatCalendarDate(day)}`}
+          // El último bloque son las "últimas 24 h" del panel; los demás, de hora a hora.
+          titleOf={(key) => {
+            const row = data.days.find((item) => String(item.index) === key);
+            if (!row || row.index === 0) return "Últimas 24 h";
+            return `${formatDateTime(row.start)} – ${formatDateTime(row.end)}`;
+          }}
           // Una fecha por semana, contando desde hoy hacia atrás (la última columna es hoy).
-          axisLabelOf={(index) => ((DAYS - 1 - index) % 7 === 0 ? (index === DAYS - 1 ? "hoy" : formatCalendarDate(data.days[index].day)) : null)}
+          axisLabelOf={(index) => ((DAYS - 1 - index) % 7 === 0 ? (index === DAYS - 1 ? "24 h" : formatDayMonth(data.days[index].end)) : null)}
           // En celular el recuadro está arriba del mapa: el cuadro del día sale por debajo (arriba lo taparía la barra).
           tooltipClassName="top-0 -translate-y-[105%] max-lg:top-full max-lg:translate-y-1"
         />
         <p className="mt-1 text-[10px] text-slate-400">
-          Según el día en que ocurrieron y su estado hoy en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de
-          eventos los oculta).
+          Cada columna son 24 h, contadas hacia atrás desde la hora del panel de eventos: la última son sus «últimas 24 h». Estado de hoy
+          en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de eventos los oculta).
         </p>
       </section>
     </div>

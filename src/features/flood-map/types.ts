@@ -437,7 +437,8 @@ export interface CantonAnalysis {
     provinceMachinery: number;
     camps: number;
     roadEventsOpen: number;
-    recoveryWorks: number;
+    /** Acciones de respuesta del MIT registradas en el cantón. */
+    responseActions: number;
   };
 }
 

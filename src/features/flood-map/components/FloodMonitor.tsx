@@ -571,6 +571,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           capas (o el borde, si está cerrado: 4 + 95 + 4 = 103).
         */}
         <EventsPerDayWidget
+          until={fetchedAt}
           className={cn(
             "absolute top-3 right-3 left-16 z-1000 lg:top-auto lg:bottom-6",
             desktopPanels.events ? "lg:left-98" : "lg:left-60",

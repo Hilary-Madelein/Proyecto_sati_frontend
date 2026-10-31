@@ -476,7 +476,7 @@ function CantonContext({ canton, name }: { canton: CantonAnalysis; name: string 
         )}
         {response.provinceMachinery > 0 && <Stat value={response.provinceMachinery} label="Maquinaria pesada en la provincia" note="MIT" />}
         {response.camps > 0 && <Stat value={response.camps} label="Campamentos del MIT" />}
-        {response.recoveryWorks > 0 && <Stat value={response.recoveryWorks} label="Trabajos de transitabilidad" />}
+        {response.responseActions > 0 && <Stat value={response.responseActions} label="Acciones de respuesta" note="MIT" />}
         {response.roadEventsOpen > 0 && (
           <Stat value={response.roadEventsOpen} label="Eventos en vías sin atender" note="Últimos 3 meses · por ejecutar o en ejecución" />
         )}
