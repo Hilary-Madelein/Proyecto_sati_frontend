@@ -103,9 +103,18 @@ export function CriticalEventsPanel({
     <div className="space-y-3">
       {/* Periodo: siempre visible, también con el panel contraído (cambia los conteos y el mapa). */}
       <div className="space-y-2">
+        {/* Qué eventos son: el gráfico de eventos por día también cuenta los cerrados y los sin afectaciones, así se entiende por qué difieren. */}
         <p className="text-[11px] text-slate-500">
-          Eventos <strong className="font-semibold text-slate-700">ya ocurridos</strong>, reportados por la SNGR. Mostrar los
-          ocurridos en:
+          Eventos <strong className="font-semibold text-slate-700">abiertos</strong>
+          {filters.showUnverified ? (
+            " (con y sin afectaciones)"
+          ) : (
+            <>
+              {" "}
+              <strong className="font-semibold text-slate-700">con afectaciones</strong>
+            </>
+          )}
+          , ya ocurridos y reportados por la SNGR. Mostrar los ocurridos en:
         </p>
         <SegmentedControl
           name="event-period"

@@ -6,18 +6,24 @@ import { cn } from "@/lib/cn";
 import { formatCalendarDate } from "@/lib/format";
 import { SEVERITY_ORDER } from "../../constants";
 import { useEventsPerDay } from "../../hooks/useEventsPerDay";
+import type { SeverityCounts } from "../../hooks/useEventsPerDay";
 import type { EventSeverity } from "../../types";
-import { StackedBarChart, type ChartSeries } from "../charts/StackedBarChart";
+import { SeriesLegend, StackedBarChart, type ChartSeries } from "../charts/StackedBarChart";
 
 /** Días que muestra el gráfico, hasta hoy. */
 const DAYS = 30;
 const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 /**
- * Una sola serie, el total del día. Por severidad no se apila: sus colores (rojo,
- * naranja y amarillo) no se distinguen entre sí apilados, y casi todos son moderados.
- * La severidad va en el cuadro de cada día.
+ * Cada día en los grupos del panel de eventos, de abajo hacia arriba: cerrados,
+ * abiertos sin afectaciones y abiertos con afectaciones (los que muestra el
+ * panel). Colores validados para daltonismo (un gris no se distinguía lo
+ * suficiente). Por severidad no se apila: sus colores (rojo, naranja y amarillo)
+ * no se distinguen entre sí; la severidad de los abiertos va en el cuadro del día.
  */
-const SERIES: readonly ChartSeries[] = [{ key: "total", label: "Eventos", plural: "eventos", color: "#2563eb" }];
+const CLOSED: ChartSeries = { key: "closed", label: "Cerrados", plural: "cerrados", color: "#0d9488" };
+const WITHOUT_DAMAGE: ChartSeries = { key: "withoutDamage", label: "Sin afectaciones", plural: "sin afectaciones", color: "#d97706" };
+const OPEN: ChartSeries = { key: "open", label: "Abiertos", plural: "abiertos con afectaciones", color: "#2563eb" };
+const SERIES: readonly ChartSeries[] = [CLOSED, WITHOUT_DAMAGE, OPEN];
 const SEVERITY_NAMES: Record<EventSeverity, [string, string]> = {
   critical: ["crítico", "críticos"],
   high: ["alto", "altos"],
@@ -68,6 +74,15 @@ export function EventsPerDayWidget({ className }: { className?: string }) {
             <p className="text-[11px] text-slate-500">
               {data.total.toLocaleString("es-EC")} {data.total === 1 ? "evento" : "eventos"} en los últimos {DAYS} días · SNGR
             </p>
+            {/* Leyenda con el total de cada grupo en el periodo, de arriba hacia abajo como en las columnas. */}
+            <SeriesLegend
+              series={[
+                { ...OPEN, label: `Abiertos: ${data.open.toLocaleString("es-EC")}` },
+                { ...WITHOUT_DAMAGE, label: `Sin afectaciones: ${data.withoutDamage.toLocaleString("es-EC")}` },
+                { ...CLOSED, label: `Cerrados: ${data.closed.toLocaleString("es-EC")}` },
+              ]}
+              className="mt-1 flex-wrap gap-y-0.5 text-[11px] font-medium text-slate-600"
+            />
           </div>
           <button
             type="button"
@@ -83,12 +98,9 @@ export function EventsPerDayWidget({ className }: { className?: string }) {
         <StackedBarChart
           bars={data.days.map((row) => ({
             key: row.day,
-            values: { total: row.total },
-            // De mayor a menor severidad, solo las que hubo: "3 altos", "22 moderados".
-            details: SEVERITY_ORDER.flatMap((severity) => {
-              const count = row.counts[severity] ?? 0;
-              return count > 0 ? [`${count} ${SEVERITY_NAMES[severity][count === 1 ? 0 : 1]}`] : [];
-            }),
+            values: { open: row.open, withoutDamage: row.withoutDamage, closed: row.closed },
+            // Severidad de los abiertos con afectaciones (como en el panel): "1 crítico · 6 moderados".
+            details: row.open > 0 ? [`De los abiertos: ${openSeverities(row.openBySeverity)}`] : [],
           }))}
           series={SERIES}
           height={112}
@@ -99,8 +111,19 @@ export function EventsPerDayWidget({ className }: { className?: string }) {
           // En celular el recuadro está arriba del mapa: el cuadro del día sale por debajo (arriba lo taparía la barra).
           tooltipClassName="top-0 -translate-y-[105%] max-lg:top-full max-lg:translate-y-1"
         />
-        <p className="mt-1 text-[10px] text-slate-400">Abiertos y cerrados, según el día en que ocurrieron.</p>
+        <p className="mt-1 text-[10px] text-slate-400">
+          Según el día en que ocurrieron y su estado hoy en la SNGR. Sin afectaciones: moderados abiertos sin daños registrados (el panel de
+          eventos los oculta).
+        </p>
       </section>
     </div>
   );
+}
+
+/** "1 crítico · 1 alto · 6 moderados": de mayor a menor severidad, solo las que hubo. */
+function openSeverities(counts: SeverityCounts): string {
+  return SEVERITY_ORDER.flatMap((severity) => {
+    const count = counts[severity] ?? 0;
+    return count > 0 ? [`${count} ${SEVERITY_NAMES[severity][count === 1 ? 0 : 1]}`] : [];
+  }).join(" · ");
 }

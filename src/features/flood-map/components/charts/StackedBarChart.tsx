@@ -167,13 +167,15 @@ export function StackedBarChart({
         <div
           role="status"
           className={cn(
-            "pointer-events-none absolute z-10 w-40 -translate-x-1/2 rounded-lg bg-white px-3 py-2 text-xs shadow-lg ring-1 ring-slate-900/10",
+            "pointer-events-none absolute z-10 w-52 -translate-x-1/2 rounded-lg bg-white px-3 py-2 text-xs shadow-lg ring-1 ring-slate-900/10",
             tooltipClassName,
           )}
-          style={{ left: Math.min(Math.max(PAD.x + slot * (activeIndex + 0.5), 80), width - 80) }}
+          // Medio ancho del cuadro (w-52 = 208 px) de margen, para que no se salga por los lados.
+          style={{ left: Math.min(Math.max(PAD.x + slot * (activeIndex + 0.5), 104), width - 104) }}
         >
           <p className="mb-1 font-semibold text-slate-700">{titleOf(active.key)}</p>
-          {series.map((item) => (
+          {/* De arriba hacia abajo, como se ven apiladas en la columna. */}
+          {[...series].reverse().map((item) => (
             <p key={item.key} className="flex items-center gap-1.5 text-slate-500">
               <span aria-hidden="true" className="h-0.5 w-3 rounded-full" style={{ backgroundColor: item.color }} />
               <span className="font-semibold text-slate-900 tabular-nums">{valueOf(active, item)}</span>
