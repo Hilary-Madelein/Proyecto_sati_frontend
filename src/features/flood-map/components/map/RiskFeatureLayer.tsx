@@ -1,7 +1,7 @@
 "use client";
 
 import L from "leaflet";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import { MAP_PANES } from "../../constants";
 import { identifyRiskFeatures, type RiskHit } from "../../risk-identify";
@@ -19,6 +19,21 @@ interface RiskFeatureLayersProps {
   renderer: L.Canvas;
   /** Entidades de todas las capas en el punto tocado (abre el panel de detalle). */
   onSelect: (hits: RiskHit[]) => void;
+}
+
+/**
+ * Pane fijo (vacío si no hay capas) con el lienzo compartido de las capas de
+ * gestión del riesgo. Se crea una vez y no se quita, a diferencia de <Pane>: este
+ * lo borra y lo vuelve a crear con el doble montaje de StrictMode (en desarrollo),
+ * y el lienzo, si ya estaba en uso, se queda en el pane borrado y con él todas las
+ * capas. Se crea antes de que las capas se agreguen al mapa (en useEffect).
+ */
+export function RiskPane() {
+  const map = useMap();
+  useLayoutEffect(() => {
+    if (!map.getPane(MAP_PANES.risk.name)) map.createPane(MAP_PANES.risk.name).style.zIndex = String(MAP_PANES.risk.zIndex);
+  }, [map]);
+  return null;
 }
 
 /**

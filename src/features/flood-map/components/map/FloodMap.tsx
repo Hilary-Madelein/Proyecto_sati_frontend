@@ -44,7 +44,7 @@ import { ProvinceBoundaries } from "./ProvinceBoundaries";
 import { ProvincePreparednessLayer } from "./ProvincePreparednessLayer";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
-import { RiskFeatureLayers } from "./RiskFeatureLayer";
+import { RiskFeatureLayers, RiskPane } from "./RiskFeatureLayer";
 import { RiverNetworkLayer } from "./RiverNetworkLayer";
 import { WeatherStationsLayer } from "./WeatherStationsLayer";
 
@@ -214,8 +214,7 @@ export default function FloodMap({
           />
         </Pane>
       )}
-      {/* Pane fijo (vacío si no hay capas) con el lienzo compartido de las capas de gestión del riesgo. */}
-      <Pane name={MAP_PANES.risk.name} style={{ zIndex: MAP_PANES.risk.zIndex }} />
+      <RiskPane />
       <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={onRiskFeaturesSelect} />
       <RiskLineLabels layers={riskLayers} />
       {selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
@@ -224,9 +223,7 @@ export default function FloodMap({
       )}
       {parishAlerts && <ParishAlertLayer parishes={parishAlerts} selected={selectedParish} onParishClick={onParishClick} />}
       {layers.flashFloods && data.floodHub?.flashFloods && (
-        <Pane name={MAP_PANES.flashFloods.name} style={{ zIndex: MAP_PANES.flashFloods.zIndex }}>
-          <FlashFloodLayer areas={data.floodHub.flashFloods} attribution={data.floodHub.attribution} />
-        </Pane>
+        <FlashFloodLayer areas={data.floodHub.flashFloods} attribution={data.floodHub.attribution} renderer={riskRenderer} />
       )}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
       {weatherStations && <WeatherStationsLayer snapshot={weatherStations} rain={data.rain} />}

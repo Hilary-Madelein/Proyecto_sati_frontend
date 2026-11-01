@@ -1,24 +1,45 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type L from "leaflet";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { GeoJSON, Popup, Tooltip } from "react-leaflet";
 import { formatDateTime } from "@/lib/format";
-import { FLASH_FLOOD_LIKELIHOODS, FLASH_FLOOD_MODEL } from "../../constants";
+import { FLASH_FLOOD_LIKELIHOODS, FLASH_FLOOD_MODEL, MAP_PANES } from "../../constants";
 import type { FlashFloodArea } from "../../types";
 
 /**
  * Zonas urbanas con riesgo de crecida repentina según Google, con las muy
  * probables encima. Es un riesgo por celdas de ~20 km, no una mancha de inundación.
+ *
+ * Van en el lienzo de las capas de gestión del riesgo (`renderer`) y al fondo de
+ * él: en un lienzo propio encima, se quedaría con los clics de todo el mapa, y
+ * encima de las otras capas, con los de sus puntos y líneas.
  */
-export function FlashFloodLayer({ areas, attribution }: { areas: FlashFloodArea[]; attribution: string }) {
-  const ordered = [...areas].sort((a, b) => Number(a.likelihood === "highly_likely") - Number(b.likelihood === "highly_likely"));
+export function FlashFloodLayer({ areas, attribution, renderer }: { areas: FlashFloodArea[]; attribution: string; renderer: L.Canvas }) {
+  const groups = useRef(new Map<string, L.GeoJSON>());
+  // De las muy probables a las probables: cada una pasa al fondo, así las muy probables quedan encima de las demás.
+  const ordered = useMemo(
+    () => [...areas].sort((a, b) => Number(b.likelihood === "highly_likely") - Number(a.likelihood === "highly_likely")),
+    [areas],
+  );
+  // Corre después de que los hijos se agregan al mapa, y otra vez si llegan zonas nuevas.
+  useEffect(() => {
+    for (const area of ordered) groups.current.get(area.id)?.bringToBack();
+  }, [ordered]);
+
   return ordered.map((area) => {
     const { color, label } = FLASH_FLOOD_LIKELIHOODS[area.likelihood];
     return (
       <GeoJSON
         key={area.id}
+        ref={(group) => {
+          if (group) groups.current.set(area.id, group);
+          else groups.current.delete(area.id);
+        }}
         data={area.geometry}
-        style={{ color, weight: 1.5, opacity: 0.9, fillColor: color, fillOpacity: 0.28 }}
+        pane={MAP_PANES.risk.name}
+        // El lienzo va en el estilo: GeoJSON lo aplica a cada zona antes de agregarla al mapa.
+        style={{ color, weight: 1.5, opacity: 0.9, fillColor: color, fillOpacity: 0.28, renderer } as L.PathOptions}
       >
         <Tooltip sticky>
           <span className="text-xs">

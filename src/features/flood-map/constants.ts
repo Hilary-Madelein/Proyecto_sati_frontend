@@ -88,8 +88,6 @@ export const MAP_PANES = {
   // Un solo lienzo para todas las capas de gestión del riesgo: con uno por capa (o por
   // geometría), el de arriba se queda con los clics y las de abajo no se pueden tocar.
   risk: { name: "risk", zIndex: 395 },
-  // Encima del lienzo de riesgo, que si no se queda con sus clics.
-  flashFloods: { name: "flashFloods", zIndex: 397 },
   // Límites de provincias y nombres del mapa base gris: encima de la lluvia, debajo de las capas de riesgo.
   provinces: { name: "provinces", zIndex: 386 },
   basemapLabels: { name: "basemapLabels", zIndex: 390 },
