@@ -33,7 +33,7 @@ import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
 import { FeatureHighlight } from "./FeatureHighlight";
-import { FloodHubLayer } from "./FloodHubLayer";
+import { FlashFloodLayer } from "./FlashFloodLayer";
 import { ParishAlertLayer } from "./ParishAlertLayer";
 import { RiskLineLabels } from "./RiskLineLabels";
 import { MapClickHandler } from "./MapClickHandler";
@@ -223,8 +223,11 @@ export default function FloodMap({
         <ProvincePreparednessLayer provinces={provincePreparedness.provinces} geometries={provincePreparedness.geometries} />
       )}
       {parishAlerts && <ParishAlertLayer parishes={parishAlerts} selected={selectedParish} onParishClick={onParishClick} />}
-      {/* Marcadores en el panel de Leaflet: su popup queda encima de todo. */}
-      {layers.floodHub && data.floodHub && <FloodHubLayer snapshot={data.floodHub} />}
+      {layers.flashFloods && data.floodHub?.flashFloods && (
+        <Pane name={MAP_PANES.flashFloods.name} style={{ zIndex: MAP_PANES.flashFloods.zIndex }}>
+          <FlashFloodLayer areas={data.floodHub.flashFloods} attribution={data.floodHub.attribution} />
+        </Pane>
+      )}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
       {weatherStations && <WeatherStationsLayer snapshot={weatherStations} rain={data.rain} />}
       {layers.riverNetwork && (

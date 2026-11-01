@@ -104,34 +104,25 @@ export interface SeaPointValue {
 }
 
 // ── Google Flood Hub (vía backend) ──────────────────────────────────────
-/** Nivel de inundación que pronostica Flood Hub en un punto. */
-export type FloodHubSeverity = "unknown" | "no_flooding" | "above_normal" | "severe" | "extreme";
-export type FloodHubTrend = "rise" | "fall" | "no_change" | "unknown";
-
-/** Punto de pronóstico de Flood Hub (una cuenca) con su último estado (GET /flood-hub). */
-export interface FloodHubGauge {
-  id: string;
-  lat: number;
-  lng: number;
-  severity: FloodHubSeverity;
-  trend: FloodHubTrend;
-  /** Google verificó la calidad del modelo en este punto. */
-  verified: boolean;
-  issuedAt: string | null;
-  /** Ventana del pronóstico a la que se refiere el nivel. */
-  forecastFrom: string | null;
-  forecastTo: string | null;
-}
-
+/** Crecidas repentinas de Google en el Ecuador (GET /flood-hub). */
 export interface FloodHubSnapshot {
   fetchedAt: string;
-  issuedAt: string | null;
   attribution: string;
   isStale: boolean;
-  /** Puntos por encima de lo normal, severos o extremos. */
-  flaggedCount: number;
-  /** Primero los de mayor severidad. */
-  gauges: FloodHubGauge[];
+  /** Crecidas repentinas urbanas vigentes; null si la fuente no las ofrece. */
+  flashFloods: FlashFloodArea[] | null;
+}
+
+export type FlashFloodLikelihood = "likely" | "highly_likely";
+
+/** Zona urbana con riesgo de crecida repentina (GET /flood-hub). */
+export interface FlashFloodArea {
+  id: string;
+  likelihood: FlashFloodLikelihood;
+  issuedAt: string;
+  validUntil: string;
+  countries: string[];
+  geometry: GeoJSON.MultiPolygon;
 }
 
 // ── Caudales (GEOGLOWS · Hydroviewer del INAMHI) ────────────────────────
@@ -293,7 +284,7 @@ export interface FloodMapData {
   floodHub: FloodHubSnapshot | null;
 }
 
-export type FloodLayerId = "riverNetwork" | "riverAlerts" | "floodHub";
+export type FloodLayerId = "riverNetwork" | "riverAlerts" | "flashFloods";
 export type LayerVisibility = Record<FloodLayerId, boolean>;
 
 /** Lluvia de una capa activa en un punto del mapa (GET .../value). `mm` es null fuera del Ecuador o sin dato. */
