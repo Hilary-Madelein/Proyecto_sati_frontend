@@ -73,8 +73,10 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
   }
 
   const counts = ROAD_CONDITIONS.map((condition) => ({ ...condition, count: countOf(condition.label) }));
-  const total = counts.reduce((sum, item) => sum + item.count, 0);
+  const total = inScope.length;
   const fullClosures = counts[0].count;
+  // Reportes sin condición (el formulario no la exige): se cuentan aparte para que las cifras sumen el total.
+  const withoutCondition = total - counts.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div className="space-y-4">
@@ -86,8 +88,8 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
       {/* Resumen del periodo: lo que más importa para el seguimiento, y cómo se reparten por condición. */}
       <section aria-label="Resumen" className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
         <dl className="grid grid-cols-2 divide-x divide-slate-200 text-center">
+          <SummaryFigure value={total} label={total === 1 ? "reporte" : "reportes"} tone="text-slate-900" />
           <SummaryFigure value={fullClosures} label={fullClosures === 1 ? "cierre total" : "cierres totales"} tone={fullClosures > 0 ? "text-red-600" : "text-slate-900"} />
-          <SummaryFigure value={total - fullClosures} label="con restricción" tone={total - fullClosures > 0 ? "text-orange-600" : "text-slate-900"} />
         </dl>
         <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
           {counts
@@ -95,6 +97,7 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
             .map((item) => (
               <span key={item.label} className="h-full first:rounded-l-full last:rounded-r-full" style={{ flexGrow: item.count, backgroundColor: item.color }} />
             ))}
+          {withoutCondition > 0 && <span className="h-full bg-slate-400 first:rounded-l-full last:rounded-r-full" style={{ flexGrow: withoutCondition }} />}
         </div>
       </section>
 
@@ -134,6 +137,13 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               </li>
             );
           })}
+          {withoutCondition > 0 && (
+            <li className="flex items-center gap-2.5 px-3 py-2 text-xs">
+              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-slate-400" />
+              <span className="min-w-0 flex-1 font-medium text-slate-500">Sin condición</span>
+              <span className="font-semibold text-slate-900 tabular-nums">{withoutCondition}</span>
+            </li>
+          )}
         </ul>
       </div>
 
