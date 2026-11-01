@@ -3,8 +3,8 @@ import { AlertTriangleIcon, WavesIcon } from "@/components/ui/icons";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
 import { formatCalendarDate, formatDateTime } from "@/lib/format";
-import { FLOOD_HUB_FLAGGED_ORDER, FLOOD_HUB_SEVERITIES } from "../../constants";
-import type { FloodLayerId, FloodMapData, LayerVisibility } from "../../types";
+import { FLASH_FLOOD_LIKELIHOODS, FLASH_FLOOD_MODEL } from "../../constants";
+import type { FlashFloodLikelihood, FloodLayerId, FloodMapData, LayerVisibility } from "../../types";
 import { alertLevelForDay } from "../../utils";
 import { LayerCard } from "./LayerCard";
 import { LegendItem } from "./LegendItem";
@@ -36,42 +36,46 @@ export function RiversSection(props: FloodLayersSectionProps) {
   );
 }
 
-/** Pronóstico de Google Flood Hub: nivel de inundación previsto en cada punto de los ríos. */
+/** Google Flood Hub: zonas donde una crecida repentina es probable o muy probable. */
 export function FloodHubSection({ data, layers, onToggleLayer }: Pick<FloodLayersSectionProps, "data" | "layers" | "onToggleLayer">) {
   const snapshot = data.floodHub;
-  const bySeverity = countBy(snapshot?.gauges ?? [], (gauge) => gauge.severity);
-  const meta = snapshot
-    ? `${snapshot.flaggedCount} ${snapshot.flaggedCount === 1 ? "punto" : "puntos"} con aviso de ${snapshot.gauges.length.toLocaleString("es-EC")}`
-    : "Sin conexión con Flood Hub";
+  const flashFloods = snapshot?.flashFloods ?? null;
+  const byLikelihood = countBy(flashFloods ?? [], (area) => area.likelihood);
+  const issuedAt = flashFloods?.[0]?.issuedAt;
+  const meta = !flashFloods
+    ? "No disponible"
+    : flashFloods.length === 0
+      ? "Sin zonas en riesgo"
+      : `${flashFloods.length} ${flashFloods.length === 1 ? "zona" : "zonas"} en riesgo`;
 
   return (
     <section>
       <SectionHeading>Google Flood Hub</SectionHeading>
       <LayerCard
-        title="Pronóstico de Flood Hub"
+        title="Crecidas repentinas urbanas"
         meta={meta}
         icon={
-          <IconTile className="bg-blue-50 text-blue-600">
-            <WavesIcon className="size-5" />
+          <IconTile className="bg-red-50 text-red-600">
+            <AlertTriangleIcon className="size-5" />
           </IconTile>
         }
-        enabled={layers.floodHub}
-        onToggle={(enabled) => onToggleLayer("floodHub", enabled)}
+        enabled={layers.flashFloods}
+        onToggle={(enabled) => onToggleLayer("flashFloods", enabled)}
       >
-        {FLOOD_HUB_FLAGGED_ORDER.map((severity) => (
+        {(Object.keys(FLASH_FLOOD_LIKELIHOODS) as FlashFloodLikelihood[]).map((likelihood) => (
           <LegendItem
-            key={severity}
+            key={likelihood}
             shape="square"
-            label={FLOOD_HUB_SEVERITIES[severity].label}
-            color={FLOOD_HUB_SEVERITIES[severity].color}
+            label={FLASH_FLOOD_LIKELIHOODS[likelihood].label}
+            color={FLASH_FLOOD_LIKELIHOODS[likelihood].color}
             borderColor="#ffffff"
-            count={bySeverity(severity)}
+            count={byLikelihood(likelihood)}
           />
         ))}
         <li className="col-span-2 text-[11px] text-slate-500">
-          Puntos de los ríos donde el modelo de Google prevé un nivel sobre lo normal en los próximos días; los demás no se
-          muestran.
-          {snapshot?.issuedAt && ` Emitido el ${formatDateTime(snapshot.issuedAt)}.`} {snapshot?.attribution}
+          Zonas urbanas donde el modelo de IA de Google estima probable una crecida repentina por eventos meteorológicos en
+          las próximas 24 h, en celdas de unos 20 km. Usa datos de {FLASH_FLOOD_MODEL.inputs}.
+          {issuedAt && ` Emitido el ${formatDateTime(issuedAt)}.`} {snapshot?.attribution}
           {snapshot?.isStale && " La fuente no responde: se muestra la última descarga."}
         </li>
       </LayerCard>

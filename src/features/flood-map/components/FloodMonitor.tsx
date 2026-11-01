@@ -229,7 +229,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     showStations && { key: "stations", label: "Lluvia en estaciones", component: "amenaza" as const, turnOff: () => setShowStations(false) },
     layers.riverNetwork && { key: "riverNetwork", label: "Red de ríos", component: "amenaza" as const, turnOff: () => toggleLayer("riverNetwork", false) },
     layers.riverAlerts && { key: "riverAlerts", label: "Alertas por caudal", component: "amenaza" as const, turnOff: () => toggleLayer("riverAlerts", false) },
-    layers.floodHub && { key: "floodHub", label: "Flood Hub", component: "amenaza" as const, turnOff: () => toggleLayer("floodHub", false) },
+    layers.flashFloods && { key: "flashFloods", label: "Crecidas repentinas", component: "amenaza" as const, turnOff: () => toggleLayer("flashFloods", false) },
     showSea && { key: "sea", label: "Temperatura del mar", component: "amenaza" as const, turnOff: () => setShowSea(false) },
     showImerg && { key: "imerg", label: "Lluvia IMERG", component: "amenaza" as const, turnOff: () => setShowImerg(false) },
     showPreparedness && {

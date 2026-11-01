@@ -3,8 +3,7 @@ import type {
   EventFilters,
   EventPeriod,
   EventSeverity,
-  FloodHubGauge,
-  FloodHubSeverity,
+  FlashFloodLikelihood,
   LatLngBounds,
   LayerVisibility,
   ObservedRainProduct,
@@ -89,6 +88,8 @@ export const MAP_PANES = {
   // Un solo lienzo para todas las capas de gestión del riesgo: con uno por capa (o por
   // geometría), el de arriba se queda con los clics y las de abajo no se pueden tocar.
   risk: { name: "risk", zIndex: 395 },
+  // Encima del lienzo de riesgo, que si no se queda con sus clics.
+  flashFloods: { name: "flashFloods", zIndex: 397 },
   // Límites de provincias y nombres del mapa base gris: encima de la lluvia, debajo de las capas de riesgo.
   provinces: { name: "provinces", zIndex: 386 },
   basemapLabels: { name: "basemapLabels", zIndex: 390 },
@@ -185,21 +186,26 @@ export const STATION_FORECAST_LABELS: Record<ForecastDay, string> = {
 };
 
 // ── Inundaciones ────────────────────────────────────────────────────────
-/** Vista inicial: solo las alertas por caudal. El resto (incluida la red de ríos) se activa desde el panel de capas. */
+/** Vista inicial: solo las crecidas repentinas de Google. El resto se activa desde el panel de capas. */
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   riverNetwork: false,
-  riverAlerts: true,
-  floodHub: false,
+  riverAlerts: false,
+  flashFloods: true,
 };
 
 // ── Google Flood Hub ────────────────────────────────────────────────────
-/** Niveles de Flood Hub con los colores de su sitio. */
-export const FLOOD_HUB_SEVERITIES: Record<FloodHubSeverity, { label: string; color: string; sizePx: number }> = {
-  extreme: { label: "Extremo", color: "#7e22ce", sizePx: 16 },
-  severe: { label: "Severo", color: "#dc2626", sizePx: 15 },
-  above_normal: { label: "Sobre lo normal", color: "#f59e0b", sizePx: 14 },
-  no_flooding: { label: "Sin inundación", color: "#94a3b8", sizePx: 10 },
-  unknown: { label: "Sin dato", color: "#cbd5e1", sizePx: 10 },
+/** Niveles de probabilidad de las crecidas repentinas urbanas (de mayor a menor). */
+export const FLASH_FLOOD_LIKELIHOODS: Record<FlashFloodLikelihood, { label: string; color: string }> = {
+  highly_likely: { label: "Muy probable", color: "#dc2626" },
+  likely: { label: "Probable", color: "#f59e0b" },
+};
+
+/** Ficha del modelo según la documentación de Google: la API no da estos datos por evento, son iguales para todas las zonas. */
+export const FLASH_FLOOD_MODEL = {
+  type: "Crecida repentina",
+  cause: "Eventos meteorológicos",
+  model: "IA de Google",
+  inputs: "ECMWF, IMERG, NOAA CPC y Google DeepMind",
 };
 
 // ── Alerta de inundación por cantón (lluvia pronosticada de 12 y 24 h) ──
@@ -238,16 +244,6 @@ export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; alert: string;
   orange: { label: "Alta", alert: "Alerta alta", color: "#f97316", panelClass: "bg-orange-50 text-orange-900 ring-1 ring-orange-600/20" },
   yellow: { label: "Moderada", alert: "Alerta moderada", color: "#eab308", panelClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-600/20" },
   green: { label: "Baja", alert: "Alerta baja", color: "#16a34a", panelClass: "bg-green-50 text-green-900 ring-1 ring-green-600/20" },
-};
-
-/** Niveles con aviso, los únicos que se dibujan (de mayor a menor). */
-export const FLOOD_HUB_FLAGGED_ORDER: FloodHubSeverity[] = ["extreme", "severe", "above_normal"];
-
-export const FLOOD_HUB_TRENDS: Record<FloodHubGauge["trend"], string> = {
-  rise: "Subiendo",
-  fall: "Bajando",
-  no_change: "Estable",
-  unknown: "Sin dato",
 };
 
 // ── Caudales (GEOGLOWS) ─────────────────────────────────────────────────

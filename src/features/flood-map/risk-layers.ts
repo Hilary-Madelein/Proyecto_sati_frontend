@@ -92,6 +92,26 @@ const RPIS_POPUP = (extra: RiskPopupField[] = []) => ({
 export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
   // ── Amenaza ──────────────────────────────────────────────────────────────
   {
+    id: "flood-history",
+    title: "Historial de inundaciones (1999–2020)",
+    description:
+      "Zonas que el satélite vio con agua: frecuente, 5 % del tiempo o más; ocasional, de 1 % a 5 %; rara vez, de 0,5 % a 1 %. Simplificada para el mapa nacional. No es una alerta actual ni trae fechas de eventos.",
+    component: "amenaza",
+    section: "Otras amenazas",
+    icon: "waves",
+    geometry: "area",
+    color: "#7c3aed",
+    classify: {
+      field: "nivel",
+      classes: [
+        { label: "Frecuente", color: "#4c1d95", values: ["FRECUENTE"] },
+        { label: "Ocasional", color: "#7c3aed", values: ["OCASIONAL"] },
+        { label: "Rara vez", color: "#c4b5fd", values: ["RARA VEZ"] },
+      ],
+    },
+    popup: { titleField: "nivel", fallbackTitle: "Historial de inundación", fields: [] },
+  },
+  {
     id: "flood-model-zones",
     title: "Zonas inundables (modelo)",
     description: "Áreas que inunda el modelo en Manabí y Azuay/Cañar, mientras llega Flood Hub.",
