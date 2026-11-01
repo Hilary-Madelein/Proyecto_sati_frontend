@@ -75,7 +75,6 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
   const counts = ROAD_CONDITIONS.map((condition) => ({ ...condition, count: countOf(condition.label) }));
   const total = counts.reduce((sum, item) => sum + item.count, 0);
   const fullClosures = counts[0].count;
-  const overdue = inScope.filter((feature) => isOverdue(feature, now)).length;
 
   return (
     <div className="space-y-4">
@@ -86,10 +85,9 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
 
       {/* Resumen del periodo: lo que más importa para el seguimiento, y cómo se reparten por condición. */}
       <section aria-label="Resumen" className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
-        <dl className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+        <dl className="grid grid-cols-2 divide-x divide-slate-200 text-center">
           <SummaryFigure value={fullClosures} label={fullClosures === 1 ? "cierre total" : "cierres totales"} tone={fullClosures > 0 ? "text-red-600" : "text-slate-900"} />
           <SummaryFigure value={total - fullClosures} label="con restricción" tone={total - fullClosures > 0 ? "text-orange-600" : "text-slate-900"} />
-          <SummaryFigure value={overdue} label={overdue === 1 ? "plazo vencido" : "plazos vencidos"} tone={overdue > 0 ? "text-red-700" : "text-slate-900"} />
         </dl>
         <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
           {counts
@@ -223,19 +221,12 @@ function EmptyState({ title, children }: { title: string; children: ReactNode })
   );
 }
 
-/** Plazo vencido: la hora estimada de habilitación ya pasó y el reporte no dice que esté habilitada. */
-function isOverdue(feature: RiskFeature, now: number): boolean {
-  const reopening = reopeningAt(feature);
-  return reopening !== null && reopening < now && !conditionOf(feature)?.label.startsWith("Habilitado");
-}
-
 function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeature; now: number; selected: boolean; onSelect: () => void }) {
   const p = feature.properties;
   const condition = conditionOf(feature);
   const color = condition?.color ?? "#64748b";
   const updated = updatedAt(feature);
   const reopening = reopeningAt(feature);
-  const overdue = isOverdue(feature, now);
   const road = p.Via_RVE ? String(p.Via_RVE) : null;
   const cause = String(p.Causa ?? "").trim() || "Novedad vial";
   const place = [p.descanto, p.despro].filter(Boolean).map((name) => placeName(String(name))).join(", ");
@@ -259,9 +250,6 @@ function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeatur
         >
           {condition?.label ?? "Sin condición"}
         </span>
-        {overdue && (
-          <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">Plazo vencido</span>
-        )}
       </span>
       <span className="mt-1.5 flex items-start gap-1.5">
         {road && (
@@ -287,12 +275,7 @@ function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeatur
         )}
       </span>
       {reopening !== null && (
-        <span
-          className={cn(
-            "mt-2 flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[11px]",
-            overdue ? "bg-red-50 font-semibold text-red-700" : "bg-slate-50 text-slate-600",
-          )}
-        >
+        <span className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
           <span>Habilitación estimada</span>
           <span className="font-semibold tabular-nums">{formatDateTime(new Date(reopening).toISOString())}</span>
         </span>
