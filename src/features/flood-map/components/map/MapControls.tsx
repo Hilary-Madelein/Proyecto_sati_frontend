@@ -1,20 +1,20 @@
 "use client";
 
-import L, { type FitBoundsOptions } from "leaflet";
+import L from "leaflet";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMap } from "react-leaflet";
 import { cn } from "@/lib/cn";
 import { CheckIcon, MapIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@/components/ui/icons";
 import { BASEMAPS, MAP_CONFIG, type BasemapId } from "../../constants";
+import { getHomeBoundsOptions } from "./home-bounds";
 
 interface MapControlsProps {
-  homeOptions: FitBoundsOptions;
   basemap: BasemapId;
   onBasemapChange: (basemap: BasemapId) => void;
 }
 
 /** Zoom, "volver a Ecuador" y mapa base (gris claro o calles), con el mismo estilo vidrio que los paneles. */
-export function MapControls({ homeOptions, basemap, onBasemapChange }: MapControlsProps) {
+export function MapControls({ basemap, onBasemapChange }: MapControlsProps) {
   const map = useMap();
   const ref = useRef<HTMLDivElement>(null);
   const [choosing, setChoosing] = useState(false);
@@ -37,7 +37,7 @@ export function MapControls({ homeOptions, basemap, onBasemapChange }: MapContro
         </ControlButton>
         <ControlButton
           label="Ver todo Ecuador"
-          onClick={() => map.flyToBounds(MAP_CONFIG.initialBounds, { ...homeOptions, duration: 1 })}
+          onClick={() => map.flyToBounds(MAP_CONFIG.initialBounds, { ...getHomeBoundsOptions(), duration: 1 })}
         >
           <MaximizeIcon className="size-4" />
         </ControlButton>

@@ -41,9 +41,11 @@ interface CriticalEventsLayerProps {
   selectedId: string | null;
   focusRequest: number;
   onSelect: (id: string) => void;
+  /** Se cerró el popup de ese evento: deja de estar seleccionado. */
+  onDeselect: (id: string) => void;
 }
 
-export function CriticalEventsLayer({ events, selectedId, focusRequest, onSelect }: CriticalEventsLayerProps) {
+export function CriticalEventsLayer({ events, selectedId, focusRequest, onSelect, onDeselect }: CriticalEventsLayerProps) {
   return events.map((event) => (
     <EventMarker
       key={event.id}
@@ -51,6 +53,7 @@ export function CriticalEventsLayer({ events, selectedId, focusRequest, onSelect
       selected={event.id === selectedId}
       focusRequest={focusRequest}
       onSelect={onSelect}
+      onDeselect={onDeselect}
     />
   ));
 }
@@ -60,11 +63,13 @@ function EventMarker({
   selected,
   focusRequest,
   onSelect,
+  onDeselect,
 }: {
   event: HazardEvent;
   selected: boolean;
   focusRequest: number;
   onSelect: (id: string) => void;
+  onDeselect: (id: string) => void;
 }) {
   const map = useMap();
   const markerRef = useRef<L.Marker>(null);
@@ -107,7 +112,7 @@ function EventMarker({
           <span className="text-slate-500">Clic para ver el detalle</span>
         </span>
       </Tooltip>
-      <Popup ref={popupRef} className="event-popup" maxWidth={320} minWidth={240} autoPanPadding={[16, 16]}>
+      <Popup ref={popupRef} className="event-popup" maxWidth={320} minWidth={240} autoPanPadding={[16, 16]} eventHandlers={{ remove: () => onDeselect(event.id) }}>
         <EventPopupContent event={event} onResize={refreshPopup} />
       </Popup>
     </Marker>

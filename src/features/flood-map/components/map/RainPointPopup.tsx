@@ -129,7 +129,7 @@ function PointPopupContent({ lat, lng, sources, onClose }: PointPopupContentProp
   return (
     <Popup ref={popupRef} position={[lat, lng]} minWidth={220} autoPanPadding={[16, 16]} eventHandlers={{ remove: onClose }}>
       <div className="w-56">
-        <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900">
+        <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900 max-lg:text-sm">
           <CloudRainIcon className="size-4 text-sky-600" />
           En este punto
         </h3>

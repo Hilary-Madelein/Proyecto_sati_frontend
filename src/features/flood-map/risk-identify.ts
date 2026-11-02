@@ -9,6 +9,8 @@ export interface RiskHit {
   style: RiskLayerStyle;
   data: RiskLayerData;
   feature: RiskFeature;
+  /** Abierta a propósito desde la línea de tiempo: se mantiene aunque el periodo de su capa no la incluya. */
+  pinned?: boolean;
 }
 
 /** Margen del toque, en píxeles: el radio de los puntos (5) más un poco, y medio ancho de línea más un poco. */
@@ -41,7 +43,8 @@ export function identifyRiskFeatures(
       }
     });
   }
-  return hits.sort((a, b) => DRAW_ORDER[a.style.geometry] - DRAW_ORDER[b.style.geometry]).slice(0, MAX_HITS);
+  // Lo último que se dibujó queda encima: se empieza por ahí, que es lo que dice el aviso del cursor.
+  return hits.reverse().sort((a, b) => DRAW_ORDER[a.style.geometry] - DRAW_ORDER[b.style.geometry]).slice(0, MAX_HITS);
 }
 
 function touches(geometry: GeoJSON.Geometry, latlng: L.LatLng, click: Projected, project: (position: Position) => Projected): boolean {

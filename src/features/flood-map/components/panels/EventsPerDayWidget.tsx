@@ -76,7 +76,7 @@ export function EventsPerDayWidget({
       >
         <header className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-slate-900">Eventos registrados por día</h2>
+            <h2 className="text-sm font-semibold text-slate-900 max-lg:text-[13px]">Eventos registrados por día</h2>
             <p className="text-[11px] text-slate-500">
               {data.total.toLocaleString("es-EC")} {data.total === 1 ? "evento" : "eventos"} en los últimos {DAYS} días · SNGR
             </p>

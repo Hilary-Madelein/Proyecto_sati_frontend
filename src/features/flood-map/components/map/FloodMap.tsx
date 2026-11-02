@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import L, { type FitBoundsOptions } from "leaflet";
+import L from "leaflet";
 import { useState } from "react";
 import { MapContainer, Pane, TileLayer } from "react-leaflet";
 import {
@@ -32,7 +32,9 @@ import type {
 import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
+import { CanvasZoomGuard } from "./CanvasZoomGuard";
 import { FeatureHighlight } from "./FeatureHighlight";
+import { getHomeBoundsOptions } from "./home-bounds";
 import { FlashFloodLayer } from "./FlashFloodLayer";
 import { ParishAlertLayer } from "./ParishAlertLayer";
 import { RiskLineLabels } from "./RiskLineLabels";
@@ -93,6 +95,7 @@ export interface FloodMapProps {
   /** Se incrementa cada vez que se pide centrar el mapa en el evento seleccionado. */
   focusRequest: number;
   onSelectEvent: (id: string) => void;
+  onDeselectEvent: (id: string) => void;
 }
 
 /**
@@ -143,9 +146,10 @@ export default function FloodMap({
   selectedEventId,
   focusRequest,
   onSelectEvent,
+  onDeselectEvent,
 }: FloodMapProps) {
   const selectedEvent = data.eventsFeed.events.find((event) => event.id === selectedEventId);
-  const [boundsOptions] = useState(getInitialBoundsOptions);
+  const [boundsOptions] = useState(getHomeBoundsOptions);
   // Un solo lienzo para todas las capas de gestión del riesgo (ver MAP_PANES.risk).
   const [riskRenderer] = useState(() => L.canvas({ pane: MAP_PANES.risk.name }));
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
@@ -175,8 +179,9 @@ export default function FloodMap({
         </Pane>
       )}
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
-      <MapLimits homeOptions={boundsOptions} />
-      <MapControls homeOptions={boundsOptions} basemap={basemap} onBasemapChange={setBasemap} />
+      <MapLimits />
+      <CanvasZoomGuard />
+      <MapControls basemap={basemap} onBasemapChange={setBasemap} />
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
       {seaTemperature && (
@@ -250,17 +255,9 @@ export default function FloodMap({
         selectedId={selectedEventId}
         focusRequest={focusRequest}
         onSelect={onSelectEvent}
+        onDeselect={onDeselectEvent}
       />
       <MapFocus target={selectedEvent?.position ?? null} request={focusRequest} />
     </MapContainer>
   );
-}
-
-/** En escritorio el panel de capas tapa la derecha: se reserva ese espacio al encuadrar. */
-function getInitialBoundsOptions(): FitBoundsOptions {
-  const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-  return isDesktop
-    ? // Corrido a la izquierda (misma suma, mismo zoom): el panel tapa la Amazonía peruana y no la costa.
-      { paddingTopLeft: [284, 16], paddingBottomRight: [190, 16] }
-    : { padding: [16, 16] };
 }

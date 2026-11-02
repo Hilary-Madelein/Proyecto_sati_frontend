@@ -344,7 +344,7 @@ function EventItem({
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">
-          <span className="text-sm leading-snug font-semibold text-slate-900">
+          <span className="text-sm leading-snug font-semibold text-slate-900 max-lg:text-[13px]">
             {event.title}
             <span className="sr-only"> ({event.hazardTypeLabel})</span>
           </span>

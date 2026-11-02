@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ResponsivePanel } from "@/components/shared/ResponsivePanel";
 import { IconTile } from "@/components/ui/IconTile";
-import { ChevronDownIcon, HistoryIcon, MapPinIcon, SearchIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, HistoryIcon, MapPinIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { ACTION_LAYER_IDS } from "../../action-timeline";
 import { RISK_COMPONENTS } from "../../constants";
@@ -17,21 +17,21 @@ interface FeatureDetailPanelProps {
   onClose: () => void;
   onNext: () => void;
   onPrevious: () => void;
-  onZoom: () => void;
   /** Abre la línea de tiempo con esta acción ubicada (solo en las acciones preventivas y de respuesta del MIT). */
   onShowInTimeline: (hit: RiskHit) => void;
 }
 
 /**
  * Detalle de lo que hay en el punto tocado, de todas las capas de gestión del
- * riesgo encendidas: "‹ 1 de N ›", "Acercar", las fotos del servicio de origen
+ * riesgo encendidas: "‹ 1 de N ›", las fotos del servicio de origen
  * y los datos de la entidad. En celular es una hoja inferior, como los demás paneles.
  */
-export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom, onShowInTimeline }: FeatureDetailPanelProps) {
+export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onShowInTimeline }: FeatureDetailPanelProps) {
   const hit = state?.hits[state.index];
   if (!state || !hit) return null;
   const total = state.hits.length;
-  const component = RISK_COMPONENTS.find((item) => item.id === hit.style.component)?.label;
+  // Una capa fuera de las listas de componentes (los cierres viales) no pertenece a ninguno a la vista.
+  const component = hit.style.listed === false ? null : RISK_COMPONENTS.find((item) => item.id === hit.style.component)?.label;
   const sections = sectionsOf(hit.style, hit.feature);
   const objectId = hit.feature.id;
 
@@ -50,53 +50,47 @@ export function FeatureDetailPanel({ state, onClose, onNext, onPrevious, onZoom,
       desktopClassName="lg:top-4 lg:right-101 lg:bottom-auto lg:left-auto lg:w-96 lg:max-h-[calc(100%-2rem)]"
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          {total > 1 && (
-            <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
-              <button
-                type="button"
-                onClick={onPrevious}
-                aria-label="Elemento anterior"
-                className="grid size-7 place-items-center rounded-md text-slate-600 hover:bg-white hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-600"
-              >
-                <ChevronDownIcon className="size-3.5 rotate-90" />
-              </button>
-              <span className="px-1 text-xs font-semibold text-slate-700 tabular-nums" aria-live="polite">
-                {state.index + 1} de {total}
-              </span>
-              <button
-                type="button"
-                onClick={onNext}
-                aria-label="Elemento siguiente"
-                className="grid size-7 place-items-center rounded-md text-slate-600 hover:bg-white hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-600"
-              >
-                <ChevronDownIcon className="size-3.5 -rotate-90" />
-              </button>
-            </div>
-          )}
-          <div className="ml-auto flex gap-2">
-            {ACTION_LAYER_IDS.includes(hit.style.id) && (
-              <button
-                type="button"
-                onClick={() => onShowInTimeline(hit)}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-700/25 transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-blue-600"
-              >
-                <HistoryIcon className="size-3.5" />
-                Línea de tiempo
-              </button>
+        {(total > 1 || ACTION_LAYER_IDS.includes(hit.style.id)) && (
+          <div className="flex items-center gap-2">
+            {total > 1 && (
+              <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                <button
+                  type="button"
+                  onClick={onPrevious}
+                  aria-label="Elemento anterior"
+                  className="grid size-7 place-items-center rounded-md text-slate-600 hover:bg-white hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-600"
+                >
+                  <ChevronDownIcon className="size-3.5 rotate-90" />
+                </button>
+                <span className="px-1 text-xs font-semibold text-slate-700 tabular-nums" aria-live="polite">
+                  {state.index + 1} de {total}
+                </span>
+                <button
+                  type="button"
+                  onClick={onNext}
+                  aria-label="Elemento siguiente"
+                  className="grid size-7 place-items-center rounded-md text-slate-600 hover:bg-white hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-600"
+                >
+                  <ChevronDownIcon className="size-3.5 -rotate-90" />
+                </button>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={onZoom}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-600/20 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
-            >
-              <SearchIcon className="size-3.5" />
-              Acercar
-            </button>
+            <div className="ml-auto flex gap-2">
+              {ACTION_LAYER_IDS.includes(hit.style.id) && (
+                <button
+                  type="button"
+                  onClick={() => onShowInTimeline(hit)}
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-700/25 transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+                >
+                  <HistoryIcon className="size-3.5" />
+                  Línea de tiempo
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <h3 className="text-base font-semibold text-slate-900">{titleOf(hit.style, hit.feature)}</h3>
+        <h3 className="text-base leading-snug font-semibold text-slate-900 max-lg:text-sm">{titleOf(hit.style, hit.feature)}</h3>
 
         {hit.data.hasAttachments && typeof objectId === "number" && (
           <FeaturePhotos key={hit.key} layerId={hit.style.id} objectId={objectId} />

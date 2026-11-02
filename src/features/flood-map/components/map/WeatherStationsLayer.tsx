@@ -101,7 +101,7 @@ function StationPopupContent({
         Estación {STATION_CATEGORY_LABELS[station.category].toLowerCase()} {station.code}
         {station.altitude !== null && ` · ${Math.round(station.altitude).toLocaleString("es-EC")} m`}
       </p>
-      <h3 className="text-[15px] font-semibold text-slate-900">{station.name}</h3>
+      <h3 className="text-[15px] font-semibold text-slate-900 max-lg:text-sm">{station.name}</h3>
 
       <p className="mt-2 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia medida · últimas {windowHours} h</p>
       <p className="text-xl font-semibold text-slate-900 tabular-nums">{formatMm(station.totalMm)}</p>

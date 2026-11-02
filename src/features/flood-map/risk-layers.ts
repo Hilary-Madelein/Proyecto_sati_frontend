@@ -1,5 +1,5 @@
 import type { PlannedLayerIcon } from "./constants";
-import { CLOSED_EVENT_STYLE, ROAD_CONDITIONS } from "./road-closures";
+import { CLOSED_EVENT_STYLE, closureStatusLine, ROAD_CONDITIONS } from "./road-closures";
 import type { RiskComponentId, RiskFeature, RiskLayerData } from "./types";
 
 /*
@@ -58,7 +58,10 @@ export interface RiskLayerStyle {
   period?: { field: string; endField?: string; defaultDays: RiskPeriodDays };
   /** Campo que se escribe sobre las líneas en el mapa, como letrero (p. ej. "E35"). */
   labelField?: string;
-  popup: { titleField: string; fallbackTitle: string; fields: readonly RiskPopupField[] };
+  /** Si `titleField` viene vacío, se prueba con estos campos antes de `fallbackTitle`. */
+  popup: { titleField: string; titleFallbackFields?: readonly string[]; fallbackTitle: string; fields: readonly RiskPopupField[] };
+  /** Primera línea del aviso al pasar el mouse. */
+  tooltipHeader?: (feature: RiskFeature) => string;
 }
 
 /** Días hacia atrás que muestra una capa con fecha; null = todos. */
@@ -601,6 +604,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     listed: false,
     // Son pocos y cada uno es una vía cortada o restringida: que se vean a escala nacional.
     pointScale: 1.8,
+    tooltipHeader: closureStatusLine,
     classify: {
       // La condición de la vía hasta que se cierre el evento (lo calcula el backend).
       field: "Condicion_mapa",
@@ -613,7 +617,9 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     },
     // Con las secciones del "Reporte de novedad vial" del MIT, en su orden.
     popup: {
-      titleField: "Causa",
+      // Lo que identifica al reporte es dónde está; la causa va en sus datos.
+      titleField: "nombre_via",
+      titleFallbackFields: ["detalles_ubi", "Causa"],
       fallbackTitle: "Novedad vial",
       fields: [
         { section: "1. Ubicación", field: "despro", label: "Provincia" },
@@ -638,6 +644,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { section: "5. Comunicación y coordinación", field: "Instituciones", label: "Instituciones articuladas" },
         { section: "5. Comunicación y coordinación", field: "observaciones", label: "Observaciones" },
         { section: "Actualización", field: "fecha_actua", label: "Fecha y hora de actualización", format: "datetime" },
+        // Al marcar el estado de atención solo cambia esta: la de arriba es la que se declaró al llenarlo.
+        { section: "Actualización", field: "EditDate", label: "Última edición del reporte", format: "datetime" },
       ],
     },
   },

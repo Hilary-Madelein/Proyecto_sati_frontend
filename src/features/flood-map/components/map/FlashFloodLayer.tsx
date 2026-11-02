@@ -59,7 +59,7 @@ function FlashFloodPopupContent({ area, attribution }: { area: FlashFloodArea; a
   return (
     <div className="w-60">
       <p className="text-[11px] font-medium text-slate-500">Crecida repentina urbana · Google</p>
-      <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900">
+      <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-900 max-lg:text-sm">
         <span aria-hidden="true" className="size-3 rounded-sm" style={{ backgroundColor: level.color }} />
         {level.label}
       </h3>

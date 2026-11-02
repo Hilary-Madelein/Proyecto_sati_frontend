@@ -1,4 +1,5 @@
 import { normalizeName } from "./parish-filters";
+import { textOf } from "./risk-popup";
 import type { RiskFeature } from "./types";
 
 /**
@@ -23,7 +24,7 @@ export type RoadCondition = (typeof ROAD_CONDITIONS)[number]["label"];
 /** Opción de "Estado de atención" (`estd_atencion`) con la que la dirección distrital cierra el evento. */
 const EVENT_CLOSED = "Habilitada - Evento Cerrado";
 
-export const CLOSED_EVENT_STYLE = { label: "Evento cerrado", plural: "Eventos cerrados", color: "#0d9488" };
+export const CLOSED_EVENT_STYLE = { label: "Evento cerrado", color: "#0d9488" };
 
 /** Qué reportes se ven: los abiertos, o todos (también los ya cerrados). */
 export const CLOSURE_VIEWS = [
@@ -69,11 +70,43 @@ export function reportedAt(feature: RiskFeature): number | null {
   return times.length > 0 ? Math.min(...times) : null;
 }
 
-/** Última actualización del reporte: la que declara el formulario o, si falta, la edición o la creación. */
+/** Última actualización: lo más reciente entre la fecha declarada y las del registro (marcar el estado solo cambia `EditDate`). */
 export function updatedAt(feature: RiskFeature): number | null {
-  for (const field of ["fecha_actua", "EditDate", "CreationDate"]) {
-    const time = Date.parse(String(feature.properties[field] ?? ""));
-    if (Number.isFinite(time)) return time;
+  const times = ["fecha_actua", "EditDate", "CreationDate"]
+    .map((field) => Date.parse(String(feature.properties[field] ?? "")))
+    .filter(Number.isFinite);
+  return times.length > 0 ? Math.max(...times) : null;
+}
+
+/** Menos que esto entre la creación del registro y su edición es el mismo envío del formulario. */
+const EDIT_MARGIN_MS = 60 * 60 * 1000;
+
+/** Cuándo se editó el reporte después de crearlo, o null si no se ha tocado (se puede subir horas después de llenarlo). */
+export function editedAt(feature: RiskFeature): number | null {
+  const created = Date.parse(String(feature.properties.CreationDate ?? ""));
+  const edited = Date.parse(String(feature.properties.EditDate ?? ""));
+  return Number.isFinite(created) && Number.isFinite(edited) && edited - created > EDIT_MARGIN_MS ? edited : null;
+}
+
+/** Estado de atención del formulario mientras el evento sigue abierto, si lo respondieron. */
+export function openAttentionOf(feature: RiskFeature): string | null {
+  return isClosed(feature) ? null : textOf(feature, "estd_atencion");
+}
+
+/** "Cierre total · Trabajos en ejecución": en qué está la vía. */
+export function closureStatusLine(feature: RiskFeature): string {
+  if (isClosed(feature)) return CLOSED_EVENT_STYLE.label;
+  return [conditionOf(feature)?.label ?? "Sin condición", openAttentionOf(feature)].filter(Boolean).join(" · ");
+}
+
+/** Lo más útil de sus acciones: qué se está haciendo o, ya cerrado, qué se hizo. */
+export function closureActionOf(feature: RiskFeature): { label: string; text: string } | null {
+  const sources = isClosed(feature)
+    ? [["Se realizó", "acc_ejecutadas"]]
+    : [["En ejecución", "acc_ejecucion"], ["Previsto", "acc_prevista"], ["Se realizó", "acc_ejecutadas"]];
+  for (const [label, field] of sources) {
+    const text = textOf(feature, field);
+    if (text) return { label, text };
   }
   return null;
 }
@@ -109,4 +142,12 @@ export function filterClosures(features: readonly RiskFeature[], filters: Closur
       return isClosed(feature) || !condition || filters.conditions.includes(condition.label);
     })
     .sort((a, b) => rank(a) - rank(b) || (updatedAt(b) ?? 0) - (updatedAt(a) ?? 0));
+}
+
+/**
+ * Los mismos reportes en el orden en que se dibujan: lo último queda encima. Si dos
+ * caen en el mismo sitio, se ve el más reciente (un reporte nuevo no siempre cierra el anterior).
+ */
+export function closuresForMap(features: readonly RiskFeature[], filters: ClosureFilters): RiskFeature[] {
+  return filterClosures(features, filters).sort((a, b) => (updatedAt(a) ?? 0) - (updatedAt(b) ?? 0));
 }

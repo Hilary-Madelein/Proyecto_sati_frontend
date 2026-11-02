@@ -48,7 +48,7 @@ export function EventPopupContent({ event, onResize }: EventPopupContentProps) {
           <HazardIcon className="size-5" />
         </span>
         <div className="min-w-0">
-          <h3 className="text-[15px] leading-snug font-semibold text-slate-900">{event.title}</h3>
+          <h3 className="text-[15px] leading-snug font-semibold text-slate-900 max-lg:text-sm">{event.title}</h3>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1 font-semibold" style={{ color: severity.color }}>
               <span className="size-2 rounded-full" style={{ backgroundColor: severity.color }} aria-hidden="true" />

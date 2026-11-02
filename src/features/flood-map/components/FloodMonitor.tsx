@@ -33,7 +33,7 @@ import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
 import { RISK_LAYER_STYLES, riskDataId, riskLayerView, type RiskLayerStyle, type RiskPeriodDays } from "../risk-layers";
 import { ACTION_LAYER_IDS, timelineActions, type TimelineAction } from "../action-timeline";
-import { DEFAULT_CLOSURE_FILTERS, filterClosures, ROAD_CLOSURES_LAYER_ID, type ClosureFilters } from "../road-closures";
+import { closuresForMap, DEFAULT_CLOSURE_FILTERS, ROAD_CLOSURES_LAYER_ID, type ClosureFilters } from "../road-closures";
 import { filterEvents } from "../utils";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type {
@@ -149,9 +149,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     const state = riskLayerState(riskDataId(style));
     return state.data ? { ...state, data: riskLayerView(style, state.data, periodOf(style)) } : state;
   };
-  // Panel de detalle al tocar una entidad de esas capas.
-  // Los cierres viales no se encienden como capa: se ven con su pestaña abierta.
-  const featureDetail = useFeatureDetail([...riskLayersOn, ...(eventsTab === "closures" ? [ROAD_CLOSURES_LAYER_ID] : [])]);
   // Componente elegido en la barra superior: el panel de capas muestra solo sus capas,
   // pero las encendidas de los demás siguen en el mapa (así se cruza la información).
   const [riskTab, setRiskTab] = useState<RiskComponentId>(DEFAULT_RISK_COMPONENT);
@@ -251,12 +248,15 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     if (style.id === ROAD_CLOSURES_LAYER_ID) {
       const data = eventsTab === "closures" ? closuresState.data : null;
       if (!data) return [];
-      const features = filterClosures(data.features, closureFilters);
+      const features = closuresForMap(data.features, closureFilters);
       return [{ style, data: { ...data, features, view: `closures:${JSON.stringify(closureFilters)}` } }];
     }
     const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
     return data ? [{ style, data }] : [];
   });
+  // Panel de detalle al tocar una entidad de esas capas.
+  // Los cierres viales no se encienden como capa: se ven con su pestaña abierta.
+  const featureDetail = useFeatureDetail([...riskLayersOn, ...(eventsTab === "closures" ? [ROAD_CLOSURES_LAYER_ID] : [])], visibleRiskLayers);
   const activeCounts = Object.fromEntries(
     RISK_COMPONENTS.map((item) => [item.id, activeLayers.filter((layer) => layer.component === item.id).length]),
   ) as Record<RiskComponentId, number>;
@@ -313,7 +313,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     toggleRiskLayer(action.layerId, true);
     setRiverTarget(null);
     setMobileSheet(null);
-    featureDetail.open([{ key: action.key, style, data, feature: action.feature }]);
+    featureDetail.open([{ key: action.key, style, data, feature: action.feature, pinned: true }]);
     featureDetail.zoomToSelected();
   };
 
@@ -383,6 +383,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           selectedEventId={selectedEventId}
           focusRequest={focusRequest}
           onSelectEvent={selectEvent}
+          // Solo si sigue siendo ese: elegir otro evento también cierra el popup anterior.
+          onDeselectEvent={(id) => setSelectedEventId((current) => (current === id ? null : current))}
         />
         {/* Leyendas de las capas visibles, una debajo de la otra. */}
         {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
@@ -595,7 +597,6 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onClose={featureDetail.close}
           onNext={featureDetail.next}
           onPrevious={featureDetail.previous}
-          onZoom={featureDetail.zoomToSelected}
           onShowInTimeline={(hit) => openTimeline(hit.key)}
         />
 
@@ -651,7 +652,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         {mobileSheet === null && riverTarget === null && featureDetail.state === null && (
           <nav
             aria-label="Paneles del mapa"
-            className="absolute bottom-6 left-1/2 z-1000 flex -translate-x-1/2 gap-1 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
+            className="absolute bottom-6 left-1/2 z-1000 flex w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 gap-0.5 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
           >
             <MobileBarButton onClick={() => openMobileSheet("layers")}>
               <LayersIcon className="size-4 text-blue-600" />
@@ -680,7 +681,7 @@ function MobileBarButton({ onClick, children }: { onClick: () => void; children:
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
+      className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-1.5 py-2.5 text-[13px] font-semibold whitespace-nowrap text-slate-800 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
     >
       {children}
     </button>

@@ -125,7 +125,7 @@ function TimelineContent({
           <HistoryIcon className="size-4.5" />
         </IconTile>
         <div className="min-w-0 flex-1">
-          <h2 id="timeline-title" className="text-base font-semibold text-slate-900 sm:text-lg">
+          <h2 id="timeline-title" className="text-sm font-semibold text-slate-900 sm:text-lg">
             Acciones del MIT
           </h2>
           <p className="text-xs text-slate-500 sm:text-sm">Línea de tiempo de las acciones preventivas y de respuesta en las vías</p>
@@ -411,7 +411,7 @@ function ActionCard({
           <StatusBadge status={status} />
           <span className="ml-auto font-semibold text-slate-500">{action.day ? dayLabel(action.day) : "Sin fecha"}</span>
         </p>
-        <h3 className="text-base leading-snug font-semibold text-slate-900">{action.title}</h3>
+        <h3 className="text-sm leading-snug font-semibold text-slate-900 sm:text-base">{action.title}</h3>
         {(action.road || action.section) && (
           <p className="text-sm text-slate-600">
             {action.road && (

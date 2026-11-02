@@ -13,14 +13,18 @@ import {
   closuresInScope,
   conditionOf,
   DEFAULT_CLOSURE_FILTERS,
+  closureActionOf,
+  editedAt,
   filterClosures,
   isClosed,
+  openAttentionOf,
   reopeningAt,
   reportedAt,
   ROAD_CONDITIONS,
   type ClosureFilters,
   type RoadCondition,
 } from "../../road-closures";
+import { placeOf, textOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 import { FilterSelect } from "./CriticalEventsPanel";
 import { Notice } from "./RainForecastSection";
@@ -84,20 +88,34 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
   const fullClosures = counts[0].count;
   // Abiertos sin condición (el formulario no la exige): se cuentan aparte para que las cifras sumen el total.
   const withoutCondition = open.length - counts.reduce((sum, item) => sum + item.count, 0);
+  const isAll = filters.view === "all";
+  // Estado de atención de los abiertos: los sin responder se dicen, porque son los que falta actualizar.
+  const attentionCount = (state: string | null) => open.filter((feature) => openAttentionOf(feature) === state).length;
+  const attention = [
+    [attentionCount("Trabajos en ejecución"), "en ejecución"],
+    [attentionCount("Habilitado parcialmente"), "parcialmente habilitados"],
+    [attentionCount(null), "sin estado de atención"],
+  ].flatMap(([count, label]) => (count ? [`${count} ${label}`] : []));
 
   return (
     <div className="space-y-4">
       {error && <Notice>{error}</Notice>}
       <p className="text-[11px] leading-relaxed text-slate-500">
-        Novedades en la red vial reportadas por las direcciones distritales del MIT. Un cierre sigue abierto hasta que se reporta
-        habilitada la vía; en «Todos» están también los eventos cerrados.
+        {isAll
+          ? "Todos los reportes de novedad vial del MIT, también los eventos ya atendidos y cerrados."
+          : "Vías con novedad reportada por el MIT."}
       </p>
 
       {/* Resumen: lo que más importa para el seguimiento, y cómo se reparten por condición. */}
       <section aria-label="Resumen" className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
-        <dl className="grid grid-cols-2 divide-x divide-slate-200 text-center">
-          <SummaryFigure value={total} label={total === 1 ? "reporte" : "reportes"} tone="text-slate-900" />
-          <SummaryFigure value={fullClosures} label={fullClosures === 1 ? "cierre total" : "cierres totales"} tone={fullClosures > 0 ? "text-red-600" : "text-slate-900"} />
+        <dl className={cn("grid divide-x divide-slate-200 text-center", isAll ? "grid-cols-3" : "grid-cols-2")}>
+          {isAll && <SummaryFigure value={total} label={total === 1 ? "reporte" : "reportes"} tone="text-slate-900" />}
+          <SummaryFigure value={open.length} label={open.length === 1 ? "abierto" : "abiertos"} tone="text-slate-900" />
+          {isAll ? (
+            <SummaryFigure value={closed} label={closed === 1 ? "cerrado" : "cerrados"} tone={closed > 0 ? "text-teal-700" : "text-slate-900"} />
+          ) : (
+            <SummaryFigure value={fullClosures} label={fullClosures === 1 ? "cierre total" : "cierres totales"} tone={fullClosures > 0 ? "text-red-600" : "text-slate-900"} />
+          )}
         </dl>
         <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
           {counts
@@ -106,8 +124,9 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               <span key={item.label} className="h-full first:rounded-l-full last:rounded-r-full" style={{ flexGrow: item.count, backgroundColor: item.color }} />
             ))}
           {withoutCondition > 0 && <span className="h-full bg-slate-400 first:rounded-l-full last:rounded-r-full" style={{ flexGrow: withoutCondition }} />}
-          {closed > 0 && <span className="h-full first:rounded-l-full last:rounded-r-full" style={{ flexGrow: closed, backgroundColor: CLOSED_EVENT_STYLE.color }} />}
+          {isAll && closed > 0 && <span className="h-full first:rounded-l-full last:rounded-r-full" style={{ flexGrow: closed, backgroundColor: CLOSED_EVENT_STYLE.color }} />}
         </div>
+        {attention.length > 0 && <p className="mt-2 text-center text-[11px] leading-snug text-slate-500">{attention.join(" · ")}</p>}
       </section>
 
       <SegmentedControl
@@ -119,7 +138,7 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
       />
 
       <div className="space-y-2">
-        <h3 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Condición de la vía</h3>
+        <h3 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Condición de la vía{isAll && " · abiertos"}</h3>
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200" aria-label="Mostrar u ocultar por condición de la vía">
           {counts.map((item) => {
             const active = filters.conditions.includes(item.label);
@@ -150,13 +169,6 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               <span className="font-semibold text-slate-900 tabular-nums">{withoutCondition}</span>
             </li>
           )}
-          {closed > 0 && (
-            <li className="flex items-center gap-2.5 px-3 py-2 text-xs">
-              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: CLOSED_EVENT_STYLE.color }} />
-              <span className="min-w-0 flex-1 font-medium text-slate-700">{CLOSED_EVENT_STYLE.plural}</span>
-              <span className="font-semibold text-slate-900 tabular-nums">{closed}</span>
-            </li>
-          )}
         </ul>
       </div>
 
@@ -179,8 +191,8 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500" aria-live="polite">
             <span>
-              <strong className="font-semibold text-slate-700">{listed.length}</strong> de {features.length}{" "}
-              {features.length === 1 ? "reporte" : "reportes"} · más graves y recientes primero
+              <strong className="font-semibold text-slate-700">{listed.length}</strong> de {total} {total === 1 ? "reporte" : "reportes"} ·{" "}
+              {isAll ? "abiertos primero, al final los cerrados" : "más graves y recientes primero"}
             </span>
             {!isDefault && (
               <button
@@ -192,7 +204,9 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               </button>
             )}
           </div>
-          {listed.length === 0 ? (
+          {total === 0 && !isAll && !filters.province ? (
+            <EmptyState title="Sin cierres abiertos">Todos los reportes están atendidos: se pueden ver en «Todos».</EmptyState>
+          ) : listed.length === 0 ? (
             <EmptyState title="Sin resultados">Ningún reporte coincide con los filtros.</EmptyState>
           ) : (
             <>
@@ -245,19 +259,21 @@ function EmptyState({ title, children }: { title: string; children: ReactNode })
 }
 
 function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeature; now: number; selected: boolean; onSelect: () => void }) {
-  const p = feature.properties;
   const eventClosed = isClosed(feature);
   const condition = conditionOf(feature);
   const color = eventClosed ? CLOSED_EVENT_STYLE.color : (condition?.color ?? "#64748b");
   const label = eventClosed ? CLOSED_EVENT_STYLE.label : (condition?.label ?? "Sin condición");
-  const attention = !eventClosed && p.estd_atencion ? String(p.estd_atencion) : null;
+  const attention = openAttentionOf(feature);
+  const action = closureActionOf(feature);
   const reported = reportedAt(feature);
+  const edited = editedAt(feature);
   const reopening = reopeningAt(feature);
-  const road = p.Via_RVE ? String(p.Via_RVE) : null;
-  const section = p.nombre_via ? String(p.nombre_via) : null;
-  const sector = p.detalles_ubi ? String(p.detalles_ubi) : null;
-  const cause = p.Causa ? String(p.Causa) : null;
-  const place = [p.descanto, p.despro].filter(Boolean).map((name) => placeName(String(name))).join(", ");
+  const road = textOf(feature, "Via_RVE");
+  const section = textOf(feature, "nombre_via");
+  const sector = textOf(feature, "detalles_ubi");
+  const cause = textOf(feature, "Causa");
+  const place = placeOf(feature);
+  const zonal = textOf(feature, "zonal");
   // Se titula por su tramo; sin tramo (suele pasar fuera de la RVE), por su ubicación o su causa.
   const title = section ?? sector ?? cause ?? "Novedad vial";
 
@@ -288,16 +304,21 @@ function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeatur
         {road && (
           <span className="mt-0.5 shrink-0 rounded border border-slate-500 bg-white px-1 text-[11px] leading-4 font-bold text-slate-800">{road}</span>
         )}
-        <span className="min-w-0 text-sm leading-snug font-semibold text-slate-900">
+        <span className="min-w-0 text-sm leading-snug font-semibold text-slate-900 max-lg:text-[13px]">
           {title}
           {sector && title !== sector && <span className="block text-xs font-normal text-slate-600">{sector}</span>}
         </span>
       </span>
+      {action && (
+        <span className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-slate-600">
+          <strong className="font-semibold text-slate-700">{action.label}:</strong> {action.text}
+        </span>
+      )}
       <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-        {place && (
+        {(place || zonal) && (
           <span className="flex items-center gap-1">
             <MapPinIcon className="size-3 shrink-0" />
-            {place}
+            {[place, zonal && placeName(zonal)].filter(Boolean).join(" · ")}
           </span>
         )}
         {reported !== null && (
@@ -305,6 +326,9 @@ function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeatur
             <ClockIcon className="size-3 shrink-0" />
             Reportado {formatTimeAgo(new Date(reported).toISOString(), now)}
           </span>
+        )}
+        {edited !== null && (
+          <span title={`Última edición: ${formatDateTime(new Date(edited).toISOString())}`}>Actualizado {formatTimeAgo(new Date(edited).toISOString(), now)}</span>
         )}
       </span>
       {reopening !== null && !eventClosed && (

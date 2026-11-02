@@ -1,4 +1,5 @@
 import { formatCalendarDate, formatDateTime, formatDayMonth } from "@/lib/format";
+import { placeName } from "./action-timeline";
 import type { RiskLayerStyle, RiskPopupField } from "./risk-layers";
 import type { RiskFeature } from "./types";
 
@@ -7,9 +8,22 @@ import type { RiskFeature } from "./types";
  * flotante, en HTML: pasa por escapeHtml) y sus datos para el panel de detalle.
  */
 
+const EMPTY_VALUES = new Set(["", "NO APLICABLE", "N/A", "NA"]);
+
+/** El texto de un campo, o null si está vacío o dice que no aplica (el formulario admite "NA"). */
+export function textOf(feature: RiskFeature, field: string): string | null {
+  const value = feature.properties[field];
+  if (value === null || value === undefined || EMPTY_VALUES.has(String(value).trim().toUpperCase())) return null;
+  return String(value).trim();
+}
+
 export function titleOf(style: RiskLayerStyle, feature: RiskFeature): string {
-  const value = style.popup.titleField ? feature.properties[style.popup.titleField] : null;
-  return value === null || value === undefined || value === "" ? style.popup.fallbackTitle : String(value);
+  const { titleField, titleFallbackFields = [], fallbackTitle } = style.popup;
+  for (const field of [titleField, ...titleFallbackFields]) {
+    const value = field ? textOf(feature, field) : null;
+    if (value) return value;
+  }
+  return fallbackTitle;
 }
 
 /** Largo máximo del título en el aviso flotante: el texto completo está en el panel de detalle. */
@@ -23,11 +37,22 @@ function shorten(text: string, max: number): string {
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.\-–]+$/, "")}…`;
 }
 
+/** Campos de cantón y de provincia, según cómo los llama cada capa. */
+const CANTON_FIELDS = ["descanto", "CANTON", "Canton", "canton"];
+const PROVINCE_FIELDS = ["despro", "PROVINCIA", "Provincia", "provincia"];
+
+/** "Cotacachi, Imbabura", si la entidad lo trae. */
+export function placeOf(feature: RiskFeature): string | null {
+  const place = [CANTON_FIELDS, PROVINCE_FIELDS].flatMap((fields) => fields.map((field) => textOf(feature, field)).find(Boolean) ?? []);
+  return place.length > 0 ? place.map(placeName).join(", ") : null;
+}
+
 /**
- * Texto del aviso al pasar el mouse: el título, corto, con el código de la vía
- * delante ("E35 · Tramo …"): el de la propia línea (labelField, p. ej. la RVE, o
- * CODIGO_DE_VIA de los proyectos viales) o el de la vía más cercana que calcula
- * el backend para los puntos (Via_RVE).
+ * Texto del aviso al pasar el mouse, en líneas (ver `.risk-tooltip`): el título,
+ * corto, con el código de la vía delante ("E35 · Tramo …"), y debajo el lugar. El
+ * código es el de la propia línea (labelField, p. ej. la RVE, o CODIGO_DE_VIA de los
+ * proyectos viales) o el de la vía más cercana que calcula el backend para los
+ * puntos (Via_RVE). Una capa puede agregar líneas encima (tooltipHeader).
  */
 export function tooltipOf(style: RiskLayerStyle, feature: RiskFeature): string {
   const { properties } = feature;
@@ -35,8 +60,11 @@ export function tooltipOf(style: RiskLayerStyle, feature: RiskFeature): string {
     (value): value is string => typeof value === "string" && value.trim() !== "",
   );
   const title = shorten(titleOf(style, feature), TOOLTIP_MAX_CHARS);
-  return code ? `${code.trim()} · ${title}` : title;
+  return [style.tooltipHeader?.(feature), code ? `${code.trim()} · ${title}` : title, placeOf(feature)].filter(Boolean).join("\n");
 }
+
+/** Encima del punto; en el celular, hacia el lado con más espacio, para que no lo corte el borde de la pantalla. */
+export const riskTooltipDirection = () => (window.matchMedia("(max-width: 1023px)").matches ? "auto" : "top");
 
 /** Datos de una entidad para el panel de detalle, ya con formato; sin los vacíos. */
 export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: string; value: string; section?: string }[] {
@@ -62,7 +90,6 @@ export function sectionsOf(style: RiskLayerStyle, feature: RiskFeature): { title
 }
 
 /** Valores que los formularios guardan cuando no hay dato. */
-const EMPTY_VALUES = new Set(["", "NO APLICABLE", "N/A", "NA"]);
 
 function formatValue(field: RiskPopupField, value: string | number | boolean | null | undefined): string | null {
   if (value === null || value === undefined || EMPTY_VALUES.has(String(value).trim().toUpperCase())) return null;

@@ -176,6 +176,7 @@ export function ResponsivePanel({
       ref={sectionRef}
       tabIndex={-1}
       aria-label={title}
+      data-map-overlay
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
       }}
@@ -218,8 +219,8 @@ export function ResponsivePanel({
         {icon}
         <div className="min-w-0 flex-1">
           {/* Título y subtítulo pueden ocupar varias líneas: así se leen completos. */}
-          <h2 className="text-sm font-semibold text-pretty text-slate-900">{title}</h2>
-          {subtitle && <p className="text-xs text-pretty text-slate-500">{subtitle}</p>}
+          <h2 className="text-sm font-semibold text-pretty text-slate-900 max-lg:text-[13px]">{title}</h2>
+          {subtitle && <p className="text-xs text-pretty text-slate-500 max-lg:text-[11px]">{subtitle}</p>}
         </div>
         <button
           type="button"
