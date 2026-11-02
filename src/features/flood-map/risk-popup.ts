@@ -63,9 +63,6 @@ export function tooltipOf(style: RiskLayerStyle, feature: RiskFeature): string {
   return [style.tooltipHeader?.(feature), code ? `${code.trim()} · ${title}` : title, placeOf(feature)].filter(Boolean).join("\n");
 }
 
-/** Encima del punto; en el celular, hacia el lado con más espacio, para que no lo corte el borde de la pantalla. */
-export const riskTooltipDirection = () => (window.matchMedia("(max-width: 1023px)").matches ? "auto" : "top");
-
 /** Datos de una entidad para el panel de detalle, ya con formato; sin los vacíos. */
 export function rowsOf(style: RiskLayerStyle, feature: RiskFeature): { label: string; value: string; section?: string }[] {
   return style.popup.fields.flatMap((field) => {

@@ -6,7 +6,7 @@ import { GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import { MAP_PANES } from "../../constants";
 import { identifyRiskFeatures, type RiskHit } from "../../risk-identify";
 import { riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
-import { escapeHtml, riskTooltipDirection, tooltipOf } from "../../risk-popup";
+import { escapeHtml, tooltipOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 import { ClusteredRiskPoints } from "./ClusteredRiskPoints";
 
@@ -121,7 +121,7 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
         }
         onEachFeature={(feature, layer) => {
           const item = feature as unknown as RiskFeature;
-          layer.bindTooltip(escapeHtml(tooltipOf(style, item)), { className: "risk-tooltip", direction: riskTooltipDirection(), sticky: style.geometry !== "point" });
+          layer.bindTooltip(escapeHtml(tooltipOf(style, item)), { className: "risk-tooltip", direction: "top", sticky: style.geometry !== "point" });
         }}
         eventHandlers={{
           // El clic en una entidad llega a su capa con la entidad en `propagatedFrom`.
