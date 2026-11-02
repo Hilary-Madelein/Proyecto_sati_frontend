@@ -8,14 +8,16 @@ import { formatDateTime, formatTimeAgo } from "@/lib/format";
 import { placeName } from "../../action-timeline";
 import { normalizeName } from "../../parish-filters";
 import {
-  CLOSURE_PERIODS,
+  CLOSED_EVENT_STYLE,
+  CLOSURE_VIEWS,
   closuresInScope,
   conditionOf,
   DEFAULT_CLOSURE_FILTERS,
   filterClosures,
+  isClosed,
   reopeningAt,
+  reportedAt,
   ROAD_CONDITIONS,
-  updatedAt,
   type ClosureFilters,
   type RoadCondition,
 } from "../../road-closures";
@@ -29,7 +31,7 @@ interface RoadClosuresPanelProps {
   isLoading: boolean;
   filters: ClosureFilters;
   onFiltersChange: (filters: ClosureFilters) => void;
-  /** Hora de referencia para el periodo y "hace X h". */
+  /** Hora de referencia para "hace X días". */
   now: number;
   selectedKey: string | null;
   /** Muestra el reporte en el mapa con su ficha completa. */
@@ -40,21 +42,26 @@ interface RoadClosuresPanelProps {
 const PAGE = 10;
 
 /**
- * Seguimiento de los cierres viales: cuántos reportes hay en cada condición de
- * la vía (que también filtran), periodo y provincia, y la lista del más grave
- * y reciente al menos grave. Lo mismo se dibuja en el mapa.
+ * Seguimiento de los cierres viales: los abiertos (o todos, con los ya cerrados),
+ * cuántos hay en cada condición de la vía (que también filtran) y provincia, y la
+ * lista del más grave y reciente al menos grave, sin importar su fecha. Lo mismo se
+ * dibuja en el mapa.
  */
 export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersChange, now, selectedKey, onSelect }: RoadClosuresPanelProps) {
   const [visible, setVisible] = useState(PAGE);
   const features = data?.features ?? [];
-  const inScope = closuresInScope(features, filters, now);
-  const listed = filterClosures(features, filters, now);
+  const inScope = closuresInScope(features, filters);
+  const listed = filterClosures(features, filters);
+  const open = inScope.filter((feature) => !isClosed(feature));
+  const closed = inScope.length - open.length;
+  // Cuántos hay en cada vista, para decirlo en sus botones.
+  const viewCount = (view: ClosureFilters["view"]) => closuresInScope(features, { view, province: filters.province }).length;
   const provinces = [...new Set(features.map((feature) => String(feature.properties.despro ?? "")).filter(Boolean))].sort((a, b) =>
     normalizeName(a).localeCompare(normalizeName(b)),
   );
-  const countOf = (label: RoadCondition) => inScope.filter((feature) => conditionOf(feature)?.label === label).length;
+  const countOf = (label: RoadCondition) => open.filter((feature) => conditionOf(feature)?.label === label).length;
   const isDefault =
-    filters.period === DEFAULT_CLOSURE_FILTERS.period &&
+    filters.view === DEFAULT_CLOSURE_FILTERS.view &&
     !filters.province &&
     filters.conditions.length === DEFAULT_CLOSURE_FILTERS.conditions.length;
 
@@ -75,17 +82,18 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
   const counts = ROAD_CONDITIONS.map((condition) => ({ ...condition, count: countOf(condition.label) }));
   const total = inScope.length;
   const fullClosures = counts[0].count;
-  // Reportes sin condición (el formulario no la exige): se cuentan aparte para que las cifras sumen el total.
-  const withoutCondition = total - counts.reduce((sum, item) => sum + item.count, 0);
+  // Abiertos sin condición (el formulario no la exige): se cuentan aparte para que las cifras sumen el total.
+  const withoutCondition = open.length - counts.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div className="space-y-4">
       {error && <Notice>{error}</Notice>}
       <p className="text-[11px] leading-relaxed text-slate-500">
-        Novedades en la red vial reportadas por las direcciones distritales del MIT: cierres y pasos restringidos, con sus acciones.
+        Novedades en la red vial reportadas por las direcciones distritales del MIT. Un cierre sigue abierto hasta que se reporta
+        habilitada la vía; en «Todos» están también los eventos cerrados.
       </p>
 
-      {/* Resumen del periodo: lo que más importa para el seguimiento, y cómo se reparten por condición. */}
+      {/* Resumen: lo que más importa para el seguimiento, y cómo se reparten por condición. */}
       <section aria-label="Resumen" className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
         <dl className="grid grid-cols-2 divide-x divide-slate-200 text-center">
           <SummaryFigure value={total} label={total === 1 ? "reporte" : "reportes"} tone="text-slate-900" />
@@ -98,19 +106,17 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               <span key={item.label} className="h-full first:rounded-l-full last:rounded-r-full" style={{ flexGrow: item.count, backgroundColor: item.color }} />
             ))}
           {withoutCondition > 0 && <span className="h-full bg-slate-400 first:rounded-l-full last:rounded-r-full" style={{ flexGrow: withoutCondition }} />}
+          {closed > 0 && <span className="h-full first:rounded-l-full last:rounded-r-full" style={{ flexGrow: closed, backgroundColor: CLOSED_EVENT_STYLE.color }} />}
         </div>
       </section>
 
-      <div className="space-y-2">
-        <h3 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Actualizados en</h3>
-        <SegmentedControl
-          name="closure-period"
-          label="Mostrar reportes actualizados en"
-          value={filters.period}
-          options={CLOSURE_PERIODS}
-          onChange={(period) => update({ period })}
-        />
-      </div>
+      <SegmentedControl
+        name="closure-view"
+        label="Qué reportes mostrar"
+        value={filters.view}
+        options={CLOSURE_VIEWS.map(({ value, label }) => ({ value, label: `${label} · ${viewCount(value)}` }))}
+        onChange={(view) => update({ view })}
+      />
 
       <div className="space-y-2">
         <h3 className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Condición de la vía</h3>
@@ -142,6 +148,13 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-slate-400" />
               <span className="min-w-0 flex-1 font-medium text-slate-500">Sin condición</span>
               <span className="font-semibold text-slate-900 tabular-nums">{withoutCondition}</span>
+            </li>
+          )}
+          {closed > 0 && (
+            <li className="flex items-center gap-2.5 px-3 py-2 text-xs">
+              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: CLOSED_EVENT_STYLE.color }} />
+              <span className="min-w-0 flex-1 font-medium text-slate-700">{CLOSED_EVENT_STYLE.plural}</span>
+              <span className="font-semibold text-slate-900 tabular-nums">{closed}</span>
             </li>
           )}
         </ul>
@@ -233,13 +246,20 @@ function EmptyState({ title, children }: { title: string; children: ReactNode })
 
 function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeature; now: number; selected: boolean; onSelect: () => void }) {
   const p = feature.properties;
+  const eventClosed = isClosed(feature);
   const condition = conditionOf(feature);
-  const color = condition?.color ?? "#64748b";
-  const updated = updatedAt(feature);
+  const color = eventClosed ? CLOSED_EVENT_STYLE.color : (condition?.color ?? "#64748b");
+  const label = eventClosed ? CLOSED_EVENT_STYLE.label : (condition?.label ?? "Sin condición");
+  const attention = !eventClosed && p.estd_atencion ? String(p.estd_atencion) : null;
+  const reported = reportedAt(feature);
   const reopening = reopeningAt(feature);
   const road = p.Via_RVE ? String(p.Via_RVE) : null;
-  const cause = String(p.Causa ?? "").trim() || "Novedad vial";
+  const section = p.nombre_via ? String(p.nombre_via) : null;
+  const sector = p.detalles_ubi ? String(p.detalles_ubi) : null;
+  const cause = p.Causa ? String(p.Causa) : null;
   const place = [p.descanto, p.despro].filter(Boolean).map((name) => placeName(String(name))).join(", ");
+  // Se titula por su tramo; sin tramo (suele pasar fuera de la RVE), por su ubicación o su causa.
+  const title = section ?? sector ?? cause ?? "Novedad vial";
 
   return (
     <button
@@ -258,16 +278,19 @@ function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeatur
           className="rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
           style={{ color, backgroundColor: `${color}14`, boxShadow: `inset 0 0 0 1px ${color}33` }}
         >
-          {condition?.label ?? "Sin condición"}
+          {label}
         </span>
+        {attention && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{attention}</span>}
+        {cause && title !== cause && <span className="text-[11px] font-medium text-slate-600">{cause}</span>}
       </span>
+      {/* La vía primero: su código en la Red Vial Estatal y su tramo. */}
       <span className="mt-1.5 flex items-start gap-1.5">
         {road && (
           <span className="mt-0.5 shrink-0 rounded border border-slate-500 bg-white px-1 text-[11px] leading-4 font-bold text-slate-800">{road}</span>
         )}
         <span className="min-w-0 text-sm leading-snug font-semibold text-slate-900">
-          {cause}
-          {p.nombre_via ? <span className="block text-xs font-normal text-slate-600">{String(p.nombre_via)}</span> : null}
+          {title}
+          {sector && title !== sector && <span className="block text-xs font-normal text-slate-600">{sector}</span>}
         </span>
       </span>
       <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
@@ -277,14 +300,14 @@ function ClosureItem({ feature, now, selected, onSelect }: { feature: RiskFeatur
             {place}
           </span>
         )}
-        {updated !== null && (
-          <span className="flex items-center gap-1" title={`Actualizado el ${formatDateTime(new Date(updated).toISOString())}`}>
+        {reported !== null && (
+          <span className="flex items-center gap-1" title={`Reportado el ${formatDateTime(new Date(reported).toISOString())}`}>
             <ClockIcon className="size-3 shrink-0" />
-            Actualizado {formatTimeAgo(new Date(updated).toISOString(), now)}
+            Reportado {formatTimeAgo(new Date(reported).toISOString(), now)}
           </span>
         )}
       </span>
-      {reopening !== null && (
+      {reopening !== null && !eventClosed && (
         <span className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
           <span>Habilitación estimada</span>
           <span className="font-semibold tabular-nums">{formatDateTime(new Date(reopening).toISOString())}</span>

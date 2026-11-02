@@ -20,18 +20,21 @@ export const ROAD_CONDITIONS = [
 
 export type RoadCondition = (typeof ROAD_CONDITIONS)[number]["label"];
 
-/** Periodo de los reportes según su última actualización (horas hacia atrás; null = todos). */
-export const CLOSURE_PERIODS = [
-  { value: "24h", label: "24 h", hours: 24 },
-  { value: "3d", label: "3 días", hours: 72 },
-  { value: "7d", label: "7 días", hours: 168 },
-  { value: "all", label: "Todos", hours: null },
+/** Opción de "Estado de atención" (`estd_atencion`) con la que la dirección distrital cierra el evento. */
+const EVENT_CLOSED = "Habilitada - Evento Cerrado";
+
+export const CLOSED_EVENT_STYLE = { label: "Evento cerrado", plural: "Eventos cerrados", color: "#0d9488" };
+
+/** Qué reportes se ven: los abiertos, o todos (también los ya cerrados). */
+export const CLOSURE_VIEWS = [
+  { value: "open", label: "Abiertos" },
+  { value: "all", label: "Todos" },
 ] as const;
 
-export type ClosurePeriod = (typeof CLOSURE_PERIODS)[number]["value"];
+export type ClosureView = (typeof CLOSURE_VIEWS)[number]["value"];
 
 export interface ClosureFilters {
-  period: ClosurePeriod;
+  view: ClosureView;
   /** Condiciones que se muestran (todas al inicio). */
   conditions: readonly RoadCondition[];
   /** "" = todas. */
@@ -39,16 +42,31 @@ export interface ClosureFilters {
 }
 
 export const DEFAULT_CLOSURE_FILTERS: ClosureFilters = {
-  // Como el panel de eventos: al abrir, lo de las últimas 24 h.
-  period: "24h",
+  view: "open",
   conditions: ROAD_CONDITIONS.map((condition) => condition.label),
   province: "",
 };
+
+/**
+ * Un cierre puede durar días: sigue abierto, sin vencer por tiempo, hasta que la
+ * dirección distrital lo marque habilitado. También los reportes anteriores a ese campo.
+ */
+export function isClosed(feature: RiskFeature): boolean {
+  return feature.properties.estd_atencion === EVENT_CLOSED;
+}
 
 /** Condición de un reporte, o null si no trae una de la lista. */
 export function conditionOf(feature: RiskFeature): (typeof ROAD_CONDITIONS)[number] | null {
   const value = normalizeName(String(feature.properties.cond_via ?? ""));
   return ROAD_CONDITIONS.find((condition) => normalizeName(condition.label) === value) ?? null;
+}
+
+/** Cuándo se reportó: lo primero entre la fecha que declara el formulario y la creación del registro. */
+export function reportedAt(feature: RiskFeature): number | null {
+  const times = ["fecha_actua", "CreationDate"]
+    .map((field) => Date.parse(String(feature.properties[field] ?? "")))
+    .filter(Number.isFinite);
+  return times.length > 0 ? Math.min(...times) : null;
 }
 
 /** Última actualización del reporte: la que declara el formulario o, si falta, la edición o la creación. */
@@ -66,32 +84,29 @@ export function reopeningAt(feature: RiskFeature): number | null {
   return Number.isFinite(time) ? time : null;
 }
 
+/** Del más grave al menos grave; después, los que no traen condición; al final, los cerrados. */
 const rank = (feature: RiskFeature) => {
+  if (isClosed(feature)) return ROAD_CONDITIONS.length + 1;
   const condition = conditionOf(feature);
   return condition ? ROAD_CONDITIONS.indexOf(condition) : ROAD_CONDITIONS.length;
 };
 
-/** Reportes del periodo y la provincia elegidos (sin filtrar por condición: así se cuentan todas). */
-export function closuresInScope(features: readonly RiskFeature[], filters: ClosureFilters, now: number): RiskFeature[] {
-  const hours = CLOSURE_PERIODS.find((period) => period.value === filters.period)?.hours ?? null;
-  const since = hours === null ? -Infinity : now - hours * 60 * 60 * 1000;
-  return features.filter(
-    (feature) =>
-      (updatedAt(feature) ?? -Infinity) >= since &&
-      (!filters.province || String(feature.properties.despro ?? "") === filters.province),
-  );
+/** Reportes de la vista y la provincia elegidas (sin filtrar por condición: así se cuentan todas). */
+export function closuresInScope(features: readonly RiskFeature[], { view, province }: Pick<ClosureFilters, "view" | "province">): RiskFeature[] {
+  return features.filter((feature) => (view === "all" || !isClosed(feature)) && (!province || String(feature.properties.despro ?? "") === province));
 }
 
 /**
- * Los reportes que se listan y se dibujan: los del periodo, la provincia y las
- * condiciones elegidas, del más grave al menos grave y, en cada condición, del
- * actualizado más recientemente. Los que no traen condición se muestran al final.
+ * Los reportes que se listan y se dibujan: los de la vista, la provincia y las
+ * condiciones elegidas, sin importar su fecha, en el orden de `rank` y, a igual
+ * orden, del actualizado más recientemente. Las condiciones solo filtran los abiertos
+ * que traen una.
  */
-export function filterClosures(features: readonly RiskFeature[], filters: ClosureFilters, now: number): RiskFeature[] {
-  return closuresInScope(features, filters, now)
+export function filterClosures(features: readonly RiskFeature[], filters: ClosureFilters): RiskFeature[] {
+  return closuresInScope(features, filters)
     .filter((feature) => {
       const condition = conditionOf(feature);
-      return !condition || filters.conditions.includes(condition.label);
+      return isClosed(feature) || !condition || filters.conditions.includes(condition.label);
     })
     .sort((a, b) => rank(a) - rank(b) || (updatedAt(b) ?? 0) - (updatedAt(a) ?? 0));
 }

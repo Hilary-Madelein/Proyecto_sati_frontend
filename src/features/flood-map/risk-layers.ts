@@ -1,5 +1,5 @@
 import type { PlannedLayerIcon } from "./constants";
-import { ROAD_CONDITIONS } from "./road-closures";
+import { CLOSED_EVENT_STYLE, ROAD_CONDITIONS } from "./road-closures";
 import type { RiskComponentId, RiskFeature, RiskLayerData } from "./types";
 
 /*
@@ -602,9 +602,13 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     // Son pocos y cada uno es una vía cortada o restringida: que se vean a escala nacional.
     pointScale: 1.8,
     classify: {
-      field: "cond_via",
+      // La condición de la vía hasta que se cierre el evento (lo calcula el backend).
+      field: "Condicion_mapa",
       // Los valores se comparan en mayúsculas (ver riskClassOf).
-      classes: ROAD_CONDITIONS.map((condition) => ({ label: condition.label, color: condition.color, values: [condition.label.toUpperCase()] })),
+      classes: [
+        ...ROAD_CONDITIONS.map((condition) => ({ label: condition.label, color: condition.color, values: [condition.label.toUpperCase()] })),
+        { label: CLOSED_EVENT_STYLE.label, color: CLOSED_EVENT_STYLE.color, values: [CLOSED_EVENT_STYLE.label.toUpperCase()] },
+      ],
       otherLabel: "Sin condición",
     },
     // Con las secciones del "Reporte de novedad vial" del MIT, en su orden.
@@ -617,6 +621,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { section: "1. Ubicación", field: "zonal", label: "Zonal" },
         { section: "1. Ubicación", field: "Via_RVE", label: "Ruta RVE" },
         { section: "1. Ubicación", field: "nombre_via", label: "Tramo vial" },
+        { section: "1. Ubicación", field: "detalles_ubi", label: "Sector / kilómetro" },
+        { section: "2. Estado de la vía", field: "estd_atencion", label: "Estado de atención" },
         { section: "2. Estado de la vía", field: "cond_via", label: "Condición" },
         { section: "2. Estado de la vía", field: "Causa", label: "Causa" },
         { section: "2. Estado de la vía", field: "descrip_afec", label: "Descripción de la afectación" },
@@ -625,11 +631,12 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { section: "3. Acciones de atención", field: "acc_prevista", label: "Acciones previstas" },
         { section: "3. Acciones de atención", field: "maq_perso", label: "Maquinaria y personal desplegado" },
         { section: "4. Tiempo estimado de habilitación", field: "fecha_estim_hab", label: "Hora estimada", format: "datetime" },
-        { section: "4. Tiempo estimado de habilitación", field: "dias_transcurridos", label: "Días transcurridos", format: "plain" },
-        { section: "4. Tiempo estimado de habilitación", field: "horas_transcurridas", label: "Horas transcurridas", format: "plain" },
+        // Pese a su nombre en el formulario, son las horas desde el reporte hasta la habilitación estimada.
+        { section: "4. Tiempo estimado de habilitación", field: "horas_transcurridas", label: "Horas estimadas", format: "plain" },
         { section: "4. Tiempo estimado de habilitación", field: "condicionantes", label: "Condicionantes" },
         { section: "5. Comunicación y coordinación", field: "ciudada_comu", label: "Ciudadanía informada" },
         { section: "5. Comunicación y coordinación", field: "Instituciones", label: "Instituciones articuladas" },
+        { section: "5. Comunicación y coordinación", field: "observaciones", label: "Observaciones" },
         { section: "Actualización", field: "fecha_actua", label: "Fecha y hora de actualización", format: "datetime" },
       ],
     },

@@ -179,7 +179,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Cierres viales: los filtros del panel se aplican también a lo que se dibuja en el mapa.
   const [closureFilters, setClosureFilters] = useState<ClosureFilters>(DEFAULT_CLOSURE_FILTERS);
   const closuresState = riskLayerState(ROAD_CLOSURES_LAYER_ID);
-  // Referencia del periodo: la hora de la descarga (no el reloj), así la lista y el mapa coinciden.
+  // Referencia de "hace X días": la hora de la descarga (no el reloj), para no leerlo en cada render.
   const closuresNow = Date.parse(closuresState.data?.fetchedAt ?? data.eventsFeed.fetchedAt);
   const actionStates = ACTION_LAYER_IDS.map((id) => riskLayerState(id));
   const timeline = showTimeline ? timelineActions(Object.fromEntries(ACTION_LAYER_IDS.map((id, i) => [id, actionStates[i].data]))) : [];
@@ -251,7 +251,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     if (style.id === ROAD_CLOSURES_LAYER_ID) {
       const data = eventsTab === "closures" ? closuresState.data : null;
       if (!data) return [];
-      const features = filterClosures(data.features, closureFilters, closuresNow);
+      const features = filterClosures(data.features, closureFilters);
       return [{ style, data: { ...data, features, view: `closures:${JSON.stringify(closureFilters)}` } }];
     }
     const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
