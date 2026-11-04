@@ -6,7 +6,7 @@ import { DATA_REFRESH_MS } from "../constants";
 import type { CantonAnalysisSnapshot } from "../types";
 
 /**
- * Alerta de inundación por cantón (lluvia pronosticada de 12 y 24 h). Se pide al abrir la pestaña
+ * Alerta de inundación por cantón (lluvia pronosticada de 3, 6, 12 y 24 h). Se pide al abrir la pestaña
  * y, mientras siga abierta, cada DATA_REFRESH_MS (el backend lo recalcula cada hora).
  */
 export function useCantonAnalysis(enabled: boolean) {
