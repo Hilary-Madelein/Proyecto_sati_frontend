@@ -1,6 +1,7 @@
 import { RIVER_ALERT_LEVELS } from "../../constants";
 import type { RiverAlertsSnapshot } from "../../types";
 import { alertLevelForDay } from "../../utils";
+import { LegendCard } from "./LegendCard";
 
 interface RiverAlertLegendProps {
   snapshot: RiverAlertsSnapshot;
@@ -20,12 +21,8 @@ export function RiverAlertLegend({ snapshot, dayIndex }: RiverAlertLegendProps) 
   }
 
   return (
-    <section
-      aria-label="Leyenda de las alertas por caudal"
-      className="rounded-xl bg-white/90 px-3 py-2.5 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md"
-    >
-      <h2 className="text-xs font-semibold text-slate-900">Caudal sobre el periodo de retorno</h2>
-      <ul className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+    <LegendCard id="river-alerts" label="Leyenda de las alertas por caudal" title="Caudal sobre el periodo de retorno">
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
         {RIVER_ALERT_LEVELS.map(({ level, label, color }) => (
           <li key={level} className="flex items-center gap-1.5 text-[11px] text-slate-700">
             <TriangleSwatch color={color} />
@@ -34,7 +31,7 @@ export function RiverAlertLegend({ snapshot, dayIndex }: RiverAlertLegendProps) 
           </li>
         ))}
       </ul>
-    </section>
+    </LegendCard>
   );
 }
 

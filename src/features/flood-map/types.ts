@@ -5,6 +5,8 @@ export type LatLngBounds = [southWest: LatLng, northEast: LatLng];
 /** Horas acumuladas desde el inicio de la corrida: 24 h = día 1, 48 h = días 1-2, 72 h = días 1-3. */
 /** Día del pronóstico: 1 = primeras 24 h de la corrida, 2 = las siguientes… */
 export type ForecastDay = 1 | 2 | 3;
+/** Ventanas del pronóstico: las próximas N horas, desde el bloque de 3 h en curso. */
+export type ForecastWindowHours = 3 | 6 | 12 | 24;
 /** Ventanas de lluvia observada (acumulada hacia atrás), en horas. */
 export type RainWindowHours = 24 | 48 | 72;
 
@@ -26,6 +28,14 @@ export interface RainImage {
 }
 
 /** Lluvia pronosticada de UN día, calculada por el backend, lista para el mapa. */
+export interface WindowRainForecast extends RainImage {
+  run: string;
+  hours: ForecastWindowHours;
+  from: string;
+  to: string;
+  maxMm: number;
+}
+
 export interface DailyRainForecast extends RainImage {
   run: string;
   day: ForecastDay;
@@ -292,6 +302,16 @@ export interface RainPointValue {
   from: string;
   to: string;
   mm: number | null;
+}
+
+/** Lo que el mapa necesita de la lluvia pronosticada elegida, sea un día del modelo o una ventana. */
+export interface RainForecastLayer {
+  data: RainImage;
+  attribution: string;
+  /** "en las próximas 3 h". */
+  label: string;
+  /** Ruta del backend con el valor en un punto. */
+  valuePath: string;
 }
 
 // ── Estaciones del INAMHI (GET /weather-stations) ───────────────────────

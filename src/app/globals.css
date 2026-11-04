@@ -107,9 +107,29 @@ html .leaflet-tooltip.risk-tooltip {
 
 /* Sin cursor no hay "pasar por encima": al tocar ya se abre el panel o el popup, con lo mismo. */
 @media (hover: none), (pointer: coarse) {
-  html .leaflet-tooltip {
+  html .leaflet-tooltip:not(.map-place-label) {
     display: none;
   }
+}
+
+/* Nombre del lugar elegido, fijo sobre su punto (también en el celular). */
+html .leaflet-tooltip.map-place-label {
+  max-width: min(220px, 60vw);
+  width: max-content;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.35);
+}
+
+html .leaflet-tooltip.map-place-label::before {
+  border-top-color: #0f172a;
 }
 
 /* Durante un zoom muy largo, Leaflet estira sus lienzos: se ocultan hasta redibujarse (ver CanvasZoomGuard.tsx). */

@@ -2,7 +2,7 @@
 
 import L from "leaflet";
 import { useEffect, useState } from "react";
-import { Marker, Popup, Tooltip } from "react-leaflet";
+import { Marker, Popup, Tooltip, useMap } from "react-leaflet";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { formatDateTime, formatHour } from "@/lib/format";
 import {
@@ -22,6 +22,7 @@ import type {
 } from "../../types";
 import { stationRainLevel, stationsWithRain, type MeasuredStation } from "../../utils";
 import { diamondSymbolHtml } from "../map-symbols";
+import { focusProvinceOf } from "./province-focus";
 
 const iconCache = new Map<StationRainLevel, L.DivIcon>();
 
@@ -60,6 +61,7 @@ interface WeatherStationsLayerProps {
  * midieron en las últimas horas. Las que no informan no se dibujan.
  */
 export function WeatherStationsLayer({ snapshot, rain }: WeatherStationsLayerProps) {
+  const map = useMap();
   // Las de más lluvia, encima: no quedan tapadas por las secas.
   const stations = stationsWithRain(snapshot.stations).sort((a, b) => a.totalMm - b.totalMm);
   return stations.map((station, index) => (
@@ -70,6 +72,13 @@ export function WeatherStationsLayer({ snapshot, rain }: WeatherStationsLayerPro
       zIndexOffset={index}
       keyboard
       title={`Estación ${station.name}`}
+      eventHandlers={{
+        click: (event) => {
+          void focusProvinceOf(map, L.latLng(station.lat, station.lng));
+          // El popup ya se abrió: al llegar se reacomoda para verse completo.
+          map.once("zoomend", () => (event.target as L.Marker).getPopup()?.update());
+        },
+      }}
     >
       {/* Al pasar el cursor: qué es y que se puede tocar. */}
       <Tooltip direction="top" offset={[0, -7]}>

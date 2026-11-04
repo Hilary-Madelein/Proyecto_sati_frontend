@@ -17,7 +17,7 @@ import type { RiskHit } from "../../risk-identify";
 import type { RiskLayerStyle } from "../../risk-layers";
 import type {
   ParishAlert,
-  DailyRainForecast,
+  RainForecastLayer,
   FloodMapData,
   HazardEvent,
   LayerVisibility,
@@ -41,6 +41,7 @@ import { RiskLineLabels } from "./RiskLineLabels";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
+import { ProvinceFocusBar } from "./ProvinceFocusBar";
 import { MapLimits } from "./MapLimits";
 import { ProvinceBoundaries } from "./ProvinceBoundaries";
 import { ProvincePreparednessLayer } from "./ProvincePreparednessLayer";
@@ -56,7 +57,7 @@ export interface FloodMapProps {
   visibleEvents: HazardEvent[];
   layers: LayerVisibility;
   /** Lluvia pronosticada del día elegido (imagen del backend); null = sin capa. */
-  rainForecast: { data: DailyRainForecast; attribution: string } | null;
+  rainForecast: RainForecastLayer | null;
   /** Lluvia observada acumulada hasta la última hora (imagen del backend); null = sin capa. */
   observedRain: { data: ObservedAccumulatedRain; attribution: string } | null;
   /** Anomalía de la temperatura del mar (imagen del backend); null = sin capa. */
@@ -96,6 +97,10 @@ export interface FloodMapProps {
   focusRequest: number;
   onSelectEvent: (id: string) => void;
   onDeselectEvent: (id: string) => void;
+  /** Dónde se muestra el aviso de la provincia a la que se acercó: junto a las leyendas, sobre el mapa. */
+  provinceBarSlot: HTMLElement | null;
+  /** Se pidió volver a todo Ecuador: se cierra lo que estaba abierto. */
+  onGoHome: () => void;
 }
 
 /**
@@ -147,6 +152,8 @@ export default function FloodMap({
   focusRequest,
   onSelectEvent,
   onDeselectEvent,
+  provinceBarSlot,
+  onGoHome,
 }: FloodMapProps) {
   const selectedEvent = data.eventsFeed.events.find((event) => event.id === selectedEventId);
   const [boundsOptions] = useState(getHomeBoundsOptions);
@@ -181,7 +188,8 @@ export default function FloodMap({
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
       <MapLimits />
       <CanvasZoomGuard />
-      <MapControls basemap={basemap} onBasemapChange={setBasemap} />
+      <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} />
+      <MapControls basemap={basemap} onBasemapChange={setBasemap} onGoHome={onGoHome} />
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
       {seaTemperature && (
@@ -257,7 +265,7 @@ export default function FloodMap({
         onSelect={onSelectEvent}
         onDeselect={onDeselectEvent}
       />
-      <MapFocus target={selectedEvent?.position ?? null} request={focusRequest} />
+      <MapFocus target={selectedEvent?.position ?? null} province={selectedEvent?.province} request={focusRequest} />
     </MapContainer>
   );
 }

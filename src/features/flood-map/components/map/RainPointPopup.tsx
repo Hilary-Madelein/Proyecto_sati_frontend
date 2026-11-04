@@ -6,8 +6,7 @@ import { Popup, useMapEvents } from "react-leaflet";
 import { CloudRainIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { formatDateTime, formatSigned } from "@/lib/format";
-import { FORECAST_DAY_LABELS } from "../../constants";
-import type { DailyRainForecast, ObservedAccumulatedRain, RainPointValue, SeaPointValue, SeaTemperatureAnomaly } from "../../types";
+import type { ObservedAccumulatedRain, RainForecastLayer, RainPointValue, SeaPointValue, SeaTemperatureAnomaly } from "../../types";
 
 interface PointSource {
   key: string;
@@ -18,7 +17,7 @@ interface PointSource {
 }
 
 interface RainPointPopupProps {
-  forecast: { data: DailyRainForecast; attribution: string } | null;
+  forecast: RainForecastLayer | null;
   observed: { data: ObservedAccumulatedRain; attribution: string } | null;
   sea: SeaTemperatureAnomaly | null;
 }
@@ -46,7 +45,7 @@ export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps)
   const clickCount = useRef(0);
   /** Qué capas están activas: si cambia, el popup del clic anterior ya no corresponde. */
   const layers = [
-    forecast && `forecast:${forecast.data.day}`,
+    forecast && `forecast:${forecast.valuePath}`,
     observed && `observed:${observed.data.product}:${observed.data.hours}`,
     sea && "sea",
   ]
@@ -71,8 +70,8 @@ export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps)
     sources.push({
       key: "forecast",
       kind: "rain",
-      title: `Lluvia pronosticada ${FORECAST_DAY_LABELS[forecast.data.day].range}`,
-      path: `/rain-forecast/days/${forecast.data.day}/value`,
+      title: `Lluvia pronosticada ${forecast.label}`,
+      path: forecast.valuePath,
     });
   }
   if (observed) {

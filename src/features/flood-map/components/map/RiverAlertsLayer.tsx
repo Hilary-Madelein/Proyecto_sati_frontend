@@ -1,11 +1,13 @@
 "use client";
 
 import L from "leaflet";
-import { Marker, Tooltip } from "react-leaflet";
+import { useEffect, useEffectEvent } from "react";
+import { Marker, Tooltip, useMap } from "react-leaflet";
 import { formatCalendarDate } from "@/lib/format";
 import type { AlertLevel, RiverAlert, RiverAlertsSnapshot, SelectedRiver } from "../../types";
 import { alertLevelForDay, alertLevelStyle } from "../../utils";
 import { triangleSymbolHtml } from "../map-symbols";
+import { focusProvinceOf } from "./province-focus";
 
 const iconCache = new Map<string, L.DivIcon>();
 
@@ -64,7 +66,13 @@ function AlertMarker({
   selected: boolean;
   onSelect: (river: SelectedRiver) => void;
 }) {
+  const map = useMap();
   const place = [alert.canton, alert.province].filter(Boolean).join(", ");
+  // Después de elegirlo: así ya se abrió el panel del río, y se esquiva.
+  const focus = useEffectEvent(() => {
+    if (selected) void focusProvinceOf(map, L.latLng(alert.latitude, alert.longitude), alert.province);
+  });
+  useEffect(() => focus(), [selected]);
   return (
     <Marker
       position={[alert.latitude, alert.longitude]}

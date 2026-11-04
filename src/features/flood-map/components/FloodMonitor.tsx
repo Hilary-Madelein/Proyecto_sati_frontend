@@ -48,11 +48,14 @@ import type {
   LayerVisibility,
   DailyRainForecast,
   ForecastDay,
+  ForecastWindowHours,
   ObservedAccumulatedRain,
   ObservedRainAvailability,
   ObservedRainProduct,
   RainForecastAvailability,
+  RainForecastLayer,
   RainWindowHours,
+  WindowRainForecast,
   SelectedRiver,
 } from "../types";
 import { RainLegend } from "./map/RainLegend";
@@ -95,6 +98,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const router = useRouter();
   // Lluvia pronosticada (WRF), un día a la vez
   const [forecastDay, setForecastDay] = useState<ForecastDay>(() => initialForecastDay(data.rain));
+  // O una ventana de las próximas horas; null = se ve el día de la corrida.
+  const [forecastHours, setForecastHours] = useState<ForecastWindowHours | null>(null);
+  const forecastBlock = useForecastBlock();
+  const [provinceBarSlot, setProvinceBarSlot] = useState<HTMLElement | null>(null);
   // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
@@ -173,6 +180,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Filtros de la alerta: la lista y el mapa muestran las mismas parroquias.
   const [parishFilters, setParishFilters] = useState<ParishFilters>(DEFAULT_PARISH_FILTERS);
   const alertSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
+  const parishAlerts = useMemo(
+    () => (alertSnapshot ? filterParishes(alertSnapshot.parishes ?? [], parishFilters) : null),
+    [alertSnapshot, parishFilters],
+  );
+  const parishWindowsLabel = parishFilters.window ? `Próximas ${parishFilters.window.replace("h", " h")}` : "Próximas 3, 6, 12 y 24 h";
   // Cierres viales: los filtros del panel se aplican también a lo que se dibuja en el mapa.
   const [closureFilters, setClosureFilters] = useState<ClosureFilters>(DEFAULT_CLOSURE_FILTERS);
   const closuresState = riskLayerState(ROAD_CLOSURES_LAYER_ID);
@@ -186,11 +198,25 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const filteredEvents = useMemo(() => filterEvents(events, eventFilters, fetchedAt), [events, eventFilters, fetchedAt]);
   const criticalCount = events.filter((event) => event.severity === "critical").length;
   const forecastAvailable = data.rain?.days.some((item) => item.day === forecastDay && item.available) ?? false;
-  const forecast = useRainImage<DailyRainForecast>(
-    showRain && forecastAvailable ? `/rain-forecast/days/${forecastDay}` : null,
+  const forecastDayImage = useRainImage<DailyRainForecast>(
+    showRain && !forecastHours && forecastAvailable ? `/rain-forecast/days/${forecastDay}` : null,
     data.rain?.run ?? null,
   );
-  const rainForecast = forecast.data ? { data: forecast.data, attribution: data.rain?.attribution ?? "" } : null;
+  // La ventana avanza con cada bloque de 3 h, aunque la corrida sea la misma.
+  const forecastWindow = useRainImage<WindowRainForecast>(
+    showRain && forecastHours ? `/rain-forecast/windows/${forecastHours}` : null,
+    data.rain?.run ? `${data.rain.run}:${forecastBlock}` : null,
+  );
+  const forecast = forecastHours ? forecastWindow : forecastDayImage;
+  const forecastLabel = forecastHours ? `en las próximas ${forecastHours} h` : FORECAST_DAY_LABELS[forecastDay].range;
+  const rainForecast: RainForecastLayer | null = forecast.data
+    ? {
+        data: forecast.data,
+        attribution: data.rain?.attribution ?? "",
+        label: forecastLabel,
+        valuePath: forecastHours ? `/rain-forecast/windows/${forecastHours}/value` : `/rain-forecast/days/${forecastDay}/value`,
+      }
+    : null;
 
   // Lluvia observada: el backend suma las horas del satélite hasta la última disponible.
   const observedStatus = data.observedRain?.products.find((product) => product.key === observedProduct);
@@ -205,7 +231,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
 
   // Leyenda de lluvia: aparece cuando hay alguna capa de lluvia visible en el mapa.
   const rainSources = [
-    rainForecast && { layerId: RAIN_FORECAST_LEGEND_LAYER, label: `Pronóstico ${FORECAST_DAY_LABELS[forecastDay].range}` },
+    rainForecast && { layerId: RAIN_FORECAST_LEGEND_LAYER, label: `Pronóstico ${forecastLabel}` },
     observedRain && {
       layerId: observedRainLegendLayer(observedProduct),
       label: `Satélite ${observedStatus?.name ?? ""} ${observedHours} h`,
@@ -359,8 +385,9 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           selectedRiskFeature={featureDetail.selected}
           riskFeatureZoomRequest={featureDetail.zoomRequest}
           showImerg={showImerg}
-          parishAlerts={alertSnapshot ? filterParishes(alertSnapshot.parishes ?? [], parishFilters).listed : null}
-          selectedParish={eventsTab === "analysis" ? selectedParish : null}
+          parishAlerts={parishAlerts?.listed ?? null}
+          // Con el nivel de la ventana elegida, como en la lista.
+          selectedParish={eventsTab === "analysis" ? (parishAlerts?.all.find((parish) => parish.code === selectedParish?.code) ?? selectedParish) : null}
           provincePreparedness={
             showPreparedness && cantonAnalysis.snapshot?.provinces && provinceGeometries
               ? { provinces: cantonAnalysis.snapshot.provinces, geometries: provinceGeometries }
@@ -383,17 +410,27 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           selectedEventId={selectedEventId}
           focusRequest={focusRequest}
           onSelectEvent={selectEvent}
+          provinceBarSlot={provinceBarSlot}
+          onGoHome={() => {
+            featureDetail.close();
+            setSelectedParish(null);
+            setSelectedEventId(null);
+            setRiverTarget(null);
+          }}
           // Solo si sigue siendo ese: elegir otro evento también cierra el popup anterior.
           onDeselectEvent={(id) => setSelectedEventId((current) => (current === id ? null : current))}
         />
-        {/* Leyendas de las capas visibles, una debajo de la otra. */}
-        {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
-          <div className="absolute top-4 left-16 z-1000 flex w-56 flex-col gap-2">
-            <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
-            {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
-            {layers.riverAlerts && data.riverAlerts && <RiverAlertLegend snapshot={data.riverAlerts} dayIndex={alertDayIndex} />}
-          </div>
-        )}
+        {/* Junto a los controles, una debajo de la otra: la provincia a la que se acercó (ver ProvinceFocusBar) y las leyendas de las capas visibles. */}
+        <div className="absolute top-4 left-16 z-1000 flex max-w-[calc(100%-5rem)] flex-col items-start gap-2">
+          <div ref={setProvinceBarSlot} className="max-w-full empty:hidden" />
+          {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
+            <div className="flex w-56 max-w-full flex-col gap-2">
+              <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
+              {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
+              {layers.riverAlerts && data.riverAlerts && <RiverAlertLegend snapshot={data.riverAlerts} dayIndex={alertDayIndex} />}
+            </div>
+          )}
+        </div>
 
         <ResponsivePanel
           title={riskComponent.label}
@@ -416,7 +453,13 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 <RainForecastSection
                   rain={data.rain}
                   day={forecastDay}
-                  onDayChange={setForecastDay}
+                  onDayChange={(day) => {
+                    setForecastDay(day);
+                    setForecastHours(null);
+                  }}
+                  hours={forecastHours}
+                  onHoursChange={setForecastHours}
+                  windowPeriod={forecastWindow.data}
                   visible={showRain}
                   onVisibleChange={setShowRain}
                   error={forecast.error}
@@ -513,8 +556,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               ? `MIT · reportes de novedad vial${closuresState.data ? ` · ${formatDateTime(closuresState.data.fetchedAt)}` : ""}`
               : eventsTab === "analysis"
               ? cantonAnalysis.snapshot
-                ? `Próximas 3, 6, 12 y 24 h · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
-                : "Próximas 3, 6, 12 y 24 h"
+                ? `${parishWindowsLabel} · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
+                : parishWindowsLabel
               : eventsError
                 ? "Sin conexión con el servidor de datos"
                 : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`
@@ -714,6 +757,23 @@ function CountBadge({ count }: { count: number }) {
 }
 
 /** El día 1 si está disponible; si no, el primer día que lo esté. */
+/** Los pasos de 3 h del WRF terminan a la 1, 4, 7… UTC. */
+const BLOCK_OFFSET_MS = 60 * 60 * 1000;
+const BLOCK_MS = 3 * 60 * 60 * 1000;
+/** Se espera a que venza la caché de 5 min de la ventana en el backend. */
+const BLOCK_DELAY_MS = 6 * 60 * 1000;
+const currentBlock = () => Math.floor((Date.now() - BLOCK_OFFSET_MS - BLOCK_DELAY_MS) / BLOCK_MS);
+
+/** Número del bloque de 3 h en curso: cambia al empezar el siguiente. */
+function useForecastBlock(): number {
+  const [block, setBlock] = useState(currentBlock);
+  useEffect(() => {
+    const timer = setInterval(() => setBlock(currentBlock()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return block;
+}
+
 function initialForecastDay(rain: RainForecastAvailability | null): ForecastDay {
   const available = rain?.days.filter((item) => item.available).map((item) => item.day) ?? [];
   return available.includes(DEFAULT_FORECAST_DAY) ? DEFAULT_FORECAST_DAY : (available[0] ?? DEFAULT_FORECAST_DAY);

@@ -1,5 +1,6 @@
 import { formatSigned } from "@/lib/format";
 import type { SeaTemperatureAnomaly } from "../../types";
+import { LegendCard } from "./LegendCard";
 
 /** Marcas de la escala (°C); la primera y la última son los extremos de la paleta. */
 const TICKS = [-4, -2, 0, 3, 5, 7];
@@ -15,15 +16,11 @@ export function SeaTemperatureLegend({ legend }: { legend: SeaTemperatureAnomaly
   const ticks = TICKS.filter((tick) => tick >= min && tick <= max);
 
   return (
-    <section
-      aria-label="Leyenda de la anomalía de temperatura del mar"
-      className="rounded-xl bg-white/90 px-3 py-2.5 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md"
-    >
-      <h2 className="text-xs font-semibold text-slate-900">Anomalía del mar ({legend.unit})</h2>
+    <LegendCard id="sea" label="Leyenda de la anomalía de temperatura del mar" title={`Anomalía del mar (${legend.unit})`}>
       <div
         role="img"
         aria-label={`Escala de ${formatSigned(min)} a ${formatSigned(max)} ${legend.unit}: azul más frío de lo normal, rojo más cálido`}
-        className="mt-1.5 h-2.5 rounded-full ring-1 ring-slate-900/10 ring-inset"
+        className="h-2.5 rounded-full ring-1 ring-slate-900/10 ring-inset"
         style={{ backgroundImage: `linear-gradient(to right, ${gradient})` }}
       />
       <div className="relative mt-1 h-3.5 text-[10px] text-slate-600 tabular-nums" aria-hidden="true">
@@ -42,6 +39,6 @@ export function SeaTemperatureLegend({ legend }: { legend: SeaTemperatureAnomaly
         ))}
       </div>
       <p className="mt-0.5 text-[10px] text-slate-500">Diferencia con la temperatura normal del día</p>
-    </section>
+    </LegendCard>
   );
 }

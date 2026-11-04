@@ -1,9 +1,11 @@
 "use client";
 
+import L from "leaflet";
 import { useEffect, useEffectEvent } from "react";
 import { CircleMarker, Pane, Tooltip, useMap } from "react-leaflet";
 import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import type { ParishAlert, Semaphore } from "../../types";
+import { focusProvinceOf } from "./province-focus";
 
 const PANE = "parishAlerts";
 
@@ -29,7 +31,7 @@ const formatMm = (mm: number | null) => (mm === null ? "—" : `${mm.toLocaleStr
 export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAlertLayerProps) {
   const map = useMap();
   const focus = useEffectEvent(() => {
-    if (selected) map.flyTo(selected.point, Math.max(map.getZoom(), 10));
+    if (selected) void focusProvinceOf(map, L.latLng(selected.point), selected.province);
   });
   useEffect(() => focus(), [selected?.code]);
 
@@ -59,7 +61,18 @@ export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAl
             eventHandlers={{ click: () => onParishClick(parish) }}
           >
             {/* En el panel de etiquetas de Leaflet: dentro del de los puntos, los que se dibujan después la taparían. */}
-            <Tooltip pane="tooltipPane" direction="top" offset={[0, -6]}>
+            {/* La elegida dice siempre dónde está; las demás, sus datos al pasar el cursor. */}
+            <Tooltip
+              key={String(isSelected)}
+              pane="tooltipPane"
+              direction="top"
+              offset={[0, isSelected ? -10 : -6]}
+              permanent={isSelected}
+              className={isSelected ? "map-place-label" : undefined}
+            >
+              {isSelected ? (
+                `${parish.name} · ${parish.province}`
+              ) : (
               <span className="text-xs">
                 <strong>{parish.name}</strong> · {parish.canton}
                 <br />
@@ -70,6 +83,7 @@ export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAl
                   return mm === undefined ? [] : [`${label}: ${formatMm(mm)}`];
                 }).join(" · ")}
               </span>
+              )}
             </Tooltip>
           </CircleMarker>
         );

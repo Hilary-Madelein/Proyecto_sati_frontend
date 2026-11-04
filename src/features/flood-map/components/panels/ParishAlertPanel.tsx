@@ -2,9 +2,10 @@ import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatHour } from "@/lib/format";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import { DEFAULT_PARISH_FILTERS, RAIN_CATEGORIES, filterParishes, isFiltered, type ParishFilters } from "../../parish-filters";
-import type { CantonAnalysis, CantonAnalysisSnapshot, ParishAlert, RainBand, RainCategory, Semaphore } from "../../types";
+import type { CantonAnalysis, CantonAnalysisSnapshot, ParishAlert, RainBand, RainCategory, RainWindow, Semaphore } from "../../types";
 import { Notice } from "./RainForecastSection";
 
 interface ParishAlertPanelProps {
@@ -60,11 +61,12 @@ export function ParishAlertPanel({
 
   const parishes = snapshot.parishes;
   const provinces = [...new Set(parishes.map((parish) => parish.province))].sort((a, b) => a.localeCompare(b, "es"));
-  const { counts, categories, listed } = filterParishes(parishes, filters);
-  const { levels, category, province, query } = filters;
+  const { all, counts, categories, listed } = filterParishes(parishes, filters);
+  const { levels, window, category, province, query } = filters;
+  const period = window ? snapshot[`forecast${window}`] : null;
   const visible = showAll ? listed : listed.slice(0, PREVIEW);
   // La elegida (p. ej. tocándola en el mapa) siempre se ve, aunque los filtros o el "Ver todas" la dejen fuera.
-  const selected = selectedCode ? parishes.find((parish) => parish.code === selectedCode) : undefined;
+  const selected = selectedCode ? all.find((parish) => parish.code === selectedCode) : undefined;
   const pinned = selected && !visible.includes(selected) ? selected : null;
   const filtered = isFiltered(filters);
   const failed = snapshot.sources.filter((source) => !source.ok);
@@ -76,6 +78,24 @@ export function ParishAlertPanel({
 
   return (
     <div className="space-y-3">
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia pronosticada en</p>
+        <SegmentedControl
+          name="parish-window"
+          label="Ventana del pronóstico con que se calcula el nivel"
+          value={window ?? "all"}
+          options={[
+            { value: "all", label: "Todas" },
+            ...RAIN_WINDOWS.map(({ id, label }) => ({
+              value: id,
+              label,
+              disabled: !snapshot[`forecast${id}`],
+              hint: snapshot[`forecast${id}`] ? undefined : "La corrida actual del modelo no tiene esta ventana",
+            })),
+          ]}
+          onChange={(value: RainWindow | "all") => update({ window: value === "all" ? null : value, category: null })}
+        />
+      </div>
       <div className="space-y-1.5">
         <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Parroquias por nivel de alerta</p>
         {/* Una franja con los cuatro niveles: cada uno se enciende o apaga en el mapa y en la lista. */}
@@ -101,9 +121,17 @@ export function ParishAlertPanel({
         </div>
       </div>
       <p className="text-[11px] text-slate-500">
-        Lluvia pronosticada para las próximas 3, 6, 12 y 24 h
-        {snapshot.forecast12h && `, desde las ${formatHour(snapshot.forecast12h.from)}`}. Toca un nivel para mostrar u ocultar sus
-        parroquias en el mapa.
+        {period ? (
+          <>
+            Nivel solo con la lluvia del {formatDateTime(period.from)} al {formatDateTime(period.to)}.
+          </>
+        ) : (
+          <>
+            Lluvia pronosticada para las próximas 3, 6, 12 y 24 h
+            {snapshot.forecast12h && `, desde las ${formatHour(snapshot.forecast12h.from)}`}; cada parroquia toma el nivel más alto.
+          </>
+        )}{" "}
+        Toca un nivel para mostrar u ocultar sus parroquias en el mapa.
       </p>
       {error && <Notice>{error}</Notice>}
 

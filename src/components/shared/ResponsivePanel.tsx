@@ -182,7 +182,8 @@ export function ResponsivePanel({
       }}
       style={{ "--sheet-h": sheetHeight } as CSSProperties}
       className={cn(
-        "absolute z-1100 flex flex-col overflow-hidden outline-none bg-white/90 shadow-2xl ring-1 shadow-slate-900/20 ring-slate-900/10 backdrop-blur-xl",
+        // overflow-clip y no -hidden: con -hidden la hoja aún se desplaza por código (al buscar una fila) y se le corta la cabecera.
+        "absolute z-1100 flex flex-col overflow-clip outline-none bg-white/90 shadow-2xl ring-1 shadow-slate-900/20 ring-slate-900/10 backdrop-blur-xl",
         // Móvil: hoja inferior a todo el ancho, con la altura que se elija arrastrando.
         "inset-x-0 bottom-0 rounded-t-3xl max-lg:h-(--sheet-h)",
         dragHeight === null && "max-lg:transition-[height] max-lg:duration-200 max-lg:ease-out",
@@ -233,7 +234,8 @@ export function ResponsivePanel({
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">{children}</div>
+      {/* relative: lo posicionado dentro (como los textos solo para lectores de pantalla) no se sale de esta área. */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">{children}</div>
 
       {desktopFooter && (
         <div className="hidden shrink-0 border-t border-slate-200/80 p-2 lg:block">{desktopFooter}</div>

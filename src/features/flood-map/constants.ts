@@ -8,6 +8,7 @@ import type {
   LayerVisibility,
   ObservedRainProduct,
   ForecastDay,
+  ForecastWindowHours,
   RainWindow,
   RainWindowHours,
   PreparednessIndicator,
@@ -104,10 +105,12 @@ export const FORECAST_DAYS: readonly ForecastDay[] = [1, 2, 3];
  * título aclara que es solo ese tramo de 24 h, no el acumulado.
  */
 export const FORECAST_DAY_LABELS: Record<ForecastDay, { option: string; range: string }> = {
-  1: { option: "24h", range: "en las primeras 24 h" },
-  2: { option: "48h", range: "entre las 24 y 48 h" },
-  3: { option: "72h", range: "entre las 48 y 72 h" },
+  1: { option: "0–24 h", range: "en las primeras 24 h" },
+  2: { option: "24–48 h", range: "entre las 24 y 48 h" },
+  3: { option: "48–72 h", range: "entre las 48 y 72 h" },
 };
+
+export const FORECAST_WINDOW_HOURS: readonly ForecastWindowHours[] = [3, 6, 12, 24];
 export const DEFAULT_FORECAST_DAY: ForecastDay = 1;
 
 /** Capa del backend cuya paleta usa la imagen de lluvia acumulada (para la leyenda). */

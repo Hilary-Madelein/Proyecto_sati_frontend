@@ -41,6 +41,9 @@ function shorten(text: string, max: number): string {
 const CANTON_FIELDS = ["descanto", "CANTON", "Canton", "canton"];
 const PROVINCE_FIELDS = ["despro", "PROVINCIA", "Provincia", "provincia"];
 
+/** La provincia que declara la entidad, si la trae. */
+export const provinceOf = (feature: RiskFeature) => PROVINCE_FIELDS.map((field) => textOf(feature, field)).find(Boolean) ?? null;
+
 /** "Cotacachi, Imbabura", si la entidad lo trae. */
 export function placeOf(feature: RiskFeature): string | null {
   const place = [CANTON_FIELDS, PROVINCE_FIELDS].flatMap((fields) => fields.map((field) => textOf(feature, field)).find(Boolean) ?? []);

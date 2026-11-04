@@ -5,8 +5,8 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
-import { FORECAST_DAY_LABELS, FORECAST_DAYS } from "../../constants";
-import type { ForecastDay, RainForecastAvailability } from "../../types";
+import { FORECAST_DAY_LABELS, FORECAST_DAYS, FORECAST_WINDOW_HOURS } from "../../constants";
+import type { ForecastDay, ForecastWindowHours, RainForecastAvailability } from "../../types";
 import { OpacitySlider } from "./OpacitySlider";
 import { SectionHeading } from "./SectionHeading";
 
@@ -14,6 +14,11 @@ interface RainForecastSectionProps {
   rain: RainForecastAvailability | null;
   day: ForecastDay;
   onDayChange: (day: ForecastDay) => void;
+  /** Ventana elegida; null = se está viendo un día del modelo. */
+  hours: ForecastWindowHours | null;
+  onHoursChange: (hours: ForecastWindowHours) => void;
+  /** Periodo de la ventana elegida, cuando ya llegó. */
+  windowPeriod: { from: string; to: string } | null;
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
   error: string | null;
@@ -22,11 +27,14 @@ interface RainForecastSectionProps {
   onOpacityChange: (opacity: number) => void;
 }
 
-/** Lluvia pronosticada por el modelo WRF del INAMHI, un día a la vez (no acumulada). */
+/** Lluvia pronosticada por el modelo WRF del INAMHI: las próximas horas, o un día de la corrida (no acumulado). */
 export function RainForecastSection({
   rain,
   day,
   onDayChange,
+  hours,
+  onHoursChange,
+  windowPeriod,
   visible,
   onVisibleChange,
   error,
@@ -34,7 +42,7 @@ export function RainForecastSection({
   opacity,
   onOpacityChange,
 }: RainForecastSectionProps) {
-  const period = rain?.days.find((item) => item.day === day);
+  const period = hours ? windowPeriod : rain?.days.find((item) => item.day === day);
   const options = FORECAST_DAYS.map((option) => {
     const available = rain?.days.find((item) => item.day === option)?.available ?? false;
     return {
@@ -56,12 +64,14 @@ export function RainForecastSection({
           </IconTile>
           <div className="min-w-0 flex-1">
             <h4 className={cn("text-sm font-semibold", visible ? "text-slate-900" : "text-slate-500")}>
-              Lluvia {FORECAST_DAY_LABELS[day].range}
+              Lluvia {hours ? `en las próximas ${hours} h` : FORECAST_DAY_LABELS[day].range}
             </h4>
             <p className="text-xs text-slate-500">
               {period?.from && period.to
                 ? `Del ${formatDateTime(period.from)} al ${formatDateTime(period.to)}`
-                : "Sin datos para este día"}
+                : hours
+                  ? "Calculando el periodo"
+                  : "Sin datos para este día"}
             </p>
           </div>
           <Toggle checked={visible} onChange={onVisibleChange} label="Mostrar lluvia pronosticada" />
@@ -70,13 +80,26 @@ export function RainForecastSection({
         {/* Las opciones solo aparecen con la capa encendida. */}
         {visible && (
           <div className="mt-3 space-y-3">
-            <SegmentedControl
-              name="rain-forecast-day"
-              label="Tramo de 24 h del pronóstico"
-              value={String(day) as `${ForecastDay}`}
-              options={options}
-              onChange={(value) => onDayChange(Number(value) as ForecastDay)}
-            />
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-slate-500">Próximas horas</p>
+              <SegmentedControl<`${ForecastWindowHours}`>
+                name="rain-forecast-window"
+                label="Lluvia de las próximas horas"
+                value={String(hours ?? "") as `${ForecastWindowHours}`}
+                options={FORECAST_WINDOW_HOURS.map((option) => ({ value: `${option}`, label: `${option} h` }))}
+                onChange={(value) => onHoursChange(Number(value) as ForecastWindowHours)}
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-slate-500">Por día de la corrida</p>
+              <SegmentedControl
+                name="rain-forecast-day"
+                label="Tramo de 24 h de la corrida del modelo"
+                value={String(hours ? "" : day) as `${ForecastDay}`}
+                options={options}
+                onChange={(value) => onDayChange(Number(value) as ForecastDay)}
+              />
+            </div>
             <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="la lluvia pronosticada" />
           </div>
         )}
