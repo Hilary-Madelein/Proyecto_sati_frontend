@@ -388,7 +388,7 @@ export interface OverlayOpacity {
 // ── Alerta de inundación por parroquia (lluvia pronosticada de 12 y 24 h, vía backend) ─
 export type Semaphore = "green" | "yellow" | "orange" | "red";
 /** Ventana que decidió el color (S = máx(S12h, S24h)). */
-export type RainWindow = "12h" | "24h";
+export type RainWindow = "3h" | "6h" | "12h" | "24h";
 /** Categoría de lluvia del documento, de menor a mayor. */
 export type RainCategory = "minima" | "ligera" | "moderada" | "fuerte" | "intensa" | "torrencial" | "extrema";
 
@@ -433,10 +433,16 @@ export interface CantonAnalysis {
   };
 }
 
-/** Una fila de la tabla del documento: categoría, desde cuántos mm empieza (12 y 24 h), nivel, consecuencias y acciones. */
+/**
+ * Una fila de la tabla del documento: categoría, desde cuántos mm empieza en cada
+ * ventana, nivel, consecuencias y acciones. Las de 3 y 6 h, opcionales: un backend
+ * publicado antes que este frontend no las manda.
+ */
 export interface RainBand {
   category: RainCategory;
   label: string;
+  from3h?: number;
+  from6h?: number;
   from12h: number;
   from24h: number;
   semaphore: Semaphore;
@@ -476,7 +482,16 @@ export interface ParishAlert {
   semaphore: Semaphore;
   category: RainCategory;
   categoryLabel: string;
-  forecast: { mm12h: number | null; mm24h: number | null; category12h: RainCategory | null; category24h: RainCategory | null };
+  forecast: {
+    mm3h?: number | null;
+    mm6h?: number | null;
+    mm12h: number | null;
+    mm24h: number | null;
+    category3h?: RainCategory | null;
+    category6h?: RainCategory | null;
+    category12h: RainCategory | null;
+    category24h: RainCategory | null;
+  };
   /** Ventana que decidió el nivel; null si no hay pronóstico en el punto. */
   decidedBy: RainWindow | null;
 }
@@ -485,6 +500,8 @@ export interface CantonAnalysisSnapshot {
   updatedAt: string;
   forecastRun: string | null;
   /** Ventanas del pronóstico usadas (null si la corrida no las tenía). */
+  forecast3h?: { from: string; to: string } | null;
+  forecast6h?: { from: string; to: string } | null;
   forecast12h: { from: string; to: string } | null;
   forecast24h: { from: string; to: string } | null;
   /** Parroquias por nivel; las sin pronóstico van aparte, no como verdes. */

@@ -2,7 +2,7 @@ import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatHour } from "@/lib/format";
-import { SEMAPHORE_STYLES } from "../../constants";
+import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import { DEFAULT_PARISH_FILTERS, RAIN_CATEGORIES, filterParishes, isFiltered, type ParishFilters } from "../../parish-filters";
 import type { CantonAnalysis, CantonAnalysisSnapshot, ParishAlert, RainBand, RainCategory, Semaphore } from "../../types";
 import { Notice } from "./RainForecastSection";
@@ -101,7 +101,7 @@ export function ParishAlertPanel({
         </div>
       </div>
       <p className="text-[11px] text-slate-500">
-        Lluvia pronosticada para las próximas 12 y 24 h
+        Lluvia pronosticada para las próximas 3, 6, 12 y 24 h
         {snapshot.forecast12h && `, desde las ${formatHour(snapshot.forecast12h.from)}`}. Toca un nivel para mostrar u ocultar sus
         parroquias en el mapa.
       </p>
@@ -178,7 +178,7 @@ export function ParishAlertPanel({
             ? levels.length === 0
               ? "Ningún nivel encendido: toca uno arriba para ver sus parroquias."
               : "Ninguna parroquia con estos filtros."
-            : "No se pronostican 30 mm o más en 12 h ni 50 mm o más en 24 h en ninguna parroquia."}
+            : "No se pronostican 10 mm o más en 3 h, 20 mm en 6 h, 30 mm en 12 h ni 50 mm en 24 h en ninguna parroquia."}
         </p>
       ) : (
         <>
@@ -229,12 +229,20 @@ function shortRange(from: number, next: number | undefined): string {
 
 const ALERT_LEVELS: readonly Semaphore[] = ["red", "orange", "yellow", "green"];
 
+/** Los límites de una categoría (o nivel) en cada ventana, cada uno con el formato pedido. */
+function windowRanges(band: RainBand, next: RainBand | undefined, format: (from: number, next: number | undefined) => string): string {
+  return RAIN_WINDOWS.flatMap(({ id, label }) => {
+    const from = band[`from${id}`];
+    return from === undefined ? [] : [`${label}: ${format(from, next?.[`from${id}`])}`];
+  }).join(" · ");
+}
+
 /** "Extrema" → "Lluvia extrema": la categoría es de la lluvia, no de la alerta. */
 const rainLabel = (label: string) => `Lluvia ${label.toLowerCase()}`;
 
 /**
  * Leyenda de la alerta de inundación con la tabla del documento: una franja por
- * nivel (alta, moderada, baja) con su lluvia de 12 y 24 h, y debajo cada
+ * nivel (alta, moderada, baja) con su lluvia en cada ventana, y debajo cada
  * categoría con sus potenciales consecuencias y acciones recomendadas.
  */
 /** Niveles que se ven abiertos al inicio: los que se dibujan en el mapa. */
@@ -280,7 +288,7 @@ function AlertLegend({ bands }: { bands: readonly RainBand[] }) {
               <span className="min-w-0 flex-1">
                 <span className="block text-xs font-semibold">{style.alert}</span>
                 <span className="block text-[10px] opacity-80">
-                  12 h: {rangeText(lowest.from12h, above?.from12h)} · 24 h: {rangeText(lowest.from24h, above?.from24h)}
+                  {windowRanges(lowest, above, rangeText)}
                 </span>
               </span>
               <ChevronDownIcon aria-hidden="true" className={cn("size-4 shrink-0 opacity-70 transition-transform", expanded && "rotate-180")} />
@@ -290,13 +298,9 @@ function AlertLegend({ bands }: { bands: readonly RainBand[] }) {
                 const next = bands[bands.indexOf(band) + 1];
                 return (
                   <li key={band.category} className="space-y-0.5 px-2.5 py-2 text-[11px]">
-                    <p className="flex items-baseline justify-between gap-2">
-                      <span className="font-semibold text-slate-800">{rainLabel(band.label)}</span>
-                      {/* Los mm de esta categoría (no los del nivel completo). */}
-                      <span className="shrink-0 text-[10px] text-slate-500 tabular-nums">
-                        12 h {shortRange(band.from12h, next?.from12h)} · 24 h {shortRange(band.from24h, next?.from24h)}
-                      </span>
-                    </p>
+                    <p className="font-semibold text-slate-800">{rainLabel(band.label)}</p>
+                    {/* Los mm de esta categoría (no los del nivel completo). */}
+                    <p className="text-[10px] text-slate-500 tabular-nums">{windowRanges(band, next, shortRange)}</p>
                     <p className="text-slate-600">{band.consequences}</p>
                     <p className="text-slate-500">
                       <span className="font-medium text-slate-600">Acción:</span> {band.actions}
@@ -318,7 +322,7 @@ function AboutCalculation({ updatedAt, failed }: { updatedAt: string; failed: st
     ["Fuente", "Modelo WRF del INAMHI"],
     ["Actualizado", `${formatDateTime(updatedAt)} · cada hora`],
     ["Lluvia", "El valor del pronóstico en el poblado de cada parroquia."],
-    ["Nivel", "Cada ventana (12 y 24 h) con sus umbrales; la parroquia toma el más alto de las dos"],
+    ["Nivel", "Cada ventana (3, 6, 12 y 24 h) con sus umbrales; la parroquia toma el más alto de todas"],
   ];
   return (
     <section className="rounded-lg bg-slate-50 p-2.5 text-[11px] ring-1 ring-slate-200/70">
@@ -351,7 +355,7 @@ function ParishRow({
   selected: boolean;
   onSelect: (parish: ParishAlert | null) => void;
 }) {
-  const decisive = parish.decidedBy === "24h" ? parish.forecast.mm24h : parish.forecast.mm12h;
+  const decisive = parish.decidedBy ? (parish.forecast[`mm${parish.decidedBy}`] ?? null) : null;
   const ref = useRef<HTMLDivElement>(null);
   // Al elegirla (en la lista o en el mapa) la lista se desplaza hasta ella.
   useEffect(() => {
@@ -383,7 +387,7 @@ function ParishRow({
         <span className="shrink-0 py-2 pr-2.5 text-right">
           <span className="block text-[13px] font-semibold text-slate-900 tabular-nums">{decisive === null ? "—" : formatMm(decisive)}</span>
           <span className="block text-[10px] text-slate-500">
-            {parish.categoryLabel} · {parish.decidedBy === "24h" ? "24 h" : "12 h"}
+            {parish.categoryLabel} · {RAIN_WINDOWS.find(({ id }) => id === parish.decidedBy)?.label}
           </span>
         </span>
       </button>
@@ -485,15 +489,17 @@ function CantonContext({ canton, name }: { canton: CantonAnalysis; name: string 
   );
 }
 
-/** Las dos ventanas del pronóstico en una franja, cada una con su lluvia y su categoría (con sus propios umbrales). */
+/** Las ventanas del pronóstico en una cuadrícula, cada una con su lluvia y su categoría (con sus propios umbrales). */
 function RainSummary({ parish }: { parish: ParishAlert }) {
   const { forecast } = parish;
   return (
     <section>
       <SectionTitle>Lluvia pronosticada</SectionTitle>
-      <div className="grid grid-cols-2 divide-x divide-slate-200 rounded-lg bg-slate-50 ring-1 ring-slate-200/70">
-        <RainWindowTile window="12 h" mm={forecast.mm12h} category={forecast.category12h} />
-        <RainWindowTile window="24 h" mm={forecast.mm24h} category={forecast.category24h} />
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-slate-200 ring-1 ring-slate-200/70">
+        {RAIN_WINDOWS.map(({ id, label }) => {
+          const mm = forecast[`mm${id}`];
+          return mm === undefined ? null : <RainWindowTile key={id} window={label} mm={mm} category={forecast[`category${id}`] ?? null} />;
+        })}
       </div>
     </section>
   );
@@ -503,7 +509,7 @@ const CATEGORY_LABELS = Object.fromEntries(RAIN_CATEGORIES.map((item) => [item.i
 
 function RainWindowTile({ window, mm, category }: { window: string; mm: number | null; category: RainCategory | null }) {
   return (
-    <div className="px-2.5 py-1.5">
+    <div className="bg-slate-50 px-2.5 py-1.5">
       <p className="text-[10px] text-slate-500">Próximas {window}</p>
       <p className="text-sm font-semibold text-slate-900 tabular-nums">{mm === null ? "—" : formatMm(mm)}</p>
       {category && <p className="text-[10px] text-slate-500">{rainLabel(CATEGORY_LABELS[category])}</p>}

@@ -21,11 +21,22 @@ export interface ChartBar {
   details?: string[];
 }
 
-const PAD = { top: 16, bottom: 20, x: 4 };
+const PAD = { top: 10, bottom: 20, left: 22, right: 4 };
+/** Líneas de la grilla, como mucho, sobre la base. */
+const MAX_GRID_LINES = 6;
 /** Ancho máximo de una columna, y espacio (del color del fondo) entre sus dos partes. */
 const MAX_BAR = 24;
 const GAP = 2;
 const RADIUS = 4;
+
+/** Paso de la grilla: el primero redondo (1, 2, 5, 10, 20, 50…) que no deja más líneas que las previstas. */
+function gridStep(max: number): number {
+  for (let magnitude = 1; ; magnitude *= 10) {
+    for (const base of [1, 2, 5]) {
+      if (max / (base * magnitude) <= MAX_GRID_LINES) return base * magnitude;
+    }
+  }
+}
 
 /**
  * Columnas apiladas por periodo, con las cifras del periodo al pasar el cursor
@@ -74,10 +85,13 @@ export function StackedBarChart({
 
   const valueOf = (bar: ChartBar, item: ChartSeries) => bar.values[item.key] ?? 0;
   const totalOf = (bar: ChartBar) => series.reduce((sum, item) => sum + valueOf(bar, item), 0);
-  const max = Math.max(1, ...bars.map(totalOf));
+  const step = gridStep(Math.max(1, ...bars.map(totalOf)));
+  // La escala llega a la línea redonda que sigue al mayor valor (el exacto está en el cuadro de cada columna).
+  const max = Math.ceil(Math.max(1, ...bars.map(totalOf)) / step) * step;
+  const gridValues = Array.from({ length: max / step }, (_, index) => (index + 1) * step);
   const plotHeight = height - PAD.top - PAD.bottom;
   const baseline = PAD.top + plotHeight;
-  const slot = (width - PAD.x * 2) / Math.max(1, bars.length);
+  const slot = (width - PAD.left - PAD.right) / Math.max(1, bars.length);
   const barWidth = Math.min(MAX_BAR, Math.max(3, slot * 0.62));
   const y = (value: number) => (value / max) * plotHeight;
   const activeIndex = bars.findIndex((bar) => bar.key === hovered);
@@ -94,15 +108,22 @@ export function StackedBarChart({
         role="group"
         aria-label={label}
       >
-        {/* Referencia: el periodo con más acciones. */}
-        <line x1={PAD.x} x2={width - PAD.x} y1={PAD.top} y2={PAD.top} className="stroke-slate-100" strokeWidth={1} />
-        <text x={PAD.x} y={PAD.top - 5} className="fill-slate-400 text-[10px] tabular-nums">
-          {max}
+        {/* Grilla: líneas en valores redondos, con su cifra, para leer las columnas. */}
+        {gridValues.map((value) => (
+          <g key={value}>
+            <line x1={PAD.left} x2={width - PAD.right} y1={baseline - y(value)} y2={baseline - y(value)} className="stroke-slate-100" strokeWidth={1} />
+            <text x={PAD.left - 4} y={baseline - y(value) + 3} textAnchor="end" className="fill-slate-400 text-[10px] tabular-nums">
+              {value}
+            </text>
+          </g>
+        ))}
+        <line x1={PAD.left} x2={width - PAD.right} y1={baseline} y2={baseline} className="stroke-slate-200" strokeWidth={1} />
+        <text x={PAD.left - 4} y={baseline + 3} textAnchor="end" className="fill-slate-400 text-[10px] tabular-nums">
+          0
         </text>
-        <line x1={PAD.x} x2={width - PAD.x} y1={baseline} y2={baseline} className="stroke-slate-200" strokeWidth={1} />
 
         {bars.map((bar, index) => {
-          const center = PAD.x + slot * (index + 0.5);
+          const center = PAD.left + slot * (index + 0.5);
           const x = center - barWidth / 2;
           const total = totalOf(bar);
           const clickable = total > 0 && !!onSelect;
@@ -159,7 +180,7 @@ export function StackedBarChart({
               {axisLabel && (
                 // En los extremos, alineado al borde: centrado se saldría del gráfico ("31 oc").
                 <text
-                  x={index === bars.length - 1 ? width - PAD.x : index === 0 ? PAD.x : center}
+                  x={index === bars.length - 1 ? width - PAD.right : index === 0 ? PAD.left : center}
                   y={height - 4}
                   textAnchor={index === bars.length - 1 ? "end" : index === 0 ? "start" : "middle"}
                   className="fill-slate-500 text-[10px]"
@@ -180,7 +201,7 @@ export function StackedBarChart({
             tooltipClassName,
           )}
           // Medio ancho del cuadro (w-52 = 208 px) de margen, para que no se salga por los lados.
-          style={{ left: Math.min(Math.max(PAD.x + slot * (activeIndex + 0.5), 104), width - 104) }}
+          style={{ left: Math.min(Math.max(PAD.left + slot * (activeIndex + 0.5), 104), width - 104) }}
         >
           <p className={cn("font-semibold text-slate-700", !subtitleOf && "mb-1")}>{titleOf(active.key)}</p>
           {subtitleOf && <p className="mb-1 text-[11px] text-slate-400">{subtitleOf(active.key)}</p>}

@@ -130,7 +130,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     setShowTimeline(true);
   };
   // Pestañas del panel de eventos: eventos de la SNGR, alerta de inundación por parroquia
-  // (lluvia de 12 y 24 h) y cierres viales (reportes de novedad vial del MIT).
+  // (lluvia de 3, 6, 12 y 24 h) y cierres viales (reportes de novedad vial del MIT).
   const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("events");
   // Varias capas pueden salir de la misma del backend (p. ej. albergues y campamentos): se pide una vez.
   // Con la línea de tiempo abierta se piden también las dos capas de acciones; con la pestaña de cierres, la de cierres.
@@ -513,8 +513,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               ? `MIT · reportes de novedad vial${closuresState.data ? ` · ${formatDateTime(closuresState.data.fetchedAt)}` : ""}`
               : eventsTab === "analysis"
               ? cantonAnalysis.snapshot
-                ? `Próximas 12 y 24 h · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
-                : "Próximas 12 y 24 h"
+                ? `Próximas 3, 6, 12 y 24 h · ${formatDateTime(cantonAnalysis.snapshot.updatedAt)}`
+                : "Próximas 3, 6, 12 y 24 h"
               : eventsError
                 ? "Sin conexión con el servidor de datos"
                 : `SNGR · ${EVENT_PERIODS.find((period) => period.value === eventFilters.period)?.label.toLowerCase()} · ${formatDateTime(fetchedAt)}`

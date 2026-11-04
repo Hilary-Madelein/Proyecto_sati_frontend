@@ -8,6 +8,7 @@ import type {
   LayerVisibility,
   ObservedRainProduct,
   ForecastDay,
+  RainWindow,
   RainWindowHours,
   PreparednessIndicator,
   PreparednessLevel,
@@ -206,7 +207,15 @@ export const FLASH_FLOOD_MODEL = {
   inputs: "ECMWF, IMERG, NOAA CPC y Google DeepMind",
 };
 
-// ── Alerta de inundación por cantón (lluvia pronosticada de 12 y 24 h) ──
+// ── Alerta de inundación por parroquia (lluvia pronosticada de 3, 6, 12 y 24 h) ──
+
+/** Ventanas del pronóstico de la alerta, de la más corta a la más larga. */
+export const RAIN_WINDOWS: readonly { id: RainWindow; label: string }[] = [
+  { id: "3h", label: "3 h" },
+  { id: "6h", label: "6 h" },
+  { id: "12h", label: "12 h" },
+  { id: "24h", label: "24 h" },
+];
 /** Semáforo del documento de la SNGR, en tres colores (el naranja pasa a rojo). */
 /**
  * Semáforo del índice de preparación provincial (documento "Semaforización para

@@ -2,7 +2,7 @@
 
 import { useEffect, useEffectEvent } from "react";
 import { CircleMarker, Pane, Tooltip, useMap } from "react-leaflet";
-import { SEMAPHORE_STYLES } from "../../constants";
+import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import type { ParishAlert, Semaphore } from "../../types";
 
 const PANE = "parishAlerts";
@@ -63,7 +63,12 @@ export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAl
               <span className="text-xs">
                 <strong>{parish.name}</strong> · {parish.canton}
                 <br />
-                {SEMAPHORE_STYLES[parish.semaphore].alert} · 12 h: {formatMm(parish.forecast.mm12h)} · 24 h: {formatMm(parish.forecast.mm24h)}
+                {SEMAPHORE_STYLES[parish.semaphore].alert}
+                <br />
+                {RAIN_WINDOWS.flatMap(({ id, label }) => {
+                  const mm = parish.forecast[`mm${id}`];
+                  return mm === undefined ? [] : [`${label}: ${formatMm(mm)}`];
+                }).join(" · ")}
               </span>
             </Tooltip>
           </CircleMarker>
