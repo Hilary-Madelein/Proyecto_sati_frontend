@@ -82,6 +82,13 @@ export type BasemapId = keyof typeof BASEMAPS;
 export const PROVINCE_BOUNDARIES_URL = "/data/provincias-ecuador.geojson";
 
 /**
+ * Contorno de la provincia (al pasar el mouse y la elegida). Azul, salvo sobre capas
+ * azules (lluvia, mar, ríos, caudales): ahí fucsia con borde blanco, que no está en
+ * ninguna de sus escalas y se distingue.
+ */
+export const PROVINCE_OUTLINE_COLORS = { normal: "#2563eb", contrast: "#c026d3" } as const;
+
+/**
  * Cuencas hidrográficas: unidades Pfafstetter de nivel 3 del MAE (nivel 5 agrupado,
  * Galápagos aparte, topología corregida), simplificadas a ~100 m: 12 polígonos,
  * ~630 KB (~200 KB comprimido). Campos `nombre` y `vertiente`. Archivo fijo.

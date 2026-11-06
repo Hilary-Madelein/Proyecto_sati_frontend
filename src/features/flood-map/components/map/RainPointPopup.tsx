@@ -22,6 +22,8 @@ interface RainPointPopupProps {
   forecast: RainForecastLayer | null;
   observed: { data: ObservedAccumulatedRain; attribution: string } | null;
   sea: SeaTemperatureAnomaly | null;
+  /** false mientras un clic elige provincia (sin provincia elegida): ahí no se abre el valor. */
+  active?: boolean;
 }
 
 type Reading =
@@ -36,7 +38,7 @@ type Reading =
  * El popup solo aparece por un clic: cerrarlo lo olvida, y prender, apagar o
  * cambiar una capa lo cierra en vez de reabrirlo con el punto anterior.
  */
-export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps) {
+export function RainPointPopup({ forecast, observed, sea, active = true }: RainPointPopupProps) {
   const [click, setClick] = useState<{ id: number; lat: number; lng: number; layers: string } | null>(null);
   /**
    * Número de cada clic, siempre creciente. No se deriva del clic anterior: al
@@ -58,7 +60,7 @@ export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps)
 
   useMapEvents({
     click: (event) => {
-      if (!layers) return;
+      if (!layers || !active) return;
       clickCount.current += 1;
       setClick({ id: clickCount.current, lat: event.latlng.lat, lng: event.latlng.lng, layers });
     },

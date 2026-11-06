@@ -192,6 +192,11 @@ export default function FloodMap({
   provinceShading,
 }: FloodMapProps) {
   const [boundsOptions] = useState(getHomeBoundsOptions);
+  // Sin provincia elegida, un clic en el mapa la elige (también con lluvia, mar o ríos);
+  // ya dentro de ella, el clic muestra el valor de la lluvia o el río, como siempre.
+  const pickingProvince = !selectedProvince && !!provinces?.length;
+  const blueLayersOn = !!rainForecast || !!observedRain || showImerg || !!seaTemperature || layers.riverNetwork || layers.riverAlerts;
+  const valueLabel = rainForecast || observedRain ? "la lluvia" : seaTemperature ? "la temperatura del mar" : layers.riverNetwork ? "el río" : null;
   const overlays: OverlayProps = {
     data,
     visibleEvents,
@@ -216,7 +221,9 @@ export default function FloodMap({
     alertDayIndex,
     selectedRiverId,
     onSelectRiver,
-    onRiverLookup,
+    onRiverLookup: (lat, lng) => {
+      if (!pickingProvince) onRiverLookup(lat, lng);
+    },
     selectedEventId,
     focusRequest,
     onSelectEvent,
@@ -253,13 +260,21 @@ export default function FloodMap({
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
       <MapLimits />
       <CanvasZoomGuard />
-      <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} onProvinceChange={onProvinceFocus} onOpenSummary={onOpenSummary} />
-      {/* Con lluvia, mar o red de ríos, el clic en el mapa ya muestra su valor: ahí la provincia se elige en el resumen. */}
+      {/* Con capas azules encendidas, el contorno de la provincia va de otro tono (ver PROVINCE_OUTLINE_COLORS). */}
+      <ProvinceFocusBar
+        slot={provinceBarSlot}
+        onGoHome={onGoHome}
+        onProvinceChange={onProvinceFocus}
+        onOpenSummary={onOpenSummary}
+        contrast={blueLayersOn}
+      />
       <ProvincePicker
         provinces={provinces}
         selected={selectedProvince}
         onSelect={onPickProvince}
-        enabled={!rainForecast && !observedRain && !seaTemperature && !layers.riverNetwork}
+        enabled
+        contrast={blueLayersOn}
+        hint={valueLabel ? `Clic para elegirla; después, toca para ver ${valueLabel}` : "Clic para ver su resumen"}
       />
       {/* Solo con todo Ecuador a la vista: con una provincia elegida, sobra. */}
       {!selectedProvince && (
@@ -269,7 +284,7 @@ export default function FloodMap({
         </GalapagosInset>
       )}
       <MapControls basemap={basemap} onBasemapChange={setBasemap} onGoHome={onGoHome} onCapture={onCapture} />
-      <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
+      <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} active={!pickingProvince} />
 
       <MapResizeWatcher />
       <MapPopupWatcher />

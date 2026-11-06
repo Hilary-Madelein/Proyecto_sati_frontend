@@ -1,6 +1,7 @@
 "use client";
 
 import L from "leaflet";
+import { PROVINCE_OUTLINE_COLORS } from "../../constants";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { GeoJSON, Pane, useMap, useMapEvents } from "react-leaflet";
 import { placeName } from "../../action-timeline";
@@ -32,14 +33,23 @@ function maskOf(province: ProvinceFeature): GeoJSON.Polygon {
     ],
   };
 }
-const HOVER = { color: "#2563eb", weight: 1.5, opacity: 0.8, dashArray: "4 4", fill: true, fillColor: "#2563eb", fillOpacity: 0.06 } as const;
+const hoverStyle = (contrast: boolean) => {
+  const color = contrast ? PROVINCE_OUTLINE_COLORS.contrast : PROVINCE_OUTLINE_COLORS.normal;
+  return { color, weight: contrast ? 2.5 : 1.5, opacity: contrast ? 1 : 0.8, dashArray: "4 4", fill: true, fillColor: color, fillOpacity: contrast ? 0.1 : 0.06 };
+};
+/** Borde blanco debajo del contorno fucsia, para que se lea sobre cualquier color. */
+const CASING = { color: "#ffffff", weight: 5, opacity: 0.85, fill: false } as const;
 
 interface ProvincePickerProps {
   provinces: readonly ProvinceFeature[] | null;
   selected: ProvinceFeature | null;
   onSelect: (province: ProvinceFeature) => void;
-  /** false si un clic en el mapa ya hace otra cosa (valor de la lluvia, río más cercano). */
+  /** false = no se elige provincia con el mouse. */
   enabled: boolean;
+  /** Segunda línea del aviso del cursor (p. ej. qué pasa después con la lluvia encendida). */
+  hint: string;
+  /** Hay capas azules encendidas (lluvia, mar, ríos, caudales): contorno de otro tono. */
+  contrast: boolean;
 }
 
 /** Sus límites, para descartar rápido las que no están cerca del cursor. */
@@ -56,7 +66,7 @@ const boundsOf = (province: ProvinceFeature) => {
  * elegirla, por el mapa o por el selector del resumen, el mapa va a ella y lo de
  * afuera se atenúa.
  */
-export function ProvincePicker({ provinces, selected, onSelect, enabled }: ProvincePickerProps) {
+export function ProvincePicker({ provinces, selected, onSelect, enabled, hint, contrast }: ProvincePickerProps) {
   const map = useMap();
   const [hovered, setHovered] = useState<ProvinceFeature | null>(null);
   // A cualquier zoom mientras no haya una elegida; con una elegida, el contorno y el aviso
@@ -86,7 +96,7 @@ export function ProvincePicker({ provinces, selected, onSelect, enabled }: Provi
       }
       // Debajo del cursor: arriba van los avisos de los puntos, y así no se tapan.
       tooltip.current ??= L.tooltip({ direction: "bottom", offset: [0, 18], className: "risk-tooltip" });
-      tooltip.current.setLatLng(latlng).setContent(`${placeName(province.name)}\nClic para ver su resumen`);
+      tooltip.current.setLatLng(latlng).setContent(`${placeName(province.name)}\n${hint}`);
       if (!map.hasLayer(tooltip.current)) tooltip.current.addTo(map);
     });
   });
@@ -154,7 +164,8 @@ export function ProvincePicker({ provinces, selected, onSelect, enabled }: Provi
       )}
       {showHover && (
         <Pane name={PANE} style={{ zIndex: 394, pointerEvents: "none" }}>
-          <GeoJSON key={hovered.key} data={hovered.geometry} style={HOVER} interactive={false} />
+          {contrast && <GeoJSON key={`c${hovered.key}`} data={hovered.geometry} style={CASING} interactive={false} />}
+          <GeoJSON key={`${hovered.key}${contrast ? ":c" : ""}`} data={hovered.geometry} style={hoverStyle(contrast)} interactive={false} />
         </Pane>
       )}
     </>

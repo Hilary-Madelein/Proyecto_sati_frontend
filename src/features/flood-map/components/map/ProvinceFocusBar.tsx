@@ -1,18 +1,23 @@
 "use client";
 
 import L from "leaflet";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GeoJSON, Pane, useMap, useMapEvents } from "react-leaflet";
 import { MapPinIcon, MaximizeIcon } from "@/components/ui/icons";
 import { placeName } from "../../action-timeline";
-import { MAP_CONFIG } from "../../constants";
+import { MAP_CONFIG, PROVINCE_OUTLINE_COLORS } from "../../constants";
 import type { ProvinceFeature } from "../../hooks/useProvinceGeometries";
 import { PROVINCE_NAMES } from "../../province-geometry";
 import { goHome, homeZoom, PROVINCE_FOCUS_EVENT, type ProvinceFocusEvent } from "./province-focus";
 
 const PANE = "provinceFocus";
-const OUTLINE = { color: "#2563eb", weight: 2, opacity: 0.9, fill: true, fillColor: "#2563eb", fillOpacity: 0.05 } as const;
+const outlineStyle = (contrast: boolean) => {
+  const color = contrast ? PROVINCE_OUTLINE_COLORS.contrast : PROVINCE_OUTLINE_COLORS.normal;
+  return { color, weight: contrast ? 3 : 2, opacity: contrast ? 1 : 0.9, fill: true, fillColor: color, fillOpacity: contrast ? 0.08 : 0.05 };
+};
+/** Borde blanco debajo del contorno fucsia, para que se lea sobre cualquier color. */
+const CASING = { color: "#ffffff", weight: 6, opacity: 0.85, fill: false } as const;
 /** Ya se ve casi todo Ecuador: no hace falta ofrecer volver. */
 const HOME_TOLERANCE = 0.25;
 
@@ -27,6 +32,7 @@ export function ProvinceFocusBar({
   onGoHome,
   onProvinceChange,
   onOpenSummary,
+  contrast,
 }: {
   slot: HTMLElement | null;
   onGoHome: () => void;
@@ -34,15 +40,22 @@ export function ProvinceFocusBar({
   onProvinceChange: (province: ProvinceFeature | null) => void;
   /** Solo en el celular (menos de 768 px): ahí el resumen no se abre solo (taparía el mapa), se abre con este botón. */
   onOpenSummary: () => void;
+  /** Hay capas azules encendidas (lluvia, mar, ríos, caudales): contorno de otro tono. */
+  contrast: boolean;
 }) {
   const map = useMap();
   // undefined = sin acercamiento; null = se acercó, pero no se reconoció la provincia.
   const [province, setProvince] = useState<ProvinceFeature | null | undefined>(undefined);
 
   const notify = useEffectEvent((focused: ProvinceFeature | null) => onProvinceChange(focused));
+  // Si ya llegó a la provincia. Al empezar el vuelo, Leaflet corta cualquier movimiento en
+  // curso (p. ej. el globo acomodándose en el celular) y avisa "moveend" todavía en la vista
+  // general: eso no es "volvió a todo Ecuador", y quitaba la provincia (y cerraba el globo).
+  const arrived = useRef(false);
   useEffect(() => {
     const onFocus = (event: L.LeafletEvent) => {
       const focused = (event as ProvinceFocusEvent).province;
+      arrived.current = false;
       setProvince(focused);
       if (focused) notify(focused);
     };
@@ -58,10 +71,14 @@ export function ProvinceFocusBar({
       // (encuadrar Galápagos en una pantalla angosta también aleja, pero mira a otro lado).
       const continent = L.latLngBounds(MAP_CONFIG.initialBounds).getCenter();
       if (province === undefined) return;
-      if (map.getZoom() <= homeZoom(map) + HOME_TOLERANCE && map.getBounds().contains(continent)) {
-        setProvince(undefined);
-        onProvinceChange(null);
+      const atHome = map.getZoom() <= homeZoom(map) + HOME_TOLERANCE && map.getBounds().contains(continent);
+      if (!atHome) {
+        arrived.current = true;
+        return;
       }
+      if (!arrived.current) return;
+      setProvince(undefined);
+      onProvinceChange(null);
     },
   });
 
@@ -71,7 +88,10 @@ export function ProvinceFocusBar({
       {province && (
         // Sin capturar clics: su lienzo cubre todo el mapa y taparía a las capas de abajo.
         <Pane name={PANE} style={{ zIndex: 395, pointerEvents: "none" }}>
-          <GeoJSON key={province.key} data={province.geometry} style={OUTLINE} interactive={false} />
+          <>
+            {contrast && <GeoJSON key={`c${province.key}`} data={province.geometry} style={CASING} interactive={false} />}
+            <GeoJSON key={`${province.key}${contrast ? ":c" : ""}`} data={province.geometry} style={outlineStyle(contrast)} interactive={false} />
+          </>
         </Pane>
       )}
       {slot &&
