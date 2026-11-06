@@ -35,6 +35,39 @@ export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAl
   });
   useEffect(() => focus(), [selected?.code]);
 
+  // La ficha del elegido va arriba del punto: tras el vuelo a la provincia podía quedar
+  // cortada en el borde del mapa (en el celular, sobre todo). Se corre el mapa lo justo.
+  const keepCardInView = useEffectEvent(() => {
+    const card = map.getContainer().querySelector<HTMLElement>(".map-place-card");
+    if (!card) return;
+    const box = card.getBoundingClientRect();
+    const area = map.getContainer().getBoundingClientRect();
+    const margin = 12;
+    const dy = box.top < area.top + margin ? box.top - area.top - margin : box.bottom > area.bottom - margin ? box.bottom - area.bottom + margin : 0;
+    const dx = box.left < area.left + margin ? box.left - area.left - margin : box.right > area.right - margin ? box.right - area.right + margin : 0;
+    if (dx || dy) map.panBy([dx, dy]);
+  });
+  const selectedCode = selected?.code;
+  useEffect(() => {
+    if (!selectedCode) return;
+    let moved = false;
+    const afterMove = () => {
+      moved = true;
+      keepCardInView();
+    };
+    map.once("moveend", afterMove);
+    // Si el mapa no se movió (ya estaba ahí), se revisa igual.
+    const fallback = setTimeout(() => {
+      if (moved) return;
+      map.off("moveend", afterMove);
+      keepCardInView();
+    }, 900);
+    return () => {
+      clearTimeout(fallback);
+      map.off("moveend", afterMove);
+    };
+  }, [map, selectedCode]);
+
   // El elegido se dibuja aunque los filtros lo dejen fuera, y al final (encima de todos).
   const drawn = [
     ...DRAW_ORDER.flatMap((level) => parishes.filter((parish) => parish.semaphore === level && parish.code !== selected?.code)),

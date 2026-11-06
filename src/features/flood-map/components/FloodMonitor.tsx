@@ -29,6 +29,7 @@ import { useRainLegends } from "../hooks/useRainLegends";
 import { DEFAULT_PARISH_FILTERS, filterParishes, type ParishFilters } from "../parish-filters";
 import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
 import { useProvinceGeometries } from "../hooks/useProvinceGeometries";
+import { buildCaptureLegend } from "../capture-legend";
 import { captureMap } from "../map-capture";
 import { useProvinces, type ProvinceFeature } from "../hooks/useProvinceGeometries";
 import { isSameProvince, layerInProvince } from "../province-filter";
@@ -42,7 +43,7 @@ import { BRIDGES_LAYER_ID, RISK_LAYER_STYLES, riskClassOf, riskDataId, riskLayer
 import { placeName, ACTION_LAYER_IDS, timelineActions, type TimelineAction } from "../action-timeline";
 import { closuresForMap, conditionOf, DEFAULT_CLOSURE_FILTERS, isClosed, ROAD_CLOSURES_LAYER_ID, type ClosureFilters } from "../road-closures";
 import { alertLevelForDay, filterEvents } from "../utils";
-import { cantonTotals, headlineFigures, provinceValues, rankProvinces, type RankIndicator } from "../province-summary";
+import { cantonTotals, headlineFigures, provinceValues, RANK_INDICATORS, rankProvinces, SHADING_COLORS, type RankIndicator } from "../province-summary";
 import type { RiverTarget } from "../hooks/useRiverForecast";
 import type { EventSeverity, Semaphore,
   ActiveLayer,
@@ -164,7 +165,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   };
   // Pestañas del panel de eventos: eventos de la SNGR, alerta de inundación por parroquia
   // (lluvia de 3, 6, 12 y 24 h) y cierres viales (reportes de novedad vial del MIT).
-  const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("events");
+  // Al cargar, el mapa muestra la alerta de inundación por parroquia (solo las de alerta muy alta, ver DEFAULT_LEVELS).
+  const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("analysis");
   // Provincia elegida (en el mapa o en el resumen): filtra las capas y los paneles.
   const provinces = useProvinces();
   const [province, setProvince] = useState<ProvinceFeature | null>(null);
@@ -358,8 +360,25 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     setMobileSheet(null);
   };
 
+  /** Desde tabletas el resumen corre el mapa; en el celular se abre encima (y tapa las hojas, y ellas a él). */
+  const isWide = () => window.matchMedia("(min-width: 768px)").matches;
+  /** En pantallas chicas solo cabe un panel a la vez: abrir una hoja o un detalle cierra el resumen. */
+  const closeSummaryIfNarrow = () => {
+    if (!isWide()) setSummaryExpanded(false);
+  };
+  /** Abrir el resumen en pantallas chicas cierra lo demás (hojas, detalle, río), por lo mismo. */
+  const setSummaryOpen = (open: boolean) => {
+    setSummaryExpanded(open);
+    if (open && !isWide()) {
+      setMobileSheet(null);
+      setRiverTarget(null);
+      featureDetail.close();
+    }
+  };
+
   const openMobileSheet = (panel: PanelId) => {
-    // En móvil solo cabe una hoja a la vez: abrir otra cierra la del río y la del detalle.
+    // En móvil solo cabe una hoja a la vez: abrir otra cierra la del río, la del detalle y el resumen.
+    closeSummaryIfNarrow();
     setRiverTarget(null);
     featureDetail.close();
     setMobileSheet(panel);
@@ -375,6 +394,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const RiskIcon = RISK_COMPONENT_ICONS[riskComponent.id];
 
   const showRiver = (target: RiverTarget) => {
+    closeSummaryIfNarrow();
     featureDetail.close();
     setRiverTarget(target);
     setMobileSheet(null);
@@ -403,6 +423,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     toggleRiskLayer(action.layerId, true);
     setRiverTarget(null);
     setMobileSheet(null);
+    closeSummaryIfNarrow();
     featureDetail.open([{ key: action.key, style, data, feature: action.feature, pinned: true }]);
     featureDetail.zoomToSelected();
   };
@@ -414,6 +435,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     if (!style || !closuresState.data) return;
     setRiverTarget(null);
     setMobileSheet(null);
+    closeSummaryIfNarrow();
     featureDetail.open([{ key: `${ROAD_CLOSURES_LAYER_ID}:${feature.id}`, style, data: closuresState.data, feature }]);
     featureDetail.zoomToSelected();
   };
@@ -524,8 +546,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       setEventsTab(target);
       if (window.matchMedia("(min-width: 1024px)").matches) openDesktopPanel("events");
       else openMobileSheet("events");
-    } else if (target === "rivers") toggleLayer("riverAlerts", !active);
-    else toggleRiskLayer(SUMMARY_LAYERS[target], !active);
+    } else {
+      if (target === "rivers") toggleLayer("riverAlerts", !active);
+      else toggleRiskLayer(SUMMARY_LAYERS[target], !active);
+      // En pantallas chicas el resumen tapa el mapa: al encender una capa se cierra para verla.
+      if (!active) closeSummaryIfNarrow();
+    }
   };
   return (
     <div className="flex size-full flex-col">
@@ -535,7 +561,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       <div className="flex min-h-0 flex-1">
         <SummarySidebar
           expanded={summaryExpanded}
-          onExpandedChange={setSummaryExpanded}
+          onExpandedChange={setSummaryOpen}
           title="Resumen"
           subtitle={province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Todo el país"}
         >
@@ -555,17 +581,18 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
               }}
             />
         </SummarySidebar>
-      <div ref={mapAreaRef} className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+      {/* Con la ficha de una parroquia abierta, en pantallas chicas lo que flota sobre el mapa se aparta (como con los globos). */}
+      <div ref={mapAreaRef} data-map-card={selectedParish ? "" : undefined} className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
         <FloodMap
           data={mapData}
           provinces={provinces}
           selectedProvince={province}
           onPickProvince={(picked) => {
             selectProvince(picked);
-            // En pantallas grandes el resumen corre el mapa; en móvil lo taparía: ahí se abre con "Resumen" en la barra de la provincia.
-            if (window.matchMedia("(min-width: 1024px)").matches) setSummaryExpanded(true);
+            // Desde tabletas el resumen corre el mapa; en el celular lo taparía: ahí se abre con "Resumen" en la barra de la provincia.
+            if (isWide()) setSummaryExpanded(true);
           }}
-          onOpenSummary={() => setSummaryExpanded(true)}
+          onOpenSummary={() => setSummaryOpen(true)}
           // Con la alerta de inundación abierta, el mapa muestra solo sus parroquias (sin los eventos de la SNGR).
           visibleEvents={eventsTab === "events" && showEventsOnMap ? filteredEvents : []}
           layers={layers}
@@ -584,6 +611,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             // Un solo detalle a la vez: se cierran el del río y la hoja móvil.
             setRiverTarget(null);
             setMobileSheet(null);
+            closeSummaryIfNarrow();
             featureDetail.open(hits);
           }}
           selectedRiskFeature={featureDetail.selected}
@@ -621,12 +649,42 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onCapture={async () => {
             if (!mapAreaRef.current) return;
             try {
-              await captureMap(mapAreaRef.current, [
-                ...activeLayers.map((layer) => layer.label),
-                ...(eventsTab === "events" && showEventsOnMap ? ["Eventos críticos (SNGR)"] : []),
-                ...(eventsTab === "analysis" && showParishesOnMap ? ["Alerta de inundación por parroquia"] : []),
-                ...(eventsTab === "closures" && showClosuresOnMap ? ["Cierres viales (MIT)"] : []),
-              ]);
+              const drawnRiskIds = new Set(visibleRiskLayers.map((layer) => layer.style.id));
+              await captureMap(
+                mapAreaRef.current,
+                [
+                  ...activeLayers.map((layer) => layer.label),
+                  ...(eventsTab === "events" && showEventsOnMap ? ["Eventos críticos (SNGR)"] : []),
+                  ...(eventsTab === "analysis" && showParishesOnMap ? ["Alerta de inundación por parroquia"] : []),
+                  ...(eventsTab === "closures" && showClosuresOnMap ? ["Cierres viales (MIT)"] : []),
+                ],
+                // Qué es cada color y símbolo de lo dibujado, para quien vea la imagen sin el panel.
+                buildCaptureLegend({
+                  riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({ style, colored: isColored(style) })),
+                  eventSeverities: new Set(eventsTab === "events" && showEventsOnMap ? filteredEvents.map((event) => event.severity) : []),
+                  parishLevels:
+                    eventsTab === "analysis" && showParishesOnMap && parishAlerts
+                      ? (["red", "orange", "yellow", "green"] as const).filter((level) => parishFilters.levels.includes(level))
+                      : null,
+                  rain: rainLegends.map((legend) => ({
+                    title: `Lluvia · ${rainSources.find((source) => source.layerId === legend.id)?.label ?? ""}`.trim(),
+                    legend,
+                  })),
+                  sea: showSea && data.seaTemperature ? data.seaTemperature.legend : null,
+                  imerg: showImerg,
+                  stations: showStations,
+                  riverNetwork: layers.riverNetwork,
+                  riverAlerts: layers.riverAlerts && !!data.riverAlerts,
+                  flashFloods: layers.flashFloods && !!data.floodHub?.flashFloods?.length,
+                  watersheds: layers.watersheds,
+                  preparedness: showPreparedness,
+                  provincialRoads: showProvincialRoads,
+                  shading:
+                    shadeProvinces && !province
+                      ? { label: RANK_INDICATORS.find((item) => item.id === rankIndicator)?.unit ?? "", colors: SHADING_COLORS }
+                      : null,
+                }),
+              );
             } catch (error) {
               window.alert(`No se pudo capturar la imagen: ${(error as Error).message}`);
             }
@@ -656,7 +714,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         />
         {/* Junto a los controles, una debajo de la otra: la provincia a la que se acercó (ver ProvinceFocusBar) y las leyendas de las capas visibles. */}
         {/* Un nivel por debajo de los controles del mapa: el menú del mapa base se abre encima de esta columna. */}
-        <div className="absolute top-4 left-16 z-999 flex max-w-[calc(100%-5rem)] flex-col items-start gap-2">
+        <div className="map-float absolute top-4 left-16 z-999 flex max-w-[calc(100%-5rem)] flex-col items-start gap-2">
           <div ref={setProvinceBarSlot} className="max-w-full empty:hidden" />
           <div ref={setGalapagosSlot} className="empty:hidden" />
           {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
@@ -946,7 +1004,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         <EventsPerDayWidget
           until={fetchedAt}
           className={cn(
-            "absolute right-3 bottom-24 left-3 z-1000 lg:bottom-6",
+            "map-float absolute right-3 bottom-24 left-3 z-1000 lg:bottom-6",
             (mobileSheet !== null || riverTarget !== null || featureDetail.state !== null) && "max-lg:hidden",
             desktopPanels.events ? "lg:left-98" : "lg:left-60",
             desktopPanels.layers ? "lg:right-103" : "lg:right-4",
@@ -973,7 +1031,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           <nav
             data-capture-ignore
             aria-label="Paneles del mapa"
-            className="absolute bottom-6 left-1/2 z-1000 flex w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 gap-0.5 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
+            className="map-float absolute bottom-6 left-1/2 z-1000 flex w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 gap-0.5 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
           >
             <MobileBarButton onClick={() => openMobileSheet("layers")}>
               <LayersIcon className="size-4 text-blue-600" />

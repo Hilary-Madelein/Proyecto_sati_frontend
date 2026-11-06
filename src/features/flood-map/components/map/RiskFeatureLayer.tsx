@@ -5,7 +5,8 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import { MAP_PANES } from "../../constants";
 import { identifyRiskFeatures, type RiskHit } from "../../risk-identify";
-import { riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
+import { pointRadiusOf, riskClassOf, riskColorOf, type RiskLayerStyle } from "../../risk-layers";
+import { GlyphMarker } from "./glyph-marker";
 import { escapeHtml, tooltipOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 import { ClusteredRiskPoints } from "./ClusteredRiskPoints";
@@ -93,11 +94,14 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
   // Puntos más chicos con el mapa alejado: si no, a escala nacional se vuelven una mancha.
   useMapEvents({
     zoomend: () => {
-      const radius = riskPointRadius(map.getZoom());
+      const zoom = map.getZoom();
       for (const [id, group] of groups.current) {
-        const scale = layers.find(({ style }) => style.id === id)?.style.pointScale ?? 1;
+        const style = layers.find((layer) => layer.style.id === id)?.style;
+        if (!style) continue;
+        const radius = pointRadiusOf(style, zoom);
+        // setRadius vuelve a dibujar: así el dibujo de los puntos aparece y desaparece con el zoom.
         group.eachLayer((layer) => {
-          if (layer instanceof L.CircleMarker) layer.setRadius(radius * scale);
+          if (layer instanceof L.CircleMarker) layer.setRadius(radius);
         });
       }
     },
@@ -141,10 +145,11 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
         // El lienzo va en el estilo: GeoJSON lo aplica a cada línea o zona antes de agregarla al mapa.
         style={(feature) => ({ ...pathStyle(style, feature as unknown as RiskFeature, opacity), renderer })}
         pointToLayer={(feature, latlng) =>
-          new (style.pointShape === "square" ? SquareMarker : style.pointShape === "diamond" ? DiamondMarker : L.CircleMarker)(latlng, {
+          new (style.pointGlyph ? GlyphMarker : style.pointShape === "square" ? SquareMarker : style.pointShape === "diamond" ? DiamondMarker : L.CircleMarker)(latlng, {
+            glyph: style.pointGlyph ?? "bridge",
             pane: MAP_PANES.risk.name,
             renderer,
-            radius: riskPointRadius(map.getZoom()) * (style.pointScale ?? 1),
+            radius: pointRadiusOf(style, map.getZoom()),
             color: "#ffffff",
             weight: style.pointScale ? 1.5 : 1,
             fillColor: riskColorOf(style, feature as unknown as RiskFeature),

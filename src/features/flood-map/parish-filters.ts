@@ -2,7 +2,7 @@ import type { ParishAlert, RainCategory, RainWindow, Semaphore } from "./types";
 
 /** Filtros de la alerta por parroquia; se aplican igual a la lista y al mapa. */
 export interface ParishFilters {
-  /** Niveles que se listan y se dibujan en el mapa (cada uno se enciende y apaga); al inicio, rojo y naranja. */
+  /** Niveles que se listan y se dibujan en el mapa (cada uno se enciende y apaga); al inicio, solo la alerta muy alta (roja). */
   levels: readonly Semaphore[];
   /** null = todas: cada parroquia toma el nivel más alto. Con una, el nivel es solo el de esa ventana. */
   window: RainWindow | null;
@@ -12,7 +12,7 @@ export interface ParishFilters {
   query: string;
 }
 
-export const DEFAULT_LEVELS: readonly Semaphore[] = ["red", "orange"];
+export const DEFAULT_LEVELS: readonly Semaphore[] = ["red"];
 
 export const DEFAULT_PARISH_FILTERS: ParishFilters = { levels: DEFAULT_LEVELS, window: null, category: null, province: "", query: "" };
 

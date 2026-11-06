@@ -14,7 +14,7 @@ interface SummarySidebarProps {
 
 /**
  * Barra lateral que se despliega y se comprime, como el menú de una página web.
- * Comprimida queda una franja con su nombre. Desplegada, en pantallas grandes corre
+ * Comprimida queda una franja con su nombre. Desplegada, desde tabletas (768 px) corre
  * el mapa a un lado (no lo tapa); en el celular se abre encima del mapa.
  */
 export function SummarySidebar({ expanded, onExpandedChange, title, subtitle, children }: SummarySidebarProps) {
@@ -23,7 +23,7 @@ export function SummarySidebar({ expanded, onExpandedChange, title, subtitle, ch
       aria-label={title}
       className={cn(
         "relative z-1100 flex shrink-0 border-r border-slate-200 bg-white transition-[width] duration-200 ease-out motion-reduce:transition-none",
-        expanded ? "w-11 lg:w-80" : "w-11",
+        expanded ? "w-11 md:w-80" : "w-11",
       )}
     >
       {/* Franja: siempre visible, despliega y comprime. */}
@@ -34,7 +34,7 @@ export function SummarySidebar({ expanded, onExpandedChange, title, subtitle, ch
         title={expanded ? "Comprimir el resumen" : "Desplegar el resumen"}
         className={cn(
           "flex h-full w-11 shrink-0 flex-col items-center gap-3 py-3 text-slate-600 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600",
-          expanded && "lg:hidden",
+          expanded && "md:hidden",
         )}
       >
         <span className="grid size-7 place-items-center rounded-lg bg-blue-600 text-white">
@@ -48,8 +48,8 @@ export function SummarySidebar({ expanded, onExpandedChange, title, subtitle, ch
         <div
           className={cn(
             "flex min-w-0 flex-col bg-white",
-            // Celular: encima del mapa, al lado de la franja. Escritorio: ocupa el ancho de la barra.
-            "max-lg:absolute max-lg:inset-y-0 max-lg:left-11 max-lg:w-[min(20rem,calc(100vw-3.5rem))] max-lg:shadow-2xl lg:w-full",
+            // Celular: encima del mapa, al lado de la franja. Tableta y escritorio: ocupa el ancho de la barra.
+            "max-md:absolute max-md:inset-y-0 max-md:left-11 max-md:w-[min(20rem,calc(100vw-3.5rem))] max-md:shadow-2xl md:w-full",
           )}
         >
           <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3">

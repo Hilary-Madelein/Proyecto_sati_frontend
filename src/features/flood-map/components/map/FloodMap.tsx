@@ -42,6 +42,7 @@ import { RiskLineLabels } from "./RiskLineLabels";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
+import { MapPopupWatcher } from "./MapPopupWatcher";
 import { MapResizeWatcher } from "./MapResizeWatcher";
 import { ProvinceFocusBar } from "./ProvinceFocusBar";
 import { ProvincePicker } from "./ProvincePicker";
@@ -271,6 +272,7 @@ export default function FloodMap({
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
       <MapResizeWatcher />
+      <MapPopupWatcher />
       {provinceShading && provinces && !selectedProvince && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
       <MapOverlays {...overlays} />
     </MapContainer>

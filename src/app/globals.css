@@ -273,3 +273,15 @@ html .leaflet-tooltip.map-place-label.map-place-card::before {
     opacity: 0.25;
   }
 }
+
+/* Globo de información (ver MapPopupWatcher) o ficha de parroquia abiertos en pantallas chicas: lo que flota sobre el mapa se aparta. */
+.map-float {
+  transition: opacity 150ms ease;
+}
+@media (max-width: 1023.98px) {
+  [data-map-popup] .map-float,
+  [data-map-card] .map-float {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

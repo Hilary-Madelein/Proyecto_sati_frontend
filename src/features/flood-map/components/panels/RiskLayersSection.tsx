@@ -160,6 +160,7 @@ function RiskLayerRow({
                   color={item.color}
                   borderColor={item.color}
                   shape={legendShape(layer)}
+                  glyph={layer.pointGlyph}
                   count={item.count}
                   dashed={item.dashed}
                 />

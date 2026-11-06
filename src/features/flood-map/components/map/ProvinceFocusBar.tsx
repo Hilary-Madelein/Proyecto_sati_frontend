@@ -32,7 +32,7 @@ export function ProvinceFocusBar({
   onGoHome: () => void;
   /** La provincia a la que se acercó el mapa, o null al volver a todo Ecuador. */
   onProvinceChange: (province: ProvinceFeature | null) => void;
-  /** Solo en móvil: ahí el resumen no se abre solo (taparía el mapa), se abre con este botón. */
+  /** Solo en el celular (menos de 768 px): ahí el resumen no se abre solo (taparía el mapa), se abre con este botón. */
   onOpenSummary: () => void;
 }) {
   const map = useMap();
@@ -76,9 +76,10 @@ export function ProvinceFocusBar({
       )}
       {slot &&
         createPortal(
-          <div data-capture-ignore className="flex items-center gap-1 rounded-xl bg-white/95 py-1 pr-1 pl-2.5 text-xs shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
+          // Si el nombre no cabe junto a los botones (celular), los botones bajan a otra línea: el nombre no se corta.
+          <div data-capture-ignore className="flex flex-wrap items-center gap-x-1 rounded-xl bg-white/95 py-1 pr-1 pl-2.5 text-xs shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
             {province && (
-              <span className="flex min-w-0 items-center gap-1.5 font-semibold text-slate-800">
+              <span className="flex max-w-full min-w-0 items-center gap-1.5 py-1 font-semibold text-slate-800">
                 <MapPinIcon className="size-3.5 shrink-0 text-blue-600" />
                 <span className="truncate">{PROVINCE_NAMES[province.key] ?? placeName(province.name)}</span>
               </span>
@@ -87,7 +88,7 @@ export function ProvinceFocusBar({
               <button
                 type="button"
                 onClick={onOpenSummary}
-                className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1.5 font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 lg:ml-1 lg:px-2 lg:hidden"
+                className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1.5 font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 md:hidden"
               >
                 Resumen
               </button>

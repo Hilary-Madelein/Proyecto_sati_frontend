@@ -13,14 +13,15 @@ export function Header({ children }: { children?: ReactNode }) {
       />
       <div aria-hidden="true" className="header-ripples absolute inset-0" />
 
-      <div className="relative flex h-16 items-center gap-4 px-4 sm:h-18 sm:px-6">
+      {/* Pantallas muy bajas (celular acostado): más angosto, para dejarle alto al mapa. */}
+      <div className="relative flex h-16 items-center gap-4 px-4 sm:h-18 sm:px-6 [@media(max-height:500px)]:h-11">
         <Image
           src={BRAND.logo.src}
           alt={BRAND.logo.alt}
           width={BRAND.logo.width}
           height={BRAND.logo.height}
           priority
-          className="h-9 w-auto shrink-0 sm:h-11"
+          className="h-9 w-auto shrink-0 sm:h-11 [@media(max-height:500px)]:h-7"
         />
 
         <div className="hidden items-center gap-4 lg:flex">

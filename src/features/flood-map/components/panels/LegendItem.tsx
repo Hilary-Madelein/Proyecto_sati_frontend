@@ -1,4 +1,6 @@
 import { cn } from "@/lib/cn";
+import type { MapGlyph } from "../../map-glyphs";
+import { GlyphDot } from "./GlyphDot";
 
 interface LegendItemProps {
   label: string;
@@ -13,12 +15,16 @@ interface LegendItemProps {
   hollow?: boolean;
   /** Solo "square": borde punteado y sin relleno (como las líneas punteadas del mapa). */
   dashed?: boolean;
+  /** Punto con dibujo (puente, maquinaria, cierre): se muestra así, como en el mapa de cerca. */
+  glyph?: MapGlyph;
 }
 
-export function LegendItem({ label, color, borderColor, shape = "circle", count, sizePx, hollow, dashed }: LegendItemProps) {
+export function LegendItem({ label, color, borderColor, shape = "circle", count, sizePx, hollow, dashed, glyph }: LegendItemProps) {
   return (
     <li className="flex items-center gap-2 text-xs text-slate-600">
-      {shape === "diamond" && sizePx ? (
+      {glyph ? (
+        <GlyphDot glyph={glyph} color={color} />
+      ) : shape === "diamond" && sizePx ? (
         // Rombo del tamaño del mapa (a escala), centrado en un recuadro fijo para que los textos queden alineados.
         <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center">
           <span

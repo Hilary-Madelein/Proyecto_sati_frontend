@@ -1,12 +1,13 @@
 "use client";
 
 import L from "leaflet";
-import { useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { CircleMarker, Marker, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
 import { MAP_PANES } from "../../constants";
-import { riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
-import { tooltipOf } from "../../risk-popup";
+import { pointRadiusOf, riskClassOf, riskColorOf, riskPointRadius, type RiskLayerStyle } from "../../risk-layers";
+import { escapeHtml, tooltipOf } from "../../risk-popup";
+import { GlyphMarker } from "./glyph-marker";
 import type { RiskFeature, RiskLayerData } from "../../types";
 
 /** Hasta este zoom se agrupa; desde el siguiente (escala de ciudad) se ven todos los puntos sueltos. */
@@ -138,6 +139,20 @@ export function ClusteredRiskPoints({ style, data, renderer, onFeatureClick, onS
       {singles.map((point) => {
         const [lng, lat] = point.geometry.coordinates;
         const feature = data.features[point.properties.index];
+        if (style.pointGlyph) {
+          return (
+            <GlyphPoint
+              key={`p${point.properties.index}`}
+              lat={lat}
+              lng={lng}
+              style={style}
+              feature={feature}
+              radius={pointRadiusOf(style, view.zoom)}
+              renderer={renderer}
+              onClick={(latlng) => onFeatureClick(feature, latlng)}
+            />
+          );
+        }
         return (
           <CircleMarker
             key={`p${point.properties.index}`}
@@ -204,4 +219,49 @@ function clusterSvg(counts: readonly number[], colors: readonly string[], total:
     .join("");
   const label = total >= 1000 ? `${(total / 1000).toFixed(1).replace(".", ",")}k` : String(total);
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true" style="filter:drop-shadow(0 1px 2px rgb(0 0 0 / 0.35))"><circle cx="${center}" cy="${center}" r="${radius + ring / 2}" fill="#ffffff"/>${arcs}<text x="${center}" y="${center}" dy="0.35em" text-anchor="middle" font-size="${size < 36 ? 11 : 12}" font-weight="700" fill="#0f172a" font-family="system-ui, sans-serif">${label}</text></svg>`;
+}
+
+/** Un punto suelto con su dibujo (ver GlyphMarker), en el mismo lienzo que los demás. */
+function GlyphPoint({
+  lat,
+  lng,
+  style,
+  feature,
+  radius,
+  renderer,
+  onClick,
+}: {
+  lat: number;
+  lng: number;
+  style: RiskLayerStyle;
+  feature: RiskFeature;
+  radius: number;
+  renderer: L.Canvas;
+  onClick: (latlng: L.LatLng) => void;
+}) {
+  const map = useMap();
+  const click = useEffectEvent((latlng: L.LatLng) => onClick(latlng));
+  const color = riskColorOf(style, feature);
+  const tooltip = tooltipOf(style, feature);
+  const glyph = style.pointGlyph ?? "machinery";
+  useEffect(() => {
+    const marker = new GlyphMarker([lat, lng], {
+      glyph,
+      pane: MAP_PANES.risk.name,
+      renderer,
+      radius,
+      color: "#ffffff",
+      weight: 1,
+      fillColor: color,
+      fillOpacity: 0.95,
+      bubblingMouseEvents: false,
+    });
+    marker.bindTooltip(escapeHtml(tooltip), { className: "risk-tooltip", direction: "top" });
+    marker.on("click", (event) => click((event as L.LeafletMouseEvent).latlng));
+    marker.addTo(map);
+    return () => {
+      marker.remove();
+    };
+  }, [map, renderer, lat, lng, radius, color, glyph, tooltip]);
+  return null;
 }

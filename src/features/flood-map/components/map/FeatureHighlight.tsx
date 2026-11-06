@@ -59,7 +59,8 @@ export function FeatureHighlight({ hit, zoomRequest }: FeatureHighlightProps) {
         // Con su pane explícito: sin él iría al de Leaflet por defecto, y ese lienzo (que cubre
         // todo el mapa, encima de las capas de riesgo) se quedaría con todos los clics.
         pointToLayer={(_, latlng) =>
-          L.circleMarker(latlng, { ...HIGHLIGHT, pane: PANE, radius: 11, interactive: false }).bindTooltip(
+          // Con dibujo (puente, cierre…) el aro lo rodea entero, sin cortarlo.
+          L.circleMarker(latlng, { ...HIGHLIGHT, pane: PANE, radius: hit.style.pointGlyph ? 17 : 11, interactive: false }).bindTooltip(
             escapeHtml(placeOf(hit.feature) ?? titleOf(hit.style, hit.feature)),
             { permanent: true, direction: "top", offset: [0, -10], className: "map-place-label" },
           )

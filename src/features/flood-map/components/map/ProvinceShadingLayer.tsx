@@ -2,22 +2,10 @@
 
 import { GeoJSON, Pane } from "react-leaflet";
 import type { ProvinceFeature } from "../../hooks/useProvinceGeometries";
+import { shadingColor } from "../../province-summary";
 
 /** Encima de las capas de imagen (lluvia, mar: 340–350) y debajo de los ríos (380). */
 const PANE = { name: "provinceShading", zIndex: 360 } as const;
-
-/**
- * De menos a más: cuatro tonos de índigo; las provincias sin nada quedan sin pintar.
- * No rojo: solo compara cantidades entre provincias, no es un nivel de alerta.
- */
-export const SHADING_COLORS = ["#e0e7ff", "#a5b4fc", "#6366f1", "#3730a3"] as const;
-
-/** Tono de un valor: cuartos del máximo, para que la provincia con más resalte siempre. */
-export function shadingColor(value: number, max: number): string | null {
-  if (value <= 0 || max <= 0) return null;
-  const index = Math.min(SHADING_COLORS.length - 1, Math.floor((value / max) * SHADING_COLORS.length - 1e-9));
-  return SHADING_COLORS[Math.max(0, index)];
-}
 
 /**
  * Provincias pintadas según el indicador del ranking del resumen (alertas, eventos

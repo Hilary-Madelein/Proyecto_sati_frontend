@@ -37,7 +37,7 @@ const PREVIEW = 5;
  * Alerta de inundación por parroquia con la lluvia pronosticada (WRF) de las
  * próximas 12 y 24 h en el punto de cada parroquia (umbrales del documento de la
  * SNGR: alerta muy alta, alta, moderada y baja; manda el nivel más alto de las
- * dos). Solo se listan y dibujan las de alerta muy alta y alta (rojo y naranja); al abrir una, su cantón con
+ * dos). Al inicio se listan y dibujan solo las de alerta muy alta (cada nivel se enciende aparte); al abrir una, su cantón con
  * sus factores detonantes, elementos expuestos, acciones preventivas y
  * herramientas para la respuesta.
  */

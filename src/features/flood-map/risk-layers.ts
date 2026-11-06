@@ -1,4 +1,5 @@
 import type { PlannedLayerIcon } from "./constants";
+import { GLYPH_MIN_ZOOM, glyphRadius, type MapGlyph } from "./map-glyphs";
 import { CLOSED_EVENT_STYLE, closureStatusLine, ROAD_CONDITIONS } from "./road-closures";
 import type { RiskComponentId, RiskFeature, RiskLayerData } from "./types";
 
@@ -60,6 +61,8 @@ export interface RiskLayerStyle {
   plainColor?: string;
   /** Forma de los puntos en el mapa; por defecto, círculos. */
   pointShape?: "square" | "diamond";
+  /** Dibujo blanco dentro del punto, desde el zoom de provincia (ver map-glyphs.ts): dice qué es; el color, el estado. */
+  pointGlyph?: MapGlyph;
   /** Campo que se escribe sobre las líneas en el mapa, como letrero (p. ej. "E35"). */
   labelField?: string;
   /** Si `titleField` viene vacío, se prueba con estos campos antes de `fallbackTitle`. */
@@ -266,6 +269,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "map",
     geometry: "point",
+    pointGlyph: "bridge",
     color: NEUTRAL,
     classify: {
       field: "ESTADO",
@@ -315,6 +319,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Servicios",
     icon: "waves",
     geometry: "point",
+    pointGlyph: "school",
     color: "#60a5fa",
     cluster: true,
     classify: {
@@ -334,6 +339,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Servicios",
     icon: "mountain",
     geometry: "point",
+    pointGlyph: "school",
     color: "#d97706",
     cluster: true,
     classify: {
@@ -353,6 +359,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Servicios",
     icon: "pin",
     geometry: "point",
+    pointGlyph: "health",
     color: "#0d9488",
     cluster: true,
     popup: RPIS_POPUP([
@@ -377,6 +384,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Servicios",
     icon: "waves",
     geometry: "point",
+    pointGlyph: "health",
     color: "#2563eb",
     popup: RPIS_POPUP([
       { field: "susce_inun", label: "Susceptibilidad" },
@@ -391,6 +399,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Servicios",
     icon: "mountain",
     geometry: "point",
+    pointGlyph: "health",
     color: "#b45309",
     popup: RPIS_POPUP([
       { field: "CATEGORIA", label: "Susceptibilidad" },
@@ -405,6 +414,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Servicios",
     icon: "shield",
     geometry: "point",
+    pointGlyph: "health",
     color: "#be123c",
     popup: RPIS_POPUP(),
   },
@@ -417,10 +427,9 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Energía",
     icon: "zap",
     geometry: "point",
+    pointGlyph: "power",
     color: "#64748b",
     pointScale: 1.3,
-    // Cuadrados: ninguna otra capa los usa (los puntos críticos son rombos), así no se confunden con escuelas o salud.
-    pointShape: "square",
     classify: {
       field: "Tipo_Cen_1",
       classes: [
@@ -456,6 +465,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Recursos",
     icon: "pin",
     geometry: "point",
+    pointGlyph: "machinery",
     color: "#a16207",
     // Todos los equipos de una provincia están en el mismo punto: el grupo muestra cuántos son.
     cluster: true,
@@ -483,6 +493,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Recursos",
     icon: "users",
     geometry: "point",
+    pointGlyph: "shelter",
     color: "#7c3aed",
     cluster: true,
     popup: {
@@ -507,6 +518,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Recursos",
     icon: "map",
     geometry: "point",
+    pointGlyph: "tent",
     color: "#475569",
     popup: {
       titleField: "",
@@ -629,6 +641,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "alert",
     geometry: "point",
+    pointGlyph: "car",
     // El servicio guarda eventos desde 2015: por defecto, solo los de los últimos 3 días.
     period: { field: "fecha_en_que_ocurri_el_evento", defaultDays: 3 },
     color: NEUTRAL,
@@ -669,6 +682,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "alert",
     geometry: "point",
+    pointGlyph: "barrier",
     color: "#64748b",
     // Se ve desde la pestaña "Cierres viales" del panel de eventos, no en la lista de Respuesta.
     listed: false,
@@ -761,6 +775,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "pin",
     geometry: "point",
+    pointGlyph: "machinery",
     color: "#ca8a04",
     popup: {
       titleField: "Tipo_maquinaria",
@@ -780,6 +795,7 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Vías",
     icon: "pin",
     geometry: "point",
+    pointGlyph: "machinery",
     color: NEUTRAL,
     cluster: true,
     classify: {
@@ -822,6 +838,12 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
 /** Radio de los puntos sueltos según el zoom: más chicos a escala nacional. */
 export function riskPointRadius(zoom: number): number {
   return zoom <= 7 ? 3.5 : zoom <= 9 ? 4.5 : 5.5;
+}
+
+/** Radio de los puntos de una capa: más grande con dibujo (para que se lea), según su escala. */
+export function pointRadiusOf(style: RiskLayerStyle, zoom: number): number {
+  if (style.pointGlyph && zoom >= GLYPH_MIN_ZOOM) return glyphRadius(zoom, style.pointScale ?? 1);
+  return riskPointRadius(zoom) * (style.pointScale ?? 1);
 }
 
 /** Clase de la leyenda en la que cae una entidad; null = "otro" (color base de la capa). */

@@ -5,17 +5,23 @@ import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 /**
- * Leyendas comprimidas en esta visita. Fuera del componente: una leyenda se desmonta
- * mientras carga su capa (p. ej. al cambiar de 3 a 6 h) y no debe volver a abrirse sola.
+ * Lo que la persona eligió para cada leyenda en esta visita (abierta o comprimida).
+ * Fuera del componente: una leyenda se desmonta mientras carga su capa (p. ej. al
+ * cambiar de 3 a 6 h) y no debe cambiar sola.
  */
-const compressed = new Set<string>();
+const chosen = new Map<string, boolean>();
+
+/**
+ * Sin elección: abiertas en pantallas grandes; en celulares y tabletas, comprimidas
+ * (solo el título), porque abiertas tapaban buena parte del mapa.
+ */
+const openByDefault = () => typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches;
 
 /** Marco de una leyenda flotante: su título comprime o despliega el contenido. */
 export function LegendCard({ id, label, title, children }: { id: string; label: string; title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(() => !compressed.has(id));
+  const [open, setOpen] = useState(() => chosen.get(id) ?? openByDefault());
   const toggle = () => {
-    if (open) compressed.add(id);
-    else compressed.delete(id);
+    chosen.set(id, !open);
     setOpen(!open);
   };
 
