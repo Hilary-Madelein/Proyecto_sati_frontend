@@ -23,6 +23,7 @@ import type {
 import { stationRainLevel, stationsWithRain, type MeasuredStation } from "../../utils";
 import { diamondSymbolHtml } from "../map-symbols";
 import { focusProvinceOf } from "./province-focus";
+import { WatershedInfo } from "./WatershedInfo";
 
 const iconCache = new Map<StationRainLevel, L.DivIcon>();
 
@@ -111,6 +112,7 @@ function StationPopupContent({
         {station.altitude !== null && ` · ${Math.round(station.altitude).toLocaleString("es-EC")} m`}
       </p>
       <h3 className="text-[15px] font-semibold text-slate-900 max-lg:text-sm">{station.name}</h3>
+      <WatershedInfo lat={station.lat} lng={station.lng} className="mt-0.5" />
 
       <p className="mt-2 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia medida · últimas {windowHours} h</p>
       <p className="text-xl font-semibold text-slate-900 tabular-nums">{formatMm(station.totalMm)}</p>

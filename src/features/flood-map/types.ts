@@ -294,7 +294,10 @@ export interface FloodMapData {
   floodHub: FloodHubSnapshot | null;
 }
 
-export type FloodLayerId = "riverNetwork" | "riverAlerts" | "flashFloods";
+export type FloodLayerId = "riverNetwork" | "riverAlerts" | "flashFloods" | "watersheds";
+
+/** Hacia dónde drena una cuenca (el Atlántico, por el Amazonas). */
+export type WatershedSlope = "Pacífico" | "Atlántico";
 export type LayerVisibility = Record<FloodLayerId, boolean>;
 
 /** Lluvia de una capa activa en un punto del mapa (GET .../value). `mm` es null fuera del Ecuador o sin dato. */

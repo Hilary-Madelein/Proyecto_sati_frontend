@@ -6,6 +6,7 @@ import { WavesIcon } from "@/components/ui/icons";
 import { formatCalendarDate, formatDateTime } from "@/lib/format";
 import type { RiverTarget } from "../../hooks/useRiverForecast";
 import { useRiverForecast } from "../../hooks/useRiverForecast";
+import { WatershedInfo } from "../map/WatershedInfo";
 import { LoadingBadge, Notice } from "../panels/RainForecastSection";
 import { Hydrograph } from "./Hydrograph";
 
@@ -22,6 +23,7 @@ export function RiverPanel({ target, onClose }: RiverPanelProps) {
   const alert = river?.alert ?? null;
   const place = [alert?.canton, alert?.province].filter(Boolean).join(", ");
   const title = alert?.river ?? (river ? "Tramo de río" : "Buscando río…");
+  const point = alert ? { lat: alert.latitude, lng: alert.longitude } : target.kind === "point" ? target : null;
   const subtitle = river ? [place, `ID ${river.riverId}`].filter(Boolean).join(" · ") : "Río más cercano al punto elegido";
 
   return (
@@ -39,6 +41,8 @@ export function RiverPanel({ target, onClose }: RiverPanelProps) {
       desktopClassName="lg:bottom-6 lg:left-auto lg:right-101 lg:top-auto lg:w-[min(40rem,calc(100%-27rem))] lg:max-h-[calc(100%-3rem)]"
     >
       <div className="space-y-4">
+        {/* Con el tramo identificado, su punto; mientras se busca, el punto elegido en el mapa. */}
+        {point && <WatershedInfo lat={point.lat} lng={point.lng} />}
         {alert?.persistent && alert.alertShare !== null && (
           <Notice>
             Este tramo tuvo alerta en el {Math.round(alert.alertShare * 100)} % de los pronósticos de los últimos 30 días.

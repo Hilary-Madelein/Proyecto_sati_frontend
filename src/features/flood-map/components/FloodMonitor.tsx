@@ -253,6 +253,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     layers.riverNetwork && { key: "riverNetwork", label: "Red de ríos", component: "amenaza" as const, turnOff: () => toggleLayer("riverNetwork", false) },
     layers.riverAlerts && { key: "riverAlerts", label: "Alertas por caudal", component: "amenaza" as const, turnOff: () => toggleLayer("riverAlerts", false) },
     layers.flashFloods && { key: "flashFloods", label: "Crecidas repentinas", component: "amenaza" as const, turnOff: () => toggleLayer("flashFloods", false) },
+    layers.watersheds && { key: "watersheds", label: "Cuencas hidrográficas", component: "amenaza" as const, turnOff: () => toggleLayer("watersheds", false) },
     showSea && { key: "sea", label: "Temperatura del mar", component: "amenaza" as const, turnOff: () => setShowSea(false) },
     showImerg && { key: "imerg", label: "Lluvia IMERG", component: "amenaza" as const, turnOff: () => setShowImerg(false) },
     showPreparedness && {

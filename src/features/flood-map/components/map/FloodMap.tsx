@@ -48,6 +48,7 @@ import { ProvincePreparednessLayer } from "./ProvincePreparednessLayer";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
 import { RiskFeatureLayers, RiskPane } from "./RiskFeatureLayer";
+import { WatershedsLayer } from "./WatershedsLayer";
 import { RiverNetworkLayer } from "./RiverNetworkLayer";
 import { WeatherStationsLayer } from "./WeatherStationsLayer";
 
@@ -186,6 +187,7 @@ export default function FloodMap({
         </Pane>
       )}
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
+      {layers.watersheds && <WatershedsLayer />}
       <MapLimits />
       <CanvasZoomGuard />
       <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} />

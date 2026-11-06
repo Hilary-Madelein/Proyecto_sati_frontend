@@ -1,10 +1,10 @@
 import { IconTile } from "@/components/ui/IconTile";
-import { AlertTriangleIcon, WavesIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, MountainIcon, WavesIcon } from "@/components/ui/icons";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/cn";
 import { formatCalendarDate, formatDateTime } from "@/lib/format";
-import { FLASH_FLOOD_LIKELIHOODS, FLASH_FLOOD_MODEL } from "../../constants";
-import type { FlashFloodLikelihood, FloodLayerId, FloodMapData, LayerVisibility } from "../../types";
+import { FLASH_FLOOD_LIKELIHOODS, FLASH_FLOOD_MODEL, WATERSHED_SLOPES } from "../../constants";
+import type { FlashFloodLikelihood, FloodLayerId, FloodMapData, LayerVisibility, WatershedSlope } from "../../types";
 import { alertLevelForDay } from "../../utils";
 import { LayerCard } from "./LayerCard";
 import { LegendItem } from "./LegendItem";
@@ -31,8 +31,41 @@ export function RiversSection(props: FloodLayersSectionProps) {
   return (
     <section>
       <SectionHeading>Pronóstico de inundaciones</SectionHeading>
-      <RiversCard {...props} />
+      <div className="space-y-3">
+        <RiversCard {...props} />
+        <WatershedsCard layers={props.layers} onToggleLayer={props.onToggleLayer} />
+      </div>
     </section>
+  );
+}
+
+/** Cuencas hidrográficas por vertiente: solo de referencia, apagada por defecto. */
+function WatershedsCard({ layers, onToggleLayer }: Pick<FloodLayersSectionProps, "layers" | "onToggleLayer">) {
+  return (
+    <LayerCard
+      title="Cuencas hidrográficas"
+      meta="Hacia dónde drena el agua: Pacífico o Atlántico"
+      icon={
+        <IconTile className="bg-sky-50 text-sky-600">
+          <MountainIcon className="size-5" />
+        </IconTile>
+      }
+      enabled={layers.watersheds}
+      onToggle={(enabled) => onToggleLayer("watersheds", enabled)}
+    >
+      {(Object.keys(WATERSHED_SLOPES) as WatershedSlope[]).map((slope) => (
+        <LegendItem
+          key={slope}
+          shape="square"
+          label={WATERSHED_SLOPES[slope].short}
+          color={WATERSHED_SLOPES[slope].fill}
+          borderColor={WATERSHED_SLOPES[slope].stroke}
+        />
+      ))}
+      <li className="col-span-2 text-[11px] text-slate-500">
+        Unidades hidrográficas Pfafstetter de nivel 3 (MAE). La cuenca de cada río o estación se ve en su ventana de detalle.
+      </li>
+    </LayerCard>
   );
 }
 

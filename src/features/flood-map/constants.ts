@@ -16,6 +16,7 @@ import type {
   RiskComponentId,
   Semaphore,
   StationRainLevel,
+  WatershedSlope,
   WeatherStationCategory,
 } from "./types";
 
@@ -79,10 +80,25 @@ export type BasemapId = keyof typeof BASEMAPS;
  * simplificados a ~200 m: 25 polígonos, ~300 KB (~90 KB comprimido). Archivo fijo.
  */
 export const PROVINCE_BOUNDARIES_URL = "/data/provincias-ecuador.geojson";
+
+/**
+ * Cuencas hidrográficas: unidades Pfafstetter de nivel 3 del MAE (nivel 5 agrupado,
+ * Galápagos aparte, topología corregida), simplificadas a ~100 m: 12 polígonos,
+ * ~630 KB (~200 KB comprimido). Campos `nombre` y `vertiente`. Archivo fijo.
+ */
+export const WATERSHEDS_URL = "/data/cuencas-ecuador.geojson";
+
+/** Hacia dónde drena cada cuenca: color del relleno en el mapa y texto en los popups. */
+export const WATERSHED_SLOPES: Record<WatershedSlope, { label: string; short: string; fill: string; stroke: string }> = {
+  Pacífico: { label: "Vertiente del Pacífico", short: "Pacífico", fill: "#38bdf8", stroke: "#0284c7" },
+  Atlántico: { label: "Vertiente del Atlántico (Amazonas)", short: "Atlántico (Amazonas)", fill: "#4ade80", stroke: "#16a34a" },
+};
 export const DEFAULT_BASEMAP: BasemapId = "light";
 
 /** Panes de Leaflet: definen qué capa se dibuja encima de cuál. */
 export const MAP_PANES = {
+  // Cuencas: relleno suave debajo de todo (la lluvia y el mar se ven encima).
+  watersheds: { name: "watersheds", zIndex: 330 },
   seaTemperature: { name: "seaTemperature", zIndex: 340 },
   observedRain: { name: "observedRain", zIndex: 345 },
   rain: { name: "rain", zIndex: 350 },
@@ -193,6 +209,7 @@ export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   riverNetwork: false,
   riverAlerts: false,
   flashFloods: true,
+  watersheds: false,
 };
 
 // ── Google Flood Hub ────────────────────────────────────────────────────
