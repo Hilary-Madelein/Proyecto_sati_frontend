@@ -32,7 +32,8 @@ export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: M
   }, []);
 
   return (
-    <div ref={ref} data-capture-ignore className="map-float absolute top-4 left-4 z-1000 flex flex-col gap-2">
+    // Siempre a la vista (también con un globo o una ficha abiertos): los globos y fichas se corren para no quedar debajo (ver map-obstacles.ts).
+    <div ref={ref} data-capture-ignore data-map-obstacle="column" className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
       <div className="flex flex-col divide-y divide-slate-200 overflow-hidden rounded-xl bg-white/90 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
         <ControlButton label="Acercar" onClick={() => map.zoomIn()}>
           <PlusIcon className="size-4" />

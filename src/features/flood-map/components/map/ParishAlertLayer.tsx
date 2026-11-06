@@ -7,6 +7,7 @@ import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import type { ParishAlert, Semaphore } from "../../types";
 import { RainProfileChart } from "../charts/RainProfileChart";
 import { focusProvinceOf } from "./province-focus";
+import { offsetToClear } from "./map-obstacles";
 
 const PANE = "parishAlerts";
 
@@ -40,11 +41,8 @@ export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAl
   const keepCardInView = useEffectEvent(() => {
     const card = map.getContainer().querySelector<HTMLElement>(".map-place-card");
     if (!card) return;
-    const box = card.getBoundingClientRect();
-    const area = map.getContainer().getBoundingClientRect();
-    const margin = 12;
-    const dy = box.top < area.top + margin ? box.top - area.top - margin : box.bottom > area.bottom - margin ? box.bottom - area.bottom + margin : 0;
-    const dx = box.left < area.left + margin ? box.left - area.left - margin : box.right > area.right - margin ? box.right - area.right + margin : 0;
+    // Dentro del mapa y sin quedar debajo de los controles ni de la barra de la provincia.
+    const [dx, dy] = offsetToClear(map, card);
     if (dx || dy) map.panBy([dx, dy]);
   });
   const selectedCode = selected?.code;

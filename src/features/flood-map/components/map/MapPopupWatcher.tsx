@@ -3,6 +3,7 @@
 import type L from "leaflet";
 import { useEffect, useRef } from "react";
 import { useMapEvents } from "react-leaflet";
+import { offsetToClear } from "./map-obstacles";
 
 /** Lo que Leaflet usa al abrir un globo para correr el mapa hasta que quepa (privado, pero estable en 1.x). */
 type PannablePopup = L.Popup & { _adjustPan?: () => void };
@@ -10,9 +11,10 @@ type PannablePopup = L.Popup & { _adjustPan?: () => void };
 /**
  * Dos ajustes para todos los globos de información del mapa (lluvia en un punto,
  * eventos, estaciones…):
- * - Mientras hay uno abierto, marca el área del mapa: Leaflet lo dibuja dentro del
- *   mapa, así que lo que flota encima (controles, Galápagos, leyendas: `.map-float`)
- *   lo tapaba; en pantallas chicas eso se aparta (ver globals.css).
+ * - Mientras hay uno abierto, marca el área del mapa: en pantallas chicas se aparta
+ *   el recuadro de Galápagos (`.map-float`, ver globals.css). Lo demás que flota
+ *   (controles, barra de la provincia, leyendas, barras de abajo) queda, y el globo se
+ *   corre para no quedar debajo (ver map-obstacles.ts).
  * - Nunca más alto que el mapa: si no cabe, su contenido se desplaza adentro.
  * - Si el globo crece después de abrirse (llegan los datos o el gráfico), vuelve a
  *   correr el mapa para que se vea entero: Leaflet solo lo hace al abrirlo, y el
@@ -42,7 +44,11 @@ export function MapPopupWatcher() {
       observer.current = new ResizeObserver(() => {
         cancelAnimationFrame(frame.current);
         frame.current = requestAnimationFrame(() => {
-          if (map.hasLayer(popup)) popup._adjustPan?.();
+          if (!map.hasLayer(popup)) return;
+          popup._adjustPan?.();
+          // Además, que no quede debajo de los controles ni de la barra de la provincia (siempre a la vista).
+          const [dx, dy] = offsetToClear(map, element);
+          if (dx || dy) map.panBy([dx, dy]);
         });
       });
       observer.current.observe(element);

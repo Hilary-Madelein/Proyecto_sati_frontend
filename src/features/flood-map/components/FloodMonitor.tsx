@@ -714,11 +714,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         />
         {/* Junto a los controles, una debajo de la otra: la provincia a la que se acercó (ver ProvinceFocusBar) y las leyendas de las capas visibles. */}
         {/* Un nivel por debajo de los controles del mapa: el menú del mapa base se abre encima de esta columna. */}
-        <div className="map-float absolute top-4 left-16 z-999 flex max-w-[calc(100%-5rem)] flex-col items-start gap-2">
-          <div ref={setProvinceBarSlot} className="max-w-full empty:hidden" />
-          <div ref={setGalapagosSlot} className="empty:hidden" />
+        <div className="absolute top-4 left-16 z-999 flex max-w-[calc(100%-5rem)] flex-col items-start gap-2">
+          {/* La barra de la provincia y las leyendas quedan siempre a la vista (volver a todo Ecuador; qué es cada color); con un globo o una ficha abiertos solo se aparta Galápagos. */}
+          <div ref={setProvinceBarSlot} data-map-obstacle className="max-w-full empty:hidden" />
+          <div ref={setGalapagosSlot} className="map-float empty:hidden" />
           {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
-            <div className="flex w-56 max-w-full flex-col gap-2">
+            <div data-map-obstacle className="flex w-56 max-w-full flex-col gap-2">
               <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
               {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
               {layers.riverAlerts && mapData.riverAlerts && <RiverAlertLegend snapshot={mapData.riverAlerts} dayIndex={alertDayIndex} />}
@@ -1004,7 +1005,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         <EventsPerDayWidget
           until={fetchedAt}
           className={cn(
-            "map-float absolute right-3 bottom-24 left-3 z-1000 lg:bottom-6",
+            "absolute right-3 bottom-24 left-3 z-1000 lg:bottom-6",
             (mobileSheet !== null || riverTarget !== null || featureDetail.state !== null) && "max-lg:hidden",
             desktopPanels.events ? "lg:left-98" : "lg:left-60",
             desktopPanels.layers ? "lg:right-103" : "lg:right-4",
@@ -1031,7 +1032,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           <nav
             data-capture-ignore
             aria-label="Paneles del mapa"
-            className="map-float absolute bottom-6 left-1/2 z-1000 flex w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 gap-0.5 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
+            data-map-obstacle
+            className="absolute bottom-6 left-1/2 z-1000 flex w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 gap-0.5 rounded-2xl bg-white/90 p-1.5 shadow-xl ring-1 shadow-slate-900/15 ring-slate-900/10 backdrop-blur-md lg:hidden"
           >
             <MobileBarButton onClick={() => openMobileSheet("layers")}>
               <LayersIcon className="size-4 text-blue-600" />

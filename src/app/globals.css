@@ -274,7 +274,7 @@ html .leaflet-tooltip.map-place-label.map-place-card::before {
   }
 }
 
-/* Globo de información (ver MapPopupWatcher) o ficha de parroquia abiertos en pantallas chicas: lo que flota sobre el mapa se aparta. */
+/* Globo de información (ver MapPopupWatcher) o ficha de parroquia abiertos en pantallas chicas: solo se aparta Galápagos (`.map-float`). Los controles, la barra de la provincia, las leyendas y las barras de abajo quedan, y el globo o la ficha se corren para no quedar debajo (ver map-obstacles.ts). */
 .map-float {
   transition: opacity 150ms ease;
 }
