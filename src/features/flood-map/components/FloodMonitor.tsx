@@ -165,8 +165,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   };
   // Pestañas del panel de eventos: eventos de la SNGR, alerta de inundación por parroquia
   // (lluvia de 3, 6, 12 y 24 h) y cierres viales (reportes de novedad vial del MIT).
-  // Al cargar, el mapa muestra la alerta de inundación por parroquia (solo las de alerta muy alta, ver DEFAULT_LEVELS).
-  const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("analysis");
+  // Al cargar, el mapa muestra los eventos críticos; la alerta de inundación, al abrirla, empieza solo con las de alerta muy alta (ver DEFAULT_LEVELS).
+  const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("events");
   // Provincia elegida (en el mapa o en el resumen): filtra las capas y los paneles.
   const provinces = useProvinces();
   const [province, setProvince] = useState<ProvinceFeature | null>(null);
