@@ -52,7 +52,7 @@ export function EventsPerDayWidget({
 
   return (
     // La franja no captura clics: así el mapa sigue usable al lado del botón plegado.
-    <div className={cn("pointer-events-none flex flex-col items-end lg:items-start", className)}>
+    <div data-capture-ignore className={cn("pointer-events-none flex flex-col items-end lg:items-start", className)}>
       <button
         type="button"
         onClick={() => setOpen(true)}

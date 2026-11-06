@@ -56,6 +56,10 @@ export interface RiskLayerStyle {
    * Con `endField` (trabajos con inicio y fin): los que estuvieron en curso en esos días.
    */
   period?: { field: string; endField?: string; defaultDays: RiskPeriodDays };
+  /** Con esto se dibuja de un solo color; su clasificación queda como opción ("Colorear por …"). */
+  plainColor?: string;
+  /** Forma de los puntos en el mapa; por defecto, círculos. */
+  pointShape?: "square" | "diamond";
   /** Campo que se escribe sobre las líneas en el mapa, como letrero (p. ej. "E35"). */
   labelField?: string;
   /** Si `titleField` viene vacío, se prueba con estos campos antes de `fallbackTitle`. */
@@ -73,10 +77,39 @@ export function riskPeriodLabel(days: RiskPeriodDays): string {
   return days === null ? "Todos" : days % 30 === 0 && days > 30 ? `${days / 30} meses` : `${days} días`;
 }
 
+export const BRIDGES_LAYER_ID = "bridges";
+/** Red Vial Estatal: café oscuro, el color habitual de las vías en los mapas. */
+const ROAD_NETWORK_COLOR = "#5b3a1e";
 const GOOD = "#16a34a";
 const FAIR = "#d97706";
 const BAD = "#dc2626";
 const NEUTRAL = "#64748b";
+
+/** Ficha de una institución educativa del MINEDUC (las dos capas traen los mismos campos). */
+const MINEDUC_POPUP = {
+  titleField: "NOM_INSTIT",
+  fallbackTitle: "Institución educativa",
+  fields: [
+    { field: "SUSCEPTI_1", label: "Susceptibilidad" },
+    { field: "SUSCEPTIBI", label: "Otra susceptibilidad" },
+    { field: "AMIE", label: "Código AMIE" },
+    { field: "TIPOLOGÍA", label: "Tipo" },
+    { field: "SOSTENI", label: "Sostenimiento" },
+    { field: "JURISDICCI", label: "Jurisdicción" },
+    { field: "REGIMEN", label: "Régimen" },
+    { field: "ESTUDIANTE", label: "Estudiantes", format: "number" },
+    { field: "DOCENTES", label: "Docentes", format: "number" },
+    { field: "JORNADA", label: "Jornada" },
+    { field: "MODALIDAD", label: "Modalidad" },
+    { field: "ACCESO", label: "Acceso" },
+    { field: "CONECTIVIDAD", label: "Conectividad" },
+    { field: "AREA", label: "Área" },
+    { field: "NOMBRE_DIS", label: "Distrito educativo" },
+    { field: "DPA_DESPAR", label: "Parroquia" },
+    { field: "DPA_DESCAN", label: "Cantón" },
+    { field: "DPA_DESPRO", label: "Provincia" },
+  ],
+} satisfies RiskLayerStyle["popup"];
 
 const RPIS_POPUP = (extra: RiskPopupField[] = []) => ({
   titleField: "UNI_NOMBRE",
@@ -163,7 +196,10 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     section: "Otras amenazas",
     icon: "alert",
     geometry: "point",
-    color: "#ea580c",
+    // Rombo fucsia con borde blanco: ninguna capa usa ese color (el naranja abunda en el mapa);
+    // las estaciones del INAMHI también son rombos, pero sin borde y en sus propios colores.
+    color: "#c026d3",
+    pointShape: "diamond",
     popup: {
       titleField: "Nomenclatura",
       fallbackTitle: "Punto crítico",
@@ -181,13 +217,15 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
   {
     id: "rve",
     title: "Red Vial Estatal",
-    description: "Tramos de la RVE según su estado.",
+    description: "Tramos de la RVE; se pueden colorear por su estado.",
     component: "exposicion",
     section: "Vías",
     icon: "map",
     geometry: "line",
-    color: NEUTRAL,
+    color: ROAD_NETWORK_COLOR,
     labelField: "CODIGO_DE_VIA",
+    // Un solo color (como un mapa vial); con el botón "Colorear por estado", los de abajo.
+    plainColor: ROAD_NETWORK_COLOR,
     classify: {
       field: "ESTADO",
       classes: [
@@ -270,48 +308,42 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     popup: { titleField: "poblado", fallbackTitle: "Poblado", fields: [{ field: "region", label: "Modelo" }] },
   },
   {
-    id: "schools",
-    title: "Instituciones educativas",
-    description: "Escuelas y colegios en zonas de susceptibilidad media o alta.",
+    id: "schools-floods",
+    title: "Educación: susceptibles a inundaciones",
+    description: "Escuelas y colegios en zonas de susceptibilidad media o alta a inundaciones.",
     component: "exposicion",
     section: "Servicios",
-    icon: "pin",
+    icon: "waves",
     geometry: "point",
-    color: NEUTRAL,
+    color: "#60a5fa",
     cluster: true,
     classify: {
-      field: "SUSCEPTIBI",
+      field: "SUSCEPTI_1",
       classes: [
-        { label: "Alta a inundaciones", color: "#1d4ed8", values: ["SUSCEPTIBILIDAD ALTA A INUNDACIONES"] },
-        { label: "Media a inundaciones", color: "#60a5fa", values: ["SUSCEPTIBILIDAD MEDIA A INUNDACIONES"] },
-        { label: "Alta a mov. en masa", color: "#92400e", values: ["SUSCEPTIBILIDAD ALTA A MOVIMIENTOS EN MASA"] },
-        { label: "Media a mov. en masa", color: "#d97706", values: ["SUSCEPTIBILIDAD MEDIA A MOVIMIENTOS EN MASA"] },
+        { label: "Alta", color: "#1d4ed8", values: ["SUSCEPTIBILIDAD ALTA A INUNDACIONES"] },
+        { label: "Media", color: "#60a5fa", values: ["SUSCEPTIBILIDAD MEDIA A INUNDACIONES"] },
       ],
     },
-    popup: {
-      titleField: "NOM_INSTIT",
-      fallbackTitle: "Institución educativa",
-      fields: [
-        { field: "SUSCEPTIBI", label: "Susceptibilidad" },
-        { field: "SUSCEPTI_1", label: "Otra susceptibilidad" },
-        { field: "AMIE", label: "Código AMIE" },
-        { field: "TIPOLOGÍA", label: "Tipo" },
-        { field: "SOSTENI", label: "Sostenimiento" },
-        { field: "JURISDICCI", label: "Jurisdicción" },
-        { field: "REGIMEN", label: "Régimen" },
-        { field: "ESTUDIANTE", label: "Estudiantes", format: "number" },
-        { field: "DOCENTES", label: "Docentes", format: "number" },
-        { field: "JORNADA", label: "Jornada" },
-        { field: "MODALIDAD", label: "Modalidad" },
-        { field: "ACCESO", label: "Acceso" },
-        { field: "CONECTIVIDAD", label: "Conectividad" },
-        { field: "AREA", label: "Área" },
-        { field: "NOMBRE_DIS", label: "Distrito educativo" },
-        { field: "DPA_DESPAR", label: "Parroquia" },
-        { field: "DPA_DESCAN", label: "Cantón" },
-        { field: "DPA_DESPRO", label: "Provincia" },
+    popup: MINEDUC_POPUP,
+  },
+  {
+    id: "schools-mass-movements",
+    title: "Educación: susceptibles a mov. en masa",
+    description: "Escuelas y colegios en zonas de susceptibilidad media o alta a deslizamientos.",
+    component: "exposicion",
+    section: "Servicios",
+    icon: "mountain",
+    geometry: "point",
+    color: "#d97706",
+    cluster: true,
+    classify: {
+      field: "SUSCEPTI_1",
+      classes: [
+        { label: "Alta", color: "#92400e", values: ["SUSCEPTIBILIDAD ALTA A MOVIMIENTOS EN MASA"] },
+        { label: "Media", color: "#d97706", values: ["SUSCEPTIBILIDAD MEDIA A MOVIMIENTOS EN MASA"] },
       ],
     },
+    popup: MINEDUC_POPUP,
   },
   {
     id: "health-centers",
@@ -375,6 +407,44 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     geometry: "point",
     color: "#be123c",
     popup: RPIS_POPUP(),
+  },
+
+  {
+    id: "power-plants",
+    title: "Centrales eléctricas",
+    description: "Centrales de generación e interconexiones eléctricas, por tipo.",
+    component: "exposicion",
+    section: "Energía",
+    icon: "zap",
+    geometry: "point",
+    color: "#64748b",
+    pointScale: 1.3,
+    // Cuadrados: ninguna otra capa los usa (los puntos críticos son rombos), así no se confunden con escuelas o salud.
+    pointShape: "square",
+    classify: {
+      field: "Tipo_Cen_1",
+      classes: [
+        { label: "Hidráulica", color: "#0284c7", values: ["HIDRÁULICA"] },
+        { label: "Térmica", color: "#6d28d9", values: ["TÉRMICA"] },
+        { label: "Solar", color: "#eab308", values: ["SOLAR"] },
+        { label: "Eólica", color: "#16a34a", values: ["EÓLICA"] },
+        { label: "Interconexión", color: "#94a3b8", values: ["INTERCONEXIÓN"] },
+      ],
+    },
+    popup: {
+      titleField: "CENTRAL",
+      fallbackTitle: "Central eléctrica",
+      fields: [
+        { field: "Tipo_Cen_1", label: "Tipo de central" },
+        { field: "TIPO_ENERG", label: "Energía" },
+        { field: "TIPO_SERVI", label: "Servicio" },
+        { field: "POT_NOMINA", label: "Potencia nominal (MW)", format: "number" },
+        { field: "POT_EFECTI", label: "Potencia efectiva (MW)", format: "number" },
+        { field: "PARROQUIA", label: "Parroquia" },
+        { field: "CANTON", label: "Cantón" },
+        { field: "PROVINCIA", label: "Provincia" },
+      ],
+    },
   },
 
   // ── Preparación ──────────────────────────────────────────────────────────
@@ -636,6 +706,9 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
         { section: "3. Acciones de atención", field: "acc_ejecucion", label: "Acciones en ejecución" },
         { section: "3. Acciones de atención", field: "acc_prevista", label: "Acciones previstas" },
         { section: "3. Acciones de atención", field: "maq_perso", label: "Maquinaria y personal desplegado" },
+        { section: "3. Acciones de atención", field: "persnl_tecnico", label: "Personal técnico requerido" },
+        { section: "3. Acciones de atención", field: "persnl_operd_maq", label: "Operadores de maquinaria requeridos", format: "number" },
+        { section: "3. Acciones de atención", field: "persnl_microempresas", label: "Microempresas requeridas", format: "number" },
         { section: "4. Tiempo estimado de habilitación", field: "fecha_estim_hab", label: "Hora estimada", format: "datetime" },
         // Pese a su nombre en el formulario, son las horas desde el reporte hasta la habilitación estimada.
         { section: "4. Tiempo estimado de habilitación", field: "horas_transcurridas", label: "Horas estimadas", format: "plain" },
@@ -752,6 +825,19 @@ export function riskPointRadius(zoom: number): number {
 }
 
 /** Clase de la leyenda en la que cae una entidad; null = "otro" (color base de la capa). */
+/** El estilo con que se dibuja: de un solo color si tiene `plainColor` y no se pidió colorear por su clase. */
+/**
+ * Si la capa admite opacidad. Las de puntos agrupados no: los grupos son íconos HTML
+ * (no se atenúan) y un punto transparente no deja ver nada que valga la pena debajo.
+ */
+export function supportsOpacity(style: RiskLayerStyle): boolean {
+  return !(style.cluster && style.geometry === "point");
+}
+
+export function styleForMap(style: RiskLayerStyle, colored: boolean): RiskLayerStyle {
+  return style.plainColor && !colored ? { ...style, color: style.plainColor, classify: undefined } : style;
+}
+
 export function riskClassOf(style: RiskLayerStyle, feature: RiskFeature): RiskClass | null {
   if (!style.classify) return null;
   const value = feature.properties[style.classify.field];

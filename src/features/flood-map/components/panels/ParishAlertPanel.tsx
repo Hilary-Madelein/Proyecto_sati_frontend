@@ -7,6 +7,8 @@ import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import { DEFAULT_PARISH_FILTERS, RAIN_CATEGORIES, filterParishes, isFiltered, type ParishFilters } from "../../parish-filters";
 import type { CantonAnalysis, CantonAnalysisSnapshot, ParishAlert, RainBand, RainCategory, RainWindow, Semaphore } from "../../types";
 import { Notice } from "./RainForecastSection";
+import { ShowOnMapToggle } from "./ShowOnMapToggle";
+import { provinceOption } from "../../province-filter";
 
 interface ParishAlertPanelProps {
   snapshot: CantonAnalysisSnapshot | null;
@@ -18,6 +20,9 @@ interface ParishAlertPanelProps {
   /** Filtros de la lista, compartidos con el mapa (que dibuja solo las mismas parroquias). */
   filters: ParishFilters;
   onFiltersChange: (filters: ParishFilters) => void;
+  /** Si las parroquias se dibujan en el mapa (la lista sigue igual). */
+  showOnMap: boolean;
+  onShowOnMapChange: (show: boolean) => void;
 }
 
 const formatMm = (mm: number) => `${mm.toLocaleString("es-EC", { maximumFractionDigits: 1 })} mm`;
@@ -44,6 +49,8 @@ export function ParishAlertPanel({
   onSelect,
   filters,
   onFiltersChange,
+  showOnMap,
+  onShowOnMapChange,
 }: ParishAlertPanelProps) {
   const [showAll, setShowAll] = useState(false);
 
@@ -78,6 +85,7 @@ export function ParishAlertPanel({
 
   return (
     <div className="space-y-3">
+      <ShowOnMapToggle checked={showOnMap} onChange={onShowOnMapChange} label="Mostrar las parroquias en alerta en el mapa" />
       <div className="space-y-1.5">
         <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia pronosticada en</p>
         <SegmentedControl
@@ -141,7 +149,7 @@ export function ParishAlertPanel({
             <span className="sr-only">Provincia</span>
             <select
               autoComplete="off"
-              value={province}
+              value={province ? provinceOption(provinces, province) : ""}
               onChange={(event) => update({ province: event.target.value })}
               className="w-full rounded-lg bg-white px-2 py-1.5 text-xs text-slate-800 ring-1 ring-slate-200 focus-visible:outline-2 focus-visible:outline-blue-600"
             >

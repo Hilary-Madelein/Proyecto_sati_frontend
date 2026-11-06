@@ -61,7 +61,7 @@ export function filterParishes(parishes: readonly ParishAlert[], filters: Parish
   const all = parishesForWindow(parishes, filters.window);
   const matching = all.filter(
     (parish) =>
-      (!filters.province || parish.province === filters.province) &&
+      (!filters.province || normalizeName(parish.province) === normalizeName(filters.province)) &&
       (!search || normalizeName(parish.name).includes(search) || normalizeName(parish.canton).includes(search)),
   );
   const counts = Object.fromEntries(

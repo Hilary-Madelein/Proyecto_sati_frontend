@@ -30,13 +30,15 @@ function alertIcon(level: AlertLevel, selected: boolean): L.DivIcon {
 }
 
 interface RiverAlertsLayerProps {
+  /** Opacidad de la capa (0 a 1). */
+  opacity?: number;
   snapshot: RiverAlertsSnapshot;
   dayIndex: number;
   selectedRiverId: number | null;
   onSelect: (river: SelectedRiver) => void;
 }
 
-export function RiverAlertsLayer({ snapshot, dayIndex, selectedRiverId, onSelect }: RiverAlertsLayerProps) {
+export function RiverAlertsLayer({ snapshot, dayIndex, selectedRiverId, onSelect, opacity = 1 }: RiverAlertsLayerProps) {
   const visible = snapshot.alerts
     .map((alert) => ({ alert, level: alertLevelForDay(alert, dayIndex) }))
     .filter(({ level }) => level > 0);
@@ -49,6 +51,7 @@ export function RiverAlertsLayer({ snapshot, dayIndex, selectedRiverId, onSelect
       day={snapshot.days[dayIndex]}
       selected={alert.riverId === selectedRiverId}
       onSelect={onSelect}
+      opacity={opacity}
     />
   ));
 }
@@ -59,7 +62,9 @@ function AlertMarker({
   day,
   selected,
   onSelect,
+  opacity,
 }: {
+  opacity: number;
   alert: RiverAlert;
   level: AlertLevel;
   day: string | undefined;
@@ -78,7 +83,7 @@ function AlertMarker({
       position={[alert.latitude, alert.longitude]}
       icon={alertIcon(level, selected)}
       // Los tramos que alertan casi siempre se atenúan y quedan debajo de los demás.
-      opacity={alert.persistent && !selected ? 0.4 : 1}
+      opacity={(alert.persistent && !selected ? 0.4 : 1) * opacity}
       zIndexOffset={selected ? 2000 : alert.persistent ? 0 : level * 10}
       keyboard
       title={`Alerta: supera ${alertLevelStyle(level).label}`}

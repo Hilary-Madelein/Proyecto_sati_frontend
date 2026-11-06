@@ -1,3 +1,4 @@
+import { normalizeName } from "./parish-filters";
 import {
   EVENT_PERIODS,
   RIVER_ALERT_LEVELS,
@@ -54,7 +55,7 @@ export function filterEvents(
       Date.parse(event.occurredAt) >= since &&
       (ignoreSeverity || filters.severities.includes(event.severity)) &&
       (filters.showUnverified || !isUnverifiedEvent(event)) &&
-      (!filters.province || event.province === filters.province) &&
+      (!filters.province || (!!event.province && normalizeName(event.province) === normalizeName(filters.province))) &&
       (!filters.hazardType || event.hazardType === filters.hazardType),
   );
 }

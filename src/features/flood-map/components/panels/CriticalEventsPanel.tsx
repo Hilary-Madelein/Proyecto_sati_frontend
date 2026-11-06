@@ -16,6 +16,8 @@ import type { EventFilters, EventSeverity, HazardEvent, HazardType } from "../..
 import { filterEvents, isUnverifiedEvent, sortEventsByPriority } from "../../utils";
 import { HAZARD_ICONS } from "../hazard-icons";
 import { SeverityPill } from "../SeverityPill";
+import { ShowOnMapToggle } from "./ShowOnMapToggle";
+import { provinceOption } from "../../province-filter";
 
 interface CriticalEventsPanelProps {
   /** Todos los eventos recibidos (sin filtrar). */
@@ -30,6 +32,9 @@ interface CriticalEventsPanelProps {
   error: string | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Si los eventos se dibujan en el mapa (la lista sigue igual). */
+  showOnMap: boolean;
+  onShowOnMapChange: (show: boolean) => void;
   /**
    * Solo afecta a escritorio: plegado muestra el resumen y el evento más grave,
    * para no tapar el mapa. En móvil la lista y los filtros siempre se muestran.
@@ -55,6 +60,8 @@ export function CriticalEventsPanel({
   selectedId,
   onSelect,
   expanded,
+  showOnMap,
+  onShowOnMapChange,
 }: CriticalEventsPanelProps) {
   const sorted = sortEventsByPriority(filteredEvents);
   const [topEvent] = sorted;
@@ -101,6 +108,7 @@ export function CriticalEventsPanel({
 
   return (
     <div className="space-y-3">
+      <ShowOnMapToggle checked={showOnMap} onChange={onShowOnMapChange} label="Mostrar los eventos críticos en el mapa" />
       {/* Periodo: siempre visible, también con el panel contraído (cambia los conteos y el mapa). */}
       <div className="space-y-2">
         {/* Qué eventos son: el gráfico de eventos por día también cuenta los cerrados y los sin afectaciones, así se entiende por qué difieren. */}
@@ -180,7 +188,7 @@ export function CriticalEventsPanel({
         <div className="grid grid-cols-2 gap-2">
           <FilterSelect
             label="Provincia"
-            value={filters.province ?? ""}
+            value={filters.province ? provinceOption(provinces, filters.province) : ""}
             onChange={(value) => update({ province: value || null })}
           >
             <option value="">Todas las provincias</option>

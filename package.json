@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "html-to-image": "1.11.13",
     "leaflet": "^1.9.4",
     "next": "16.3.8",
     "protomaps-leaflet": "^5.1.0",

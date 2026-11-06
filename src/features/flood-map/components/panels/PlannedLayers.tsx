@@ -9,6 +9,7 @@ import {
   ShieldIcon,
   UsersIcon,
   WavesIcon,
+  ZapIcon,
 } from "@/components/ui/icons";
 import type { PlannedLayer, PlannedLayerIcon } from "../../constants";
 
@@ -21,6 +22,7 @@ export const PLANNED_LAYER_ICONS: Record<PlannedLayerIcon, (props: { className?:
   shield: ShieldIcon,
   users: UsersIcon,
   refresh: RefreshIcon,
+  zap: ZapIcon,
 };
 
 /** Capa prevista sin fuente de datos todavía: ocupa su lugar en la pestaña, sin interruptor. */

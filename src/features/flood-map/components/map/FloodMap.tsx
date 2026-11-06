@@ -34,6 +34,7 @@ import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
 import { CanvasZoomGuard } from "./CanvasZoomGuard";
 import { FeatureHighlight } from "./FeatureHighlight";
+import { GalapagosInset } from "./GalapagosInset";
 import { getHomeBoundsOptions } from "./home-bounds";
 import { FlashFloodLayer } from "./FlashFloodLayer";
 import { ParishAlertLayer } from "./ParishAlertLayer";
@@ -41,10 +42,15 @@ import { RiskLineLabels } from "./RiskLineLabels";
 import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
+import { MapResizeWatcher } from "./MapResizeWatcher";
 import { ProvinceFocusBar } from "./ProvinceFocusBar";
+import { ProvincePicker } from "./ProvincePicker";
+import { ProvinceShadingLayer } from "./ProvinceShadingLayer";
+import type { ProvinceFeature } from "../../hooks/useProvinceGeometries";
 import { MapLimits } from "./MapLimits";
 import { ProvinceBoundaries } from "./ProvinceBoundaries";
 import { ProvincePreparednessLayer } from "./ProvincePreparednessLayer";
+import { ProvincialRoadsLayer } from "./ProvincialRoadsLayer";
 import { RainPointPopup } from "./RainPointPopup";
 import { RiverAlertsLayer } from "./RiverAlertsLayer";
 import { RiskFeatureLayers, RiskPane } from "./RiskFeatureLayer";
@@ -100,8 +106,26 @@ export interface FloodMapProps {
   onDeselectEvent: (id: string) => void;
   /** Dónde se muestra el aviso de la provincia a la que se acercó: junto a las leyendas, sobre el mapa. */
   provinceBarSlot: HTMLElement | null;
+  /** Opacidad de las capas propias (crecidas repentinas, preparación…), de 0 a 1. */
+  layerOpacity: (id: "flash-floods" | "preparedness" | "river-network" | "river-alerts" | "provincial-roads") => number;
+  /** Red vial provincial (teselas vectoriales). */
+  provincialRoads: boolean;
+  /** Dónde va el recuadro de Galápagos: junto a los controles, sobre las leyendas. */
+  galapagosSlot: HTMLElement | null;
+  /** Descarga una imagen del mapa (botón de los controles). */
+  onCapture: () => Promise<void>;
+  /** Provincias para elegir una en el mapa (y la elegida). */
+  provinces: readonly ProvinceFeature[] | null;
+  selectedProvince: ProvinceFeature | null;
+  onPickProvince: (province: ProvinceFeature) => void;
   /** Se pidió volver a todo Ecuador: se cierra lo que estaba abierto. */
   onGoHome: () => void;
+  /** El mapa se acercó a una provincia (queda elegida) o volvió a todo Ecuador (null). */
+  onProvinceFocus: (province: ProvinceFeature | null) => void;
+  /** Abre el resumen (botón de la barra de la provincia, solo en móvil). */
+  onOpenSummary: () => void;
+  /** Provincias pintadas por el indicador del ranking del resumen (por su clave); null = sin pintar. */
+  provinceShading: ReadonlyMap<string, number> | null;
 }
 
 /**
@@ -154,12 +178,51 @@ export default function FloodMap({
   onSelectEvent,
   onDeselectEvent,
   provinceBarSlot,
+  layerOpacity,
+  provincialRoads,
+  galapagosSlot,
+  onCapture,
+  provinces,
+  selectedProvince,
+  onPickProvince,
   onGoHome,
+  onProvinceFocus,
+  onOpenSummary,
+  provinceShading,
 }: FloodMapProps) {
-  const selectedEvent = data.eventsFeed.events.find((event) => event.id === selectedEventId);
   const [boundsOptions] = useState(getHomeBoundsOptions);
-  // Un solo lienzo para todas las capas de gestión del riesgo (ver MAP_PANES.risk).
-  const [riskRenderer] = useState(() => L.canvas({ pane: MAP_PANES.risk.name }));
+  const overlays: OverlayProps = {
+    data,
+    visibleEvents,
+    layers,
+    rainForecast,
+    observedRain,
+    seaTemperature,
+    weatherStations,
+    riskLayers,
+    onRiskFeaturesSelect,
+    selectedRiskFeature,
+    riskFeatureZoomRequest,
+    showImerg,
+    parishAlerts,
+    selectedParish,
+    provincePreparedness,
+    onParishClick,
+    opacity,
+    onRainLoadingChange,
+    onObservedRainLoadingChange,
+    onSeaLoadingChange,
+    alertDayIndex,
+    selectedRiverId,
+    onSelectRiver,
+    onRiverLookup,
+    selectedEventId,
+    focusRequest,
+    onSelectEvent,
+    onDeselectEvent,
+    layerOpacity,
+    provincialRoads,
+  };
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
 
   return (
@@ -187,20 +250,101 @@ export default function FloodMap({
         </Pane>
       )}
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
-      {layers.watersheds && <WatershedsLayer />}
       <MapLimits />
       <CanvasZoomGuard />
-      <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} />
-      <MapControls basemap={basemap} onBasemapChange={setBasemap} onGoHome={onGoHome} />
+      <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} onProvinceChange={onProvinceFocus} onOpenSummary={onOpenSummary} />
+      {/* Con lluvia, mar o red de ríos, el clic en el mapa ya muestra su valor: ahí la provincia se elige en el resumen. */}
+      <ProvincePicker
+        provinces={provinces}
+        selected={selectedProvince}
+        onSelect={onPickProvince}
+        enabled={!rainForecast && !observedRain && !seaTemperature && !layers.riverNetwork}
+      />
+      {/* Solo con todo Ecuador a la vista: con una provincia elegida, sobra. */}
+      {!selectedProvince && (
+        <GalapagosInset tileUrl={BASEMAPS[basemap].url} slot={galapagosSlot}>
+          {/* Las mismas capas y filtros que el mapa principal, solo para ver: el recuadro entero lleva a Galápagos. */}
+          <MapOverlays {...overlays} inset />
+        </GalapagosInset>
+      )}
+      <MapControls basemap={basemap} onBasemapChange={setBasemap} onGoHome={onGoHome} onCapture={onCapture} />
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} />
 
+      <MapResizeWatcher />
+      {provinceShading && provinces && !selectedProvince && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
+      <MapOverlays {...overlays} />
+    </MapContainer>
+  );
+}
+
+type OverlayProps = Omit<
+  FloodMapProps,
+  | "provinceBarSlot"
+  | "galapagosSlot"
+  | "onCapture"
+  | "provinces"
+  | "selectedProvince"
+  | "onPickProvince"
+  | "onGoHome"
+  | "onProvinceFocus"
+  | "onOpenSummary"
+  | "provinceShading"
+>;
+
+const noop = () => {};
+
+/**
+ * Capas de datos del mapa. Se dibujan en el mapa principal y en el recuadro de
+ * Galápagos (`inset`): ahí solo se ven, sin selección, vuelos ni etiquetas.
+ */
+function MapOverlays({
+  data,
+  visibleEvents,
+  layers,
+  rainForecast,
+  observedRain,
+  seaTemperature,
+  weatherStations,
+  riskLayers,
+  onRiskFeaturesSelect,
+  selectedRiskFeature,
+  riskFeatureZoomRequest,
+  showImerg,
+  parishAlerts,
+  selectedParish,
+  provincePreparedness,
+  onParishClick,
+  opacity,
+  onRainLoadingChange,
+  onObservedRainLoadingChange,
+  onSeaLoadingChange,
+  alertDayIndex,
+  selectedRiverId,
+  onSelectRiver,
+  onRiverLookup,
+  selectedEventId,
+  focusRequest,
+  onSelectEvent,
+  onDeselectEvent,
+  layerOpacity,
+  provincialRoads,
+  inset = false,
+}: OverlayProps & { inset?: boolean }) {
+  const selectedEvent = data.eventsFeed.events.find((event) => event.id === selectedEventId);
+  // Un solo lienzo para todas las capas de gestión del riesgo (ver MAP_PANES.risk); uno por mapa.
+  const [riskRenderer] = useState(() => L.canvas({ pane: MAP_PANES.risk.name }));
+
+  return (
+    <>
+      {/* Cuencas: también en el recuadro de Galápagos, que tiene las suyas. */}
+      {layers.watersheds && <WatershedsLayer />}
       {seaTemperature && (
         <Pane name={MAP_PANES.seaTemperature.name} style={{ zIndex: MAP_PANES.seaTemperature.zIndex }}>
           <AccumulatedRainLayer
             rain={seaTemperature}
             opacity={opacity.sea}
             attribution={seaTemperature.attribution}
-            onLoadingChange={onSeaLoadingChange}
+            onLoadingChange={inset ? noop : onSeaLoadingChange}
           />
         </Pane>
       )}
@@ -215,7 +359,7 @@ export default function FloodMap({
             rain={observedRain.data}
             opacity={opacity.observed}
             attribution={observedRain.attribution}
-            onLoadingChange={onObservedRainLoadingChange}
+            onLoadingChange={inset ? noop : onObservedRainLoadingChange}
           />
         </Pane>
       )}
@@ -225,30 +369,40 @@ export default function FloodMap({
             rain={rainForecast.data}
             opacity={opacity.forecast}
             attribution={rainForecast.attribution}
-            onLoadingChange={onRainLoadingChange}
+            onLoadingChange={inset ? noop : onRainLoadingChange}
           />
         </Pane>
       )}
+      {provincialRoads && <ProvincialRoadsLayer opacity={layerOpacity("provincial-roads")} hint={!inset} />}
       <RiskPane />
-      <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={onRiskFeaturesSelect} />
-      <RiskLineLabels layers={riskLayers} />
-      {selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
+      <RiskFeatureLayers layers={riskLayers} renderer={riskRenderer} onSelect={inset ? noop : onRiskFeaturesSelect} />
+      {!inset && <RiskLineLabels layers={riskLayers} />}
+      {!inset && selectedRiskFeature && <FeatureHighlight hit={selectedRiskFeature} zoomRequest={riskFeatureZoomRequest} />}
       {provincePreparedness && (
-        <ProvincePreparednessLayer provinces={provincePreparedness.provinces} geometries={provincePreparedness.geometries} />
+        <ProvincePreparednessLayer
+          provinces={provincePreparedness.provinces}
+          geometries={provincePreparedness.geometries}
+          opacity={layerOpacity("preparedness")}
+        />
       )}
-      {parishAlerts && <ParishAlertLayer parishes={parishAlerts} selected={selectedParish} onParishClick={onParishClick} />}
+      {parishAlerts && <ParishAlertLayer parishes={parishAlerts} selected={inset ? null : selectedParish} onParishClick={inset ? noop : onParishClick} />}
       {layers.flashFloods && data.floodHub?.flashFloods && (
-        <FlashFloodLayer areas={data.floodHub.flashFloods} attribution={data.floodHub.attribution} renderer={riskRenderer} />
+        <FlashFloodLayer
+          areas={data.floodHub.flashFloods}
+          attribution={data.floodHub.attribution}
+          renderer={riskRenderer}
+          opacity={layerOpacity("flash-floods")}
+        />
       )}
       {/* En el panel de marcadores de Leaflet (sin Pane propio): así su popup queda encima de todo. */}
       {weatherStations && <WeatherStationsLayer snapshot={weatherStations} rain={data.rain} />}
       {layers.riverNetwork && (
         <>
           <Pane name={MAP_PANES.rivers.name} style={{ zIndex: MAP_PANES.rivers.zIndex }}>
-            <RiverNetworkLayer pane={MAP_PANES.rivers.name} />
+            <RiverNetworkLayer pane={MAP_PANES.rivers.name} opacity={layerOpacity("river-network")} />
           </Pane>
           {/* Con una capa de lluvia o de mar activa, el clic muestra sus valores (ver RainPointPopup) y no el río. */}
-          {!rainForecast && !observedRain && !seaTemperature && <MapClickHandler onClick={onRiverLookup} />}
+          {!inset && !rainForecast && !observedRain && !seaTemperature && <MapClickHandler onClick={onRiverLookup} />}
         </>
       )}
 
@@ -256,18 +410,19 @@ export default function FloodMap({
         <RiverAlertsLayer
           snapshot={data.riverAlerts}
           dayIndex={alertDayIndex}
-          selectedRiverId={selectedRiverId}
-          onSelect={onSelectRiver}
+          selectedRiverId={inset ? null : selectedRiverId}
+          onSelect={inset ? noop : onSelectRiver}
+          opacity={layerOpacity("river-alerts")}
         />
       )}
       <CriticalEventsLayer
         events={visibleEvents}
-        selectedId={selectedEventId}
-        focusRequest={focusRequest}
-        onSelect={onSelectEvent}
-        onDeselect={onDeselectEvent}
+        selectedId={inset ? null : selectedEventId}
+        focusRequest={inset ? 0 : focusRequest}
+        onSelect={inset ? noop : onSelectEvent}
+        onDeselect={inset ? noop : onDeselectEvent}
       />
-      <MapFocus target={selectedEvent?.position ?? null} province={selectedEvent?.province} request={focusRequest} />
-    </MapContainer>
+      {!inset && <MapFocus target={selectedEvent?.position ?? null} province={selectedEvent?.province} request={focusRequest} />}
+    </>
   );
 }

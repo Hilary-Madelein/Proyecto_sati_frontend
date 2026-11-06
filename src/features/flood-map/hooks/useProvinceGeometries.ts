@@ -53,3 +53,20 @@ export function useProvinceGeometries(enabled: boolean): Map<string, ProvinceGeo
   }, [enabled, geometries]);
   return geometries;
 }
+
+/** Las provincias con su nombre y contorno (sin la zona no delimitada), cargadas una vez. */
+export function useProvinces(): ProvinceFeature[] | null {
+  const [provinces, setProvinces] = useState<ProvinceFeature[] | null>(null);
+  useEffect(() => {
+    let active = true;
+    loadProvinces()
+      .then((list) => {
+        if (active) setProvinces(list.filter(({ key }) => key !== normalizeName("Zona no delimitada")));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return provinces;
+}

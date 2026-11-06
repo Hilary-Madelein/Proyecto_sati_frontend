@@ -1,3 +1,4 @@
+import { Fragment, type ReactNode } from "react";
 import { IconTile } from "@/components/ui/IconTile";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Toggle } from "@/components/ui/Toggle";
@@ -5,15 +6,18 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { PLANNED_LAYERS } from "../../constants";
 import type { RiskLayerState } from "../../hooks/useRiskLayers";
-import { RISK_LAYER_STYLES, RISK_PERIOD_OPTIONS, riskClassOf, riskPeriodLabel, type RiskLayerStyle, type RiskPeriodDays } from "../../risk-layers";
+import { RISK_LAYER_STYLES, RISK_PERIOD_OPTIONS, riskClassOf, riskPeriodLabel, supportsOpacity, type RiskLayerStyle, type RiskPeriodDays } from "../../risk-layers";
 import type { RiskComponentId, RiskFeature } from "../../types";
 import { LegendItem } from "./LegendItem";
+import { OpacitySlider } from "./OpacitySlider";
 import { PLANNED_LAYER_ICONS, PlannedLayerList } from "./PlannedLayers";
 import { Notice } from "./RainForecastSection";
 import { SectionHeading } from "./SectionHeading";
 
 interface RiskLayersSectionProps {
   component: RiskComponentId;
+  /** Filas extra que van justo después de una capa, por su id (p. ej. la red vial provincial después de la RVE). */
+  rowsAfter?: Partial<Record<string, ReactNode>>;
   enabled: ReadonlySet<string>;
   onToggle: (id: string, enabled: boolean) => void;
   /** Estado de la capa con sus datos ya filtrados (su parte y su periodo). */
@@ -21,13 +25,18 @@ interface RiskLayersSectionProps {
   /** Periodo de las capas con fecha (días; null = todos). */
   periodOf: (layer: RiskLayerStyle) => RiskPeriodDays;
   onPeriodChange: (id: string, days: RiskPeriodDays) => void;
+  /** Las de un solo color que se pidió colorear por su clase (p. ej. la red vial por estado). */
+  isColored: (layer: RiskLayerStyle) => boolean;
+  onColoredChange: (id: string, colored: boolean) => void;
+  opacityOf: (layer: RiskLayerStyle) => number;
+  onOpacityChange: (id: string, opacity: number) => void;
 }
 
 /**
  * Capas de la pestaña (amenaza, exposición, preparación o respuesta) agrupadas
  * por sección, y al final las previstas que aún no tienen datos.
  */
-export function RiskLayersSection({ component, enabled, onToggle, stateOf, periodOf, onPeriodChange }: RiskLayersSectionProps) {
+export function RiskLayersSection({ component, rowsAfter, enabled, onToggle, stateOf, periodOf, onPeriodChange, isColored, onColoredChange, opacityOf, onOpacityChange }: RiskLayersSectionProps) {
   const layers = RISK_LAYER_STYLES.filter((layer) => layer.component === component && layer.listed !== false);
   const sections = [...new Set(layers.map((layer) => layer.section))];
   const planned = PLANNED_LAYERS[component];
@@ -41,15 +50,21 @@ export function RiskLayersSection({ component, enabled, onToggle, stateOf, perio
             {layers
               .filter((layer) => layer.section === section)
               .map((layer) => (
-                <RiskLayerRow
-                  key={layer.id}
-                  layer={layer}
-                  visible={enabled.has(layer.id)}
-                  onVisibleChange={(value) => onToggle(layer.id, value)}
-                  state={stateOf(layer)}
-                  period={periodOf(layer)}
-                  onPeriodChange={(days) => onPeriodChange(layer.id, days)}
-                />
+                <Fragment key={layer.id}>
+                  <RiskLayerRow
+                    layer={layer}
+                    visible={enabled.has(layer.id)}
+                    onVisibleChange={(value) => onToggle(layer.id, value)}
+                    state={stateOf(layer)}
+                    period={periodOf(layer)}
+                    onPeriodChange={(days) => onPeriodChange(layer.id, days)}
+                    colored={isColored(layer)}
+                    onColoredChange={(colored) => onColoredChange(layer.id, colored)}
+                    opacity={opacityOf(layer)}
+                    onOpacityChange={(value) => onOpacityChange(layer.id, value)}
+                  />
+                  {rowsAfter?.[layer.id]}
+                </Fragment>
               ))}
           </ul>
         </section>
@@ -71,6 +86,10 @@ function RiskLayerRow({
   state,
   period,
   onPeriodChange,
+  colored,
+  onColoredChange,
+  opacity,
+  onOpacityChange,
 }: {
   layer: RiskLayerStyle;
   visible: boolean;
@@ -78,6 +97,10 @@ function RiskLayerRow({
   state: RiskLayerState;
   period: RiskPeriodDays;
   onPeriodChange: (days: RiskPeriodDays) => void;
+  colored: boolean;
+  onColoredChange: (colored: boolean) => void;
+  opacity: number;
+  onOpacityChange: (opacity: number) => void;
 }) {
   const Icon = PLANNED_LAYER_ICONS[layer.icon];
   const { data, error, isLoading } = state;
@@ -122,7 +145,13 @@ function RiskLayerRow({
               onChange={(value) => onPeriodChange(value === "all" ? null : (Number(value) as RiskPeriodDays))}
             />
           )}
-          {data && layer.classify && (
+          {data && layer.plainColor && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-slate-700">Colorear por estado</span>
+              <Toggle checked={colored} onChange={onColoredChange} label={`Colorear ${layer.title.toLowerCase()} por estado`} />
+            </div>
+          )}
+          {data && layer.classify && (!layer.plainColor || colored) && (
             <ul className="grid grid-cols-2 gap-x-4 gap-y-2">
               {legendOf(layer, data.features).map((item) => (
                 <LegendItem
@@ -137,6 +166,7 @@ function RiskLayerRow({
               ))}
             </ul>
           )}
+          {data && supportsOpacity(layer) && <OpacitySlider value={opacity} onChange={onOpacityChange} layerName={layer.title.toLowerCase()} />}
           {data && (
             <p className="text-[11px] text-slate-500">
               {layer.description} Fuente: {data.attribution}
@@ -160,8 +190,9 @@ function periodLabel(days: RiskPeriodDays): string {
   return days ? `últimos ${riskPeriodLabel(days)}` : "todos";
 }
 
-function legendShape(layer: RiskLayerStyle): "circle" | "square" {
-  return layer.geometry === "point" ? "circle" : "square";
+function legendShape(layer: RiskLayerStyle): "circle" | "square" | "diamond" {
+  if (layer.geometry !== "point") return "square";
+  return layer.pointShape ?? "circle";
 }
 
 /** Clases de la leyenda con cuántas entidades caen en cada una; "otro" solo si hay alguna. */

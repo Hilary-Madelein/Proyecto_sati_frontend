@@ -40,12 +40,15 @@ export interface ClosureFilters {
   conditions: readonly RoadCondition[];
   /** "" = todas. */
   province: string;
+  /** En "Todos": si se muestran los eventos ya cerrados. */
+  showClosed: boolean;
 }
 
 export const DEFAULT_CLOSURE_FILTERS: ClosureFilters = {
   view: "open",
   conditions: ROAD_CONDITIONS.map((condition) => condition.label),
   province: "",
+  showClosed: true,
 };
 
 /**
@@ -126,7 +129,7 @@ const rank = (feature: RiskFeature) => {
 
 /** Reportes de la vista y la provincia elegidas (sin filtrar por condición: así se cuentan todas). */
 export function closuresInScope(features: readonly RiskFeature[], { view, province }: Pick<ClosureFilters, "view" | "province">): RiskFeature[] {
-  return features.filter((feature) => (view === "all" || !isClosed(feature)) && (!province || String(feature.properties.despro ?? "") === province));
+  return features.filter((feature) => (view === "all" || !isClosed(feature)) && (!province || normalizeName(String(feature.properties.despro ?? "")) === normalizeName(province)));
 }
 
 /**
@@ -139,7 +142,8 @@ export function filterClosures(features: readonly RiskFeature[], filters: Closur
   return closuresInScope(features, filters)
     .filter((feature) => {
       const condition = conditionOf(feature);
-      return isClosed(feature) || !condition || filters.conditions.includes(condition.label);
+      if (isClosed(feature)) return filters.showClosed;
+      return !condition || filters.conditions.includes(condition.label);
     })
     .sort((a, b) => rank(a) - rank(b) || (updatedAt(b) ?? 0) - (updatedAt(a) ?? 0));
 }

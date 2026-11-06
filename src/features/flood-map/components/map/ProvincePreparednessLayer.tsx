@@ -9,6 +9,8 @@ import type { ProvincePreparedness } from "../../types";
 const PANE = "provincePreparedness";
 
 interface ProvincePreparednessLayerProps {
+  /** Opacidad de la capa (0 a 1). */
+  opacity?: number;
   provinces: readonly ProvincePreparedness[];
   geometries: ReadonlyMap<string, ProvinceGeometry>;
 }
@@ -18,7 +20,7 @@ interface ProvincePreparednessLayerProps {
  * color de su nivel. Debajo de las capas de puntos y líneas, y sin capturar
  * clics: el detalle de cada provincia está en el panel.
  */
-export function ProvincePreparednessLayer({ provinces, geometries }: ProvincePreparednessLayerProps) {
+export function ProvincePreparednessLayer({ provinces, geometries, opacity = 1 }: ProvincePreparednessLayerProps) {
   const drawn = provinces.flatMap((province) => {
     const geometry = geometries.get(normalizeName(province.name));
     return geometry ? [{ province, geometry }] : [];
@@ -35,9 +37,9 @@ export function ProvincePreparednessLayer({ provinces, geometries }: ProvincePre
             // Colores vivos: con poca opacidad, sobre el mapa gris quedaban pastel.
             color: "#ffffff",
             weight: 1.5,
-            opacity: 1,
+            opacity,
             fillColor: PREPAREDNESS_LEVEL_STYLES[province.level].color,
-            fillOpacity: 0.75,
+            fillOpacity: 0.85 * opacity,
           }}
         />
       ))}

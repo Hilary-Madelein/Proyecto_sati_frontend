@@ -2,6 +2,7 @@ import L, { type Map as LeafletMap } from "leaflet";
 import { MAP_CONFIG } from "../../constants";
 import { loadProvinces, type ProvinceFeature } from "../../hooks/useProvinceGeometries";
 import { normalizeName } from "../../parish-filters";
+import { isInProvince } from "../../province-geometry";
 import { freeMapArea, isUsable } from "./free-map-area";
 import { getHomeBoundsOptions } from "./home-bounds";
 
@@ -53,21 +54,6 @@ export function homeZoom(map: LeafletMap): number {
   return map.getBoundsZoom(MAP_CONFIG.initialBounds, false, padding);
 }
 
-function isInRing(ring: number[][], lng: number, lat: number): boolean {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i];
-    const [xj, yj] = ring[j];
-    if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
-function isInProvince({ geometry }: ProvinceFeature, { lat, lng }: L.LatLng): boolean {
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-  return polygons.some(([outer, ...holes]) => isInRing(outer, lng, lat) && !holes.some((hole) => isInRing(hole, lng, lat)));
-}
-
 /**
  * Primero la provincia que trae el dato: los contornos están simplificados y cerca
  * de un límite el punto puede caer en la vecina. Sin ese dato, la que lo contiene.
@@ -101,9 +87,11 @@ export async function focusProvinceOf(map: LeafletMap, point: L.LatLng, declared
     const bottomRight = usable ? paddingBottomRight : L.point(PLAIN_MARGIN_PX, PLAIN_MARGIN_PX);
     const inFreeArea = map.getBoundsZoom(bounds, false, topLeft.add(bottomRight));
     const minimum = homeZoom(map) + MIN_ZOOM_GAIN;
-    const fits = inFreeArea >= minimum;
+    // Si está fuera de la vista (p. ej. Galápagos), lo primero es verla entera, aunque no se acerque tanto.
+    const far = !map.getBounds().intersects(bounds);
+    const fits = inFreeArea >= minimum || far;
     const zoom = fits ? inFreeArea : minimum;
-    if (current > zoom + KEEP_DEEPER_THAN && current !== lastFocusZoom.get(map)) {
+    if (!far && current > zoom + KEEP_DEEPER_THAN && current !== lastFocusZoom.get(map)) {
       flyIntoFreeArea(map, point, current);
     } else {
       lastFocusZoom.set(map, zoom);

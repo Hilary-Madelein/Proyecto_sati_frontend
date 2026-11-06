@@ -1,39 +1,51 @@
 "use client";
 
-import type L from "leaflet";
-import { useEffect, useState } from "react";
+import L from "leaflet";
+import { useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { GeoJSON, Pane, useMap, useMapEvents } from "react-leaflet";
 import { MapPinIcon, MaximizeIcon } from "@/components/ui/icons";
 import { placeName } from "../../action-timeline";
+import { MAP_CONFIG } from "../../constants";
 import type { ProvinceFeature } from "../../hooks/useProvinceGeometries";
+import { PROVINCE_NAMES } from "../../province-geometry";
 import { goHome, homeZoom, PROVINCE_FOCUS_EVENT, type ProvinceFocusEvent } from "./province-focus";
 
 const PANE = "provinceFocus";
 const OUTLINE = { color: "#2563eb", weight: 2, opacity: 0.9, fill: true, fillColor: "#2563eb", fillOpacity: 0.05 } as const;
 /** Ya se ve casi todo Ecuador: no hace falta ofrecer volver. */
 const HOME_TOLERANCE = 0.25;
-/** El archivo de contornos trae los nombres en mayúsculas y sin tildes. */
-const NAMES_WITH_ACCENT: Record<string, string> = {
-  bolivar: "Bolívar",
-  galapagos: "Galápagos",
-  "los rios": "Los Ríos",
-  manabi: "Manabí",
-  "santo domingo de los tsachilas": "Santo Domingo de los Tsáchilas",
-  sucumbios: "Sucumbíos",
-};
 
 /**
  * Tras acercarse a un punto: resalta su provincia, dice cuál es y ofrece volver a
  * todo Ecuador. Desaparece al volver, con este botón o de cualquier otra forma.
+ * Acercarse a una provincia es elegirla (`onProvinceChange`): así el resumen, las
+ * capas y los paneles muestran lo mismo que dice la barra.
  */
-export function ProvinceFocusBar({ slot, onGoHome }: { slot: HTMLElement | null; onGoHome: () => void }) {
+export function ProvinceFocusBar({
+  slot,
+  onGoHome,
+  onProvinceChange,
+  onOpenSummary,
+}: {
+  slot: HTMLElement | null;
+  onGoHome: () => void;
+  /** La provincia a la que se acercó el mapa, o null al volver a todo Ecuador. */
+  onProvinceChange: (province: ProvinceFeature | null) => void;
+  /** Solo en móvil: ahí el resumen no se abre solo (taparía el mapa), se abre con este botón. */
+  onOpenSummary: () => void;
+}) {
   const map = useMap();
   // undefined = sin acercamiento; null = se acercó, pero no se reconoció la provincia.
   const [province, setProvince] = useState<ProvinceFeature | null | undefined>(undefined);
 
+  const notify = useEffectEvent((focused: ProvinceFeature | null) => onProvinceChange(focused));
   useEffect(() => {
-    const onFocus = (event: L.LeafletEvent) => setProvince((event as ProvinceFocusEvent).province);
+    const onFocus = (event: L.LeafletEvent) => {
+      const focused = (event as ProvinceFocusEvent).province;
+      setProvince(focused);
+      if (focused) notify(focused);
+    };
     map.on(PROVINCE_FOCUS_EVENT, onFocus);
     return () => {
       map.off(PROVINCE_FOCUS_EVENT, onFocus);
@@ -42,7 +54,14 @@ export function ProvinceFocusBar({ slot, onGoHome }: { slot: HTMLElement | null;
 
   useMapEvents({
     moveend: () => {
-      if (map.getZoom() <= homeZoom(map) + HOME_TOLERANCE) setProvince(undefined);
+      // De vuelta en la vista general: con el zoom de todo Ecuador y el continente a la vista
+      // (encuadrar Galápagos en una pantalla angosta también aleja, pero mira a otro lado).
+      const continent = L.latLngBounds(MAP_CONFIG.initialBounds).getCenter();
+      if (province === undefined) return;
+      if (map.getZoom() <= homeZoom(map) + HOME_TOLERANCE && map.getBounds().contains(continent)) {
+        setProvince(undefined);
+        onProvinceChange(null);
+      }
     },
   });
 
@@ -57,12 +76,21 @@ export function ProvinceFocusBar({ slot, onGoHome }: { slot: HTMLElement | null;
       )}
       {slot &&
         createPortal(
-          <div className="flex items-center gap-1 rounded-xl bg-white/95 py-1 pr-1 pl-2.5 text-xs shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
+          <div data-capture-ignore className="flex items-center gap-1 rounded-xl bg-white/95 py-1 pr-1 pl-2.5 text-xs shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
             {province && (
               <span className="flex min-w-0 items-center gap-1.5 font-semibold text-slate-800">
                 <MapPinIcon className="size-3.5 shrink-0 text-blue-600" />
-                <span className="truncate">{NAMES_WITH_ACCENT[province.key] ?? placeName(province.name)}</span>
+                <span className="truncate">{PROVINCE_NAMES[province.key] ?? placeName(province.name)}</span>
               </span>
+            )}
+            {province && (
+              <button
+                type="button"
+                onClick={onOpenSummary}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1.5 font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 lg:ml-1 lg:px-2 lg:hidden"
+              >
+                Resumen
+              </button>
             )}
             <button
               type="button"
@@ -70,10 +98,12 @@ export function ProvinceFocusBar({ slot, onGoHome }: { slot: HTMLElement | null;
                 goHome(map);
                 onGoHome();
               }}
-              className="ml-1 flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1.5 font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 lg:ml-1 lg:px-2"
             >
               <MaximizeIcon className="size-3.5" />
-              Ver todo Ecuador
+              {/* En móvil, más corto: con el botón "Resumen" no cabía el nombre de la provincia. */}
+              <span className="max-lg:hidden">Ver todo Ecuador</span>
+              <span className="lg:hidden">Todo Ecuador</span>
             </button>
           </div>,
           slot,

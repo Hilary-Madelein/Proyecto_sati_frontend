@@ -10,7 +10,40 @@ import { escapeHtml, tooltipOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 import { ClusteredRiskPoints } from "./ClusteredRiskPoints";
 
-type RiskLayer = { style: RiskLayerStyle; data: RiskLayerData };
+/** `opacity` (0 a 1) multiplica la de su estilo; por defecto, 1. */
+type RiskLayer = { style: RiskLayerStyle; data: RiskLayerData; opacity?: number };
+
+/** Punto cuadrado en el lienzo: se comporta como un círculo (radio, clic) pero se dibuja como cuadrado. */
+const SquareMarker = L.CircleMarker.extend({
+  _updatePath(this: L.CircleMarker & { _renderer: L.Canvas & Record<string, never>; _point: L.Point; _radius: number; _empty: () => boolean }) {
+    const renderer = this._renderer as unknown as { _drawing: boolean; _ctx: CanvasRenderingContext2D; _fillStroke: (ctx: CanvasRenderingContext2D, layer: unknown) => void };
+    if (!renderer._drawing || this._empty()) return;
+    const { x, y } = this._point;
+    const size = this._radius * 0.9;
+    renderer._ctx.beginPath();
+    renderer._ctx.rect(x - size, y - size, size * 2, size * 2);
+    renderer._fillStroke(renderer._ctx, this);
+  },
+}) as unknown as new (latlng: L.LatLngExpression, options: L.CircleMarkerOptions) => L.CircleMarker;
+
+/** Punto en rombo: se toca como un círculo, pero se dibuja como un cuadrado girado 45° con borde blanco. */
+const DiamondMarker = L.CircleMarker.extend({
+  _updatePath(this: L.CircleMarker & { _renderer: unknown; _point: L.Point; _radius: number; _empty: () => boolean }) {
+    const renderer = this._renderer as unknown as { _drawing: boolean; _ctx: CanvasRenderingContext2D; _fillStroke: (ctx: CanvasRenderingContext2D, layer: unknown) => void };
+    if (!renderer._drawing || this._empty()) return;
+    const { x, y } = this._point;
+    // Un poco más alto que el radio: el rombo ocupa menos área que un círculo del mismo ancho.
+    const size = this._radius * 1.25;
+    const ctx = renderer._ctx;
+    ctx.beginPath();
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size, y);
+    ctx.lineTo(x, y + size);
+    ctx.lineTo(x - size, y);
+    ctx.closePath();
+    renderer._fillStroke(ctx, this);
+  },
+}) as unknown as new (latlng: L.LatLngExpression, options: L.CircleMarkerOptions) => L.CircleMarker;
 
 interface RiskFeatureLayersProps {
   /** Capas encendidas y con datos. */
@@ -80,7 +113,7 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
     onSelect(hits.some((hit) => hit.key === key) ? hits : [{ key, style, data, feature }, ...hits]);
   };
 
-  return layers.map(({ style, data }) => {
+  return layers.map(({ style, data, opacity = 1 }) => {
     // Se vuelve a crear con cada descarga nueva o cambio de filtro (periodo).
     const key = `${style.id}:${data.fetchedAt}:${data.view ?? ""}`;
     if (style.cluster && style.geometry === "point") {
@@ -106,16 +139,17 @@ export function RiskFeatureLayers({ layers, renderer, onSelect }: RiskFeatureLay
         data={drawOrder(style, data)}
         pane={MAP_PANES.risk.name}
         // El lienzo va en el estilo: GeoJSON lo aplica a cada línea o zona antes de agregarla al mapa.
-        style={(feature) => ({ ...pathStyle(style, feature as unknown as RiskFeature), renderer })}
+        style={(feature) => ({ ...pathStyle(style, feature as unknown as RiskFeature, opacity), renderer })}
         pointToLayer={(feature, latlng) =>
-          L.circleMarker(latlng, {
+          new (style.pointShape === "square" ? SquareMarker : style.pointShape === "diamond" ? DiamondMarker : L.CircleMarker)(latlng, {
             pane: MAP_PANES.risk.name,
             renderer,
             radius: riskPointRadius(map.getZoom()) * (style.pointScale ?? 1),
             color: "#ffffff",
             weight: style.pointScale ? 1.5 : 1,
             fillColor: riskColorOf(style, feature as unknown as RiskFeature),
-            fillOpacity: 0.95,
+            opacity,
+            fillOpacity: 0.95 * opacity,
             bubblingMouseEvents: false,
           })
         }
@@ -142,17 +176,17 @@ function drawOrder(style: RiskLayerStyle, data: RiskLayerData): GeoJSON.FeatureC
   return { ...data, features } as unknown as GeoJSON.FeatureCollection;
 }
 
-function pathStyle(style: RiskLayerStyle, feature: RiskFeature): L.PathOptions {
+function pathStyle(style: RiskLayerStyle, feature: RiskFeature, opacity = 1): L.PathOptions {
   const color = riskColorOf(style, feature);
   if (style.geometry === "line") {
     return riskClassOf(style, feature)?.dashed
-      ? { color, weight: 2.5, opacity: 0.8, dashArray: "4 6", bubblingMouseEvents: false }
-      : { color, weight: 3, opacity: 0.9, bubblingMouseEvents: false };
+      ? { color, weight: 2.5, opacity: 0.9 * opacity, dashArray: "4 6", bubblingMouseEvents: false }
+      : { color, weight: 3, opacity, bubblingMouseEvents: false };
   }
   // Puntos: relleno sólido con borde blanco, como se crean en pointToLayer (GeoJSON aplica este estilo también a ellos,
   // y con el de las zonas se veían pálidos).
   if (style.geometry === "point") {
-    return { color: "#ffffff", weight: style.pointScale ? 1.5 : 1, opacity: 1, fillColor: color, fillOpacity: 0.95, bubblingMouseEvents: false };
+    return { color: "#ffffff", weight: style.pointScale ? 1.5 : 1, opacity, fillColor: color, fillOpacity: 0.95 * opacity, bubblingMouseEvents: false };
   }
-  return { color, weight: 1, opacity: 0.8, fillColor: color, fillOpacity: 0.35, bubblingMouseEvents: false };
+  return { color, weight: 1, opacity: 0.9 * opacity, fillColor: color, fillOpacity: 0.5 * opacity, bubblingMouseEvents: false };
 }

@@ -15,7 +15,10 @@ import type { FlashFloodArea } from "../../types";
  * él: en un lienzo propio encima, se quedaría con los clics de todo el mapa, y
  * encima de las otras capas, con los de sus puntos y líneas.
  */
-export function FlashFloodLayer({ areas, attribution, renderer }: { areas: FlashFloodArea[]; attribution: string; renderer: L.Canvas }) {
+export function FlashFloodLayer({ areas, attribution, renderer, opacity = 1 }: {
+  /** Opacidad de la capa (0 a 1). */
+  opacity?: number;
+  areas: FlashFloodArea[]; attribution: string; renderer: L.Canvas }) {
   const groups = useRef(new Map<string, L.GeoJSON>());
   // De las muy probables a las probables: cada una pasa al fondo, así las muy probables quedan encima de las demás.
   const ordered = useMemo(
@@ -39,7 +42,7 @@ export function FlashFloodLayer({ areas, attribution, renderer }: { areas: Flash
         data={area.geometry}
         pane={MAP_PANES.risk.name}
         // El lienzo va en el estilo: GeoJSON lo aplica a cada zona antes de agregarla al mapa.
-        style={{ color, weight: 1.5, opacity: 0.9, fillColor: color, fillOpacity: 0.28, renderer } as L.PathOptions}
+        style={{ color, weight: 1.5, opacity: 0.9 * opacity, fillColor: color, fillOpacity: 0.4 * opacity, renderer } as L.PathOptions}
       >
         <Tooltip sticky>
           <span className="text-xs">

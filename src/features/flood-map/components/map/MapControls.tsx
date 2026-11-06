@@ -4,7 +4,7 @@ import L from "leaflet";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMap } from "react-leaflet";
 import { cn } from "@/lib/cn";
-import { CheckIcon, MapIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@/components/ui/icons";
+import { CameraIcon, CheckIcon, MapIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@/components/ui/icons";
 import { BASEMAPS, type BasemapId } from "../../constants";
 import { goHome } from "./province-focus";
 
@@ -13,10 +13,13 @@ interface MapControlsProps {
   onBasemapChange: (basemap: BasemapId) => void;
   /** Al volver a todo Ecuador: se cierra lo que estaba abierto. */
   onGoHome: () => void;
+  /** Descarga una imagen del mapa con sus capas. */
+  onCapture: () => Promise<void>;
 }
 
 /** Zoom, "volver a Ecuador" y mapa base (gris claro o calles), con el mismo estilo vidrio que los paneles. */
-export function MapControls({ basemap, onBasemapChange, onGoHome }: MapControlsProps) {
+export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: MapControlsProps) {
+  const [capturing, setCapturing] = useState(false);
   const map = useMap();
   const ref = useRef<HTMLDivElement>(null);
   const [choosing, setChoosing] = useState(false);
@@ -29,7 +32,7 @@ export function MapControls({ basemap, onBasemapChange, onGoHome }: MapControlsP
   }, []);
 
   return (
-    <div ref={ref} className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
+    <div ref={ref} data-capture-ignore className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
       <div className="flex flex-col divide-y divide-slate-200 overflow-hidden rounded-xl bg-white/90 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
         <ControlButton label="Acercar" onClick={() => map.zoomIn()}>
           <PlusIcon className="size-4" />
@@ -52,6 +55,26 @@ export function MapControls({ basemap, onBasemapChange, onGoHome }: MapControlsP
         <div className="overflow-hidden rounded-xl bg-white/90 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
           <ControlButton label="Mapa base" onClick={() => setChoosing((open) => !open)} expanded={choosing}>
             <MapIcon className="size-4" />
+          </ControlButton>
+        </div>
+        <div className="mt-2 overflow-hidden rounded-xl bg-white/90 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
+          <ControlButton
+            label={capturing ? "Capturando la imagen…" : "Descargar una imagen del mapa"}
+            onClick={async () => {
+              if (capturing) return;
+              setCapturing(true);
+              try {
+                await onCapture();
+              } finally {
+                setCapturing(false);
+              }
+            }}
+          >
+            {capturing ? (
+              <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            ) : (
+              <CameraIcon className="size-4" />
+            )}
           </ControlButton>
         </div>
         {/* En fila, a la altura del botón: así no queda tapada por el panel de eventos. */}

@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent } from "react";
 import { CircleMarker, Pane, Tooltip, useMap } from "react-leaflet";
 import { RAIN_WINDOWS, SEMAPHORE_STYLES } from "../../constants";
 import type { ParishAlert, Semaphore } from "../../types";
+import { RainProfileChart } from "../charts/RainProfileChart";
 import { focusProvinceOf } from "./province-focus";
 
 const PANE = "parishAlerts";
@@ -22,7 +23,6 @@ const DRAW_ORDER: readonly Semaphore[] = ["green", "yellow", "orange", "red"];
 /** Los niveles bajos, más chicos: no tapan a los graves. */
 const RADIUS: Record<Semaphore, number> = { red: 6, orange: 5, yellow: 4, green: 3.5 };
 
-const formatMm = (mm: number | null) => (mm === null ? "—" : `${mm.toLocaleString("es-EC", { maximumFractionDigits: 1 })} mm`);
 
 /**
  * Alerta de inundación en el mapa: un punto por parroquia con el color de su
@@ -61,29 +61,23 @@ export function ParishAlertLayer({ parishes, selected, onParishClick }: ParishAl
             eventHandlers={{ click: () => onParishClick(parish) }}
           >
             {/* En el panel de etiquetas de Leaflet: dentro del de los puntos, los que se dibujan después la taparían. */}
-            {/* La elegida dice siempre dónde está; las demás, sus datos al pasar el cursor. */}
+            {/* Al pasar el cursor, sus datos y la gráfica de la lluvia acumulada; la elegida la muestra siempre, con su nombre. */}
             <Tooltip
               key={String(isSelected)}
               pane="tooltipPane"
               direction="top"
               offset={[0, isSelected ? -10 : -6]}
               permanent={isSelected}
-              className={isSelected ? "map-place-label" : undefined}
+              className={isSelected ? "map-place-label map-place-card" : undefined}
             >
-              {isSelected ? (
-                `${parish.name} · ${parish.province}`
-              ) : (
-              <span className="text-xs">
-                <strong>{parish.name}</strong> · {parish.canton}
+              <span className="block w-48 text-xs">
+                <strong>{parish.name}</strong> · {isSelected ? parish.province : parish.canton}
                 <br />
-                {SEMAPHORE_STYLES[parish.semaphore].alert}
-                <br />
-                {RAIN_WINDOWS.flatMap(({ id, label }) => {
-                  const mm = parish.forecast[`mm${id}`];
-                  return mm === undefined ? [] : [`${label}: ${formatMm(mm)}`];
-                }).join(" · ")}
+                <span className="text-slate-600">{SEMAPHORE_STYLES[parish.semaphore].alert}</span>
+                {parish.forecast.mm3h !== undefined && (
+                  <RainProfileChart className="mt-1" points={RAIN_WINDOWS.map(({ id, label }) => ({ label, mm: parish.forecast[`mm${id}`] ?? null }))} />
+                )}
               </span>
-              )}
             </Tooltip>
           </CircleMarker>
         );

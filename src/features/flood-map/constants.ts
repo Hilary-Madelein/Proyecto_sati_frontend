@@ -27,9 +27,9 @@ export const MAP_CONFIG = {
     [-5.1, -81.1],
     [1.5, -75.2],
   ] as LatLngBounds,
-  /** Ecuador con Galápagos (hasta ~92° O); al este no pasa mucho de la frontera. */
+  /** Ecuador con Galápagos (hasta ~92° O) y mar al oeste, para poder centrar las islas; al este no pasa mucho de la frontera. */
   maxBounds: [
-    [-6.5, -93.5],
+    [-6.5, -97],
     [3, -74],
   ] as LatLngBounds,
   minZoom: 5,
@@ -110,6 +110,8 @@ export const MAP_PANES = {
   provinces: { name: "provinces", zIndex: 386 },
   basemapLabels: { name: "basemapLabels", zIndex: 390 },
   rivers: { name: "rivers", zIndex: 380 },
+  /** Debajo de la máscara de provincia (385): no se puede filtrar por provincia, así que fuera de ella se atenúa. */
+  provincialRoads: { name: "provincialRoads", zIndex: 384 },
 } as const;
 
 // ── Lluvia pronosticada (WRF), día por día ──────────────────────────────
@@ -146,7 +148,7 @@ export const OBSERVED_RAIN_WINDOWS: readonly { value: `${RainWindowHours}`; labe
 export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product}-24h`;
 
 /** Opacidad inicial de cada capa de imagen (después se ajusta con su deslizador). */
-export const DEFAULT_OVERLAY_OPACITY = { forecast: 0.7, observed: 0.7, imerg: 0.7, sea: 0.7 } as const;
+export const DEFAULT_OVERLAY_OPACITY = { forecast: 0.85, observed: 0.85, imerg: 0.85, sea: 0.85 } as const;
 
 /** IMERG (NASA): tasa de lluvia de 30 min, la más reciente ("default"), en teselas de NASA GIBS. */
 export const IMERG_TILE_URL =
@@ -280,6 +282,15 @@ export const RIVER_NETWORK_LAYER = {
   sourceLayer: "geoglows_drainage_ecuador",
   attribution: "Ríos: INAMHI · GEOGLOWS",
   color: "#3b82c4",
+} as const;
+
+/** Red vial provincial (teselas vectoriales del SNGR vía el proxy del backend): solo el trazado, sin atributos. */
+export const PROVINCIAL_ROADS_LAYER = {
+  id: "provincial-roads",
+  sourceLayer: "Red_Vial_Provincial",
+  attribution: "Red vial provincial: SNGR",
+  // Gris pizarra y más delgada que la RVE (café): se lee como vía secundaria.
+  color: "#475569",
 } as const;
 
 /**
@@ -416,7 +427,7 @@ export const RISK_COMPONENTS: readonly { id: RiskComponentId; label: string; des
 ];
 export const DEFAULT_RISK_COMPONENT: RiskComponentId = "amenaza";
 
-export type PlannedLayerIcon = "waves" | "mountain" | "alert" | "map" | "pin" | "shield" | "users" | "refresh";
+export type PlannedLayerIcon = "waves" | "mountain" | "alert" | "map" | "pin" | "shield" | "users" | "refresh" | "zap";
 
 /** Una capa prevista que aún no tiene fuente de datos: se muestra como "Próximamente". */
 export interface PlannedLayer {

@@ -1,7 +1,7 @@
 "use client";
 
 import { leafletLayer, LineSymbolizer, type Feature } from "protomaps-leaflet";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import { RIVER_NETWORK_LAYER } from "../../constants";
 
@@ -17,8 +17,9 @@ function lineWidth(zoom: number, feature?: Feature): number {
  * Red de ríos del Ecuador (teselas vectoriales del Hydroviewer del INAMHI, vía
  * el proxy del backend). Se dibuja en canvas con protomaps-leaflet.
  */
-export function RiverNetworkLayer({ pane }: { pane: string }) {
+export function RiverNetworkLayer({ pane, opacity = 1 }: { pane: string; opacity?: number }) {
   const map = useMap();
+  const ref = useRef<ReturnType<typeof leafletLayer> | null>(null);
 
   useEffect(() => {
     const layer = leafletLayer({
@@ -37,10 +38,17 @@ export function RiverNetworkLayer({ pane }: { pane: string }) {
       labelRules: [],
     });
     layer.addTo(map);
+    ref.current = layer;
     return () => {
       layer.remove();
+      ref.current = null;
     };
   }, [map, pane]);
+
+  // La opacidad se cambia en la capa ya creada (después de crearla): no hace falta volver a pedir las teselas.
+  useEffect(() => {
+    ref.current?.setOpacity(opacity);
+  }, [opacity, pane]);
 
   return null;
 }

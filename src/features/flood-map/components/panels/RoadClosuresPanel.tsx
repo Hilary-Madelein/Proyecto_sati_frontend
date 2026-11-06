@@ -28,6 +28,8 @@ import { placeOf, textOf } from "../../risk-popup";
 import type { RiskFeature, RiskLayerData } from "../../types";
 import { FilterSelect } from "./CriticalEventsPanel";
 import { Notice } from "./RainForecastSection";
+import { ShowOnMapToggle } from "./ShowOnMapToggle";
+import { provinceOption } from "../../province-filter";
 
 interface RoadClosuresPanelProps {
   data: RiskLayerData | null;
@@ -40,6 +42,9 @@ interface RoadClosuresPanelProps {
   selectedKey: string | null;
   /** Muestra el reporte en el mapa con su ficha completa. */
   onSelect: (feature: RiskFeature) => void;
+  /** Si los reportes se dibujan en el mapa (la lista sigue igual). */
+  showOnMap: boolean;
+  onShowOnMapChange: (show: boolean) => void;
 }
 
 /** Reportes que se muestran al inicio y cuántos más con cada "Ver más". */
@@ -51,7 +56,7 @@ const PAGE = 10;
  * lista del más grave y reciente al menos grave, sin importar su fecha. Lo mismo se
  * dibuja en el mapa.
  */
-export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersChange, now, selectedKey, onSelect }: RoadClosuresPanelProps) {
+export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersChange, now, selectedKey, onSelect, showOnMap, onShowOnMapChange }: RoadClosuresPanelProps) {
   const [visible, setVisible] = useState(PAGE);
   const features = data?.features ?? [];
   const inScope = closuresInScope(features, filters);
@@ -60,12 +65,13 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
   const closed = inScope.length - open.length;
   // Cuántos hay en cada vista, para decirlo en sus botones.
   const viewCount = (view: ClosureFilters["view"]) => closuresInScope(features, { view, province: filters.province }).length;
-  const provinces = [...new Set(features.map((feature) => String(feature.properties.despro ?? "")).filter(Boolean))].sort((a, b) =>
+  const provinces = [...new Set([...features.map((feature) => String(feature.properties.despro ?? "")), filters.province].filter(Boolean))].sort((a, b) =>
     normalizeName(a).localeCompare(normalizeName(b)),
   );
   const countOf = (label: RoadCondition) => open.filter((feature) => conditionOf(feature)?.label === label).length;
   const isDefault =
     filters.view === DEFAULT_CLOSURE_FILTERS.view &&
+    filters.showClosed === DEFAULT_CLOSURE_FILTERS.showClosed &&
     !filters.province &&
     filters.conditions.length === DEFAULT_CLOSURE_FILTERS.conditions.length;
 
@@ -100,6 +106,7 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
   return (
     <div className="space-y-4">
       {error && <Notice>{error}</Notice>}
+      <ShowOnMapToggle checked={showOnMap} onChange={onShowOnMapChange} label="Mostrar los cierres viales en el mapa" />
       <p className="text-[11px] leading-relaxed text-slate-500">
         {isAll
           ? "Todos los reportes de novedad vial del MIT, también los eventos ya atendidos y cerrados."
@@ -169,11 +176,33 @@ export function RoadClosuresPanel({ data, error, isLoading, filters, onFiltersCh
               <span className="font-semibold text-slate-900 tabular-nums">{withoutCondition}</span>
             </li>
           )}
+          {/* En "Todos", los ya cerrados también se ocultan y muestran, como cada condición. */}
+          {isAll && closed > 0 && (
+            <li>
+              <button
+                type="button"
+                aria-pressed={filters.showClosed}
+                onClick={() => update({ showClosed: !filters.showClosed })}
+                title={`${filters.showClosed ? "Ocultar" : "Mostrar"}: eventos cerrados`}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <span
+                  aria-hidden="true"
+                  className={cn("size-2.5 shrink-0 rounded-full", !filters.showClosed && "ring-1 ring-slate-300")}
+                  style={filters.showClosed ? { backgroundColor: CLOSED_EVENT_STYLE.color } : undefined}
+                />
+                <span className={cn("min-w-0 flex-1 font-medium", filters.showClosed ? "text-slate-700" : "text-slate-400 line-through")}>
+                  Eventos cerrados (habilitada la vía)
+                </span>
+                <span className={cn("font-semibold tabular-nums", filters.showClosed ? "text-slate-900" : "text-slate-400")}>{closed}</span>
+              </button>
+            </li>
+          )}
         </ul>
       </div>
 
       {provinces.length > 1 && (
-        <FilterSelect label="Provincia" value={filters.province} onChange={(province) => update({ province })}>
+        <FilterSelect label="Provincia" value={filters.province ? provinceOption(provinces, filters.province) : ""} onChange={(province) => update({ province })}>
           <option value="">Todas las provincias</option>
           {provinces.map((province) => (
             <option key={province} value={province}>

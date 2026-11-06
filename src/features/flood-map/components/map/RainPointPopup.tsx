@@ -6,6 +6,8 @@ import { Popup, useMapEvents } from "react-leaflet";
 import { CloudRainIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { formatDateTime, formatSigned } from "@/lib/format";
+import { FORECAST_WINDOW_HOURS } from "../../constants";
+import { RainProfileChart, type RainProfilePoint } from "../charts/RainProfileChart";
 import type { ObservedAccumulatedRain, RainForecastLayer, RainPointValue, SeaPointValue, SeaTemperatureAnomaly } from "../../types";
 
 interface PointSource {
@@ -87,20 +89,25 @@ export function RainPointPopup({ forecast, observed, sea }: RainPointPopupProps)
   }
 
   // `key` reabre el popup (y vuelve a consultar) en cada clic nuevo.
-  return <PointPopupContent key={click.id} lat={click.lat} lng={click.lng} sources={sources} onClose={() => close(click.id)} />;
+  return (
+    <PointPopupContent key={click.id} lat={click.lat} lng={click.lng} sources={sources} withProfile={!!forecast} onClose={() => close(click.id)} />
+  );
 }
 
 interface PointPopupContentProps {
   lat: number;
   lng: number;
   sources: PointSource[];
+  /** Con el pronóstico encendido: la gráfica de la lluvia acumulada en 3, 6, 12 y 24 h. */
+  withProfile: boolean;
   /** Se cerró (con la × o al hacer clic en otro lado). */
   onClose: () => void;
 }
 
-function PointPopupContent({ lat, lng, sources, onClose }: PointPopupContentProps) {
+function PointPopupContent({ lat, lng, sources, withProfile, onClose }: PointPopupContentProps) {
   const popupRef = useRef<LeafletPopup>(null);
   const [readings, setReadings] = useState<Record<string, Reading>>({});
+  const [profile, setProfile] = useState<RainProfilePoint[] | "error" | null>(null);
   const refreshPopup = useCallback(() => popupRef.current?.update(), []);
 
   useEffect(() => {
@@ -117,13 +124,25 @@ function PointPopupContent({ lat, lng, sources, onClose }: PointPopupContentProp
           if (error.name !== "AbortError") setReadings((current) => ({ ...current, [source.key]: { status: "error" } }));
         });
     }
+    if (withProfile) {
+      const query = { lat: lat.toFixed(5), lng: lng.toFixed(5) };
+      Promise.all(
+        FORECAST_WINDOW_HOURS.map((hours) =>
+          satiClientGet<RainPointValue>(`/rain-forecast/windows/${hours}/value`, query, controller.signal).then((value) => ({ label: `${hours} h`, mm: value.mm })),
+        ),
+      )
+        .then(setProfile)
+        .catch((error: Error) => {
+          if (error.name !== "AbortError") setProfile("error");
+        });
+    }
     return () => controller.abort();
     // Los datos de las capas no cambian durante la vida de este popup (se remonta en cada clic).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Al llegar los valores cambia el tamaño: se reacomoda para que el popup se vea completo.
-  useEffect(refreshPopup, [readings, refreshPopup]);
+  useEffect(refreshPopup, [readings, profile, refreshPopup]);
 
   return (
     <Popup ref={popupRef} position={[lat, lng]} minWidth={220} autoPanPadding={[16, 16]} eventHandlers={{ remove: onClose }}>
@@ -140,6 +159,18 @@ function PointPopupContent({ lat, lng, sources, onClose }: PointPopupContentProp
             </li>
           ))}
         </ul>
+        {withProfile && (
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia acumulada pronosticada</p>
+            {profile === null ? (
+              <p className="text-xs text-slate-500">Consultando…</p>
+            ) : profile === "error" ? (
+              <p className="text-xs text-red-600">No se pudo consultar la gráfica.</p>
+            ) : (
+              <RainProfileChart points={profile} />
+            )}
+          </div>
+        )}
         <p className="mt-2 text-[11px] text-slate-400 tabular-nums">
           {lat.toFixed(4)}, {lng.toFixed(4)}
         </p>

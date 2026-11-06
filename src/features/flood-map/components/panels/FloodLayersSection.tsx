@@ -1,6 +1,7 @@
 import { IconTile } from "@/components/ui/IconTile";
 import { AlertTriangleIcon, MountainIcon, WavesIcon } from "@/components/ui/icons";
 import { Toggle } from "@/components/ui/Toggle";
+import { OpacitySlider } from "./OpacitySlider";
 import { cn } from "@/lib/cn";
 import { formatCalendarDate, formatDateTime } from "@/lib/format";
 import { FLASH_FLOOD_LIKELIHOODS, FLASH_FLOOD_MODEL, WATERSHED_SLOPES } from "../../constants";
@@ -18,6 +19,8 @@ interface FloodLayersSectionProps {
   /** Día del pronóstico de caudales (índice 0 = primer día). */
   alertDayIndex: number;
   onAlertDayChange: (dayIndex: number) => void;
+  opacityOf: (id: "river-network" | "river-alerts") => number;
+  onOpacityChange: (id: "river-network" | "river-alerts", opacity: number) => void;
 }
 
 function countBy<T, K extends string>(items: T[], key: (item: T) => K) {
@@ -70,7 +73,13 @@ function WatershedsCard({ layers, onToggleLayer }: Pick<FloodLayersSectionProps,
 }
 
 /** Google Flood Hub: zonas donde una crecida repentina es probable o muy probable. */
-export function FloodHubSection({ data, layers, onToggleLayer }: Pick<FloodLayersSectionProps, "data" | "layers" | "onToggleLayer">) {
+export function FloodHubSection({
+  data,
+  layers,
+  onToggleLayer,
+  opacity,
+  onOpacityChange,
+}: Pick<FloodLayersSectionProps, "data" | "layers" | "onToggleLayer"> & { opacity: number; onOpacityChange: (opacity: number) => void }) {
   const snapshot = data.floodHub;
   const flashFloods = snapshot?.flashFloods ?? null;
   const byLikelihood = countBy(flashFloods ?? [], (area) => area.likelihood);
@@ -111,12 +120,15 @@ export function FloodHubSection({ data, layers, onToggleLayer }: Pick<FloodLayer
           {issuedAt && ` Emitido el ${formatDateTime(issuedAt)}.`} {snapshot?.attribution}
           {snapshot?.isStale && " La fuente no responde: se muestra la última descarga."}
         </li>
+        <li className="col-span-2">
+          <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="las crecidas repentinas" />
+        </li>
       </LayerCard>
     </section>
   );
 }
 
-function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange }: FloodLayersSectionProps) {
+function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChange, opacityOf, onOpacityChange }: FloodLayersSectionProps) {
   const snapshot = data.riverAlerts;
   const dayAlerts = (snapshot?.alerts ?? []).filter((alert) => alertLevelForDay(alert, alertDayIndex) > 0).length;
   const selectedDay = snapshot?.days[alertDayIndex];
@@ -144,6 +156,11 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
           label="Mostrar red de ríos"
         />
       </div>
+      {layers.riverNetwork && (
+        <div className="mt-2">
+          <OpacitySlider value={opacityOf("river-network")} onChange={(value) => onOpacityChange("river-network", value)} layerName="la red de ríos" />
+        </div>
+      )}
 
       <div className="mt-3 border-t border-slate-100 pt-3">
         <div className="flex items-center gap-3">
@@ -166,6 +183,11 @@ function RiversCard({ data, layers, onToggleLayer, alertDayIndex, onAlertDayChan
             label="Mostrar alertas por caudal"
           />
         </div>
+        {layers.riverAlerts && snapshot && (
+          <div className="mt-2">
+            <OpacitySlider value={opacityOf("river-alerts")} onChange={(value) => onOpacityChange("river-alerts", value)} layerName="las alertas por caudal" />
+          </div>
+        )}
 
         {!snapshot ? (
           <Notice>No se pudieron cargar las alertas de GEOGLOWS.</Notice>

@@ -132,9 +132,32 @@ html .leaflet-tooltip.map-place-label::before {
   border-top-color: #0f172a;
 }
 
+/* Etiqueta con gráfica (parroquia elegida): clara, para leer la gráfica. */
+html .leaflet-tooltip.map-place-label.map-place-card {
+  padding: 6px 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 400;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.25);
+}
+
+html .leaflet-tooltip.map-place-label.map-place-card::before {
+  border-top-color: #ffffff;
+}
+
 /* Durante un zoom muy largo, Leaflet estira sus lienzos: se ocultan hasta redibujarse (ver CanvasZoomGuard.tsx). */
 .leaflet-container.is-canvas-stretched canvas.leaflet-zoom-animated {
   visibility: hidden;
+}
+
+/* Recuadro de Galápagos (ver GalapagosInset): las capas solo se ven; el clic va al botón que lo envuelve. */
+.galapagos-inset,
+.galapagos-inset * {
+  pointer-events: none !important;
+}
+.galapagos-inset .leaflet-tooltip-pane,
+.galapagos-inset .leaflet-popup-pane {
+  display: none;
 }
 
 /* Estaciones del INAMHI (ver map-symbols.ts → diamondSymbolHtml): rombo sin borde blanco que crece al pasar el cursor. */

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Toggle } from "@/components/ui/Toggle";
+import { OpacitySlider } from "./OpacitySlider";
 import { cn } from "@/lib/cn";
 import { PREPAREDNESS_INDICATOR_LABELS, PREPAREDNESS_LEVEL_STYLES, PREPAREDNESS_RATES } from "../../constants";
 import type { PreparednessIndicator, PreparednessLevel, ProvincePreparedness } from "../../types";
@@ -16,6 +17,8 @@ interface PreparednessSectionProps {
   /** Pintar las provincias con su nivel en el mapa. */
   visible: boolean;
   onVisibleChange: (visible: boolean) => void;
+  opacity: number;
+  onOpacityChange: (opacity: number) => void;
 }
 
 const LEVELS: readonly PreparednessLevel[] = ["very-high", "high", "medium", "low", "very-low"];
@@ -38,7 +41,7 @@ function rateText(province: ProvincePreparedness, indicator: PreparednessIndicat
  * ranking de las 24 con su semáforo de cinco niveles y, al elegir una, los
  * cuatro indicadores con su conteo y su tasa (por área o por km de vía).
  */
-export function PreparednessSection({ provinces, weights, error, isLoading, visible, onVisibleChange }: PreparednessSectionProps) {
+export function PreparednessSection({ provinces, weights, error, isLoading, visible, onVisibleChange, opacity, onOpacityChange }: PreparednessSectionProps) {
   const [openCode, setOpenCode] = useState<string | null>(null);
 
   return (
@@ -67,6 +70,7 @@ export function PreparednessSection({ provinces, weights, error, isLoading, visi
           </div>
         ) : (
           <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+            <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="el índice de preparación" />
             {/* Cuántas provincias hay en cada nivel. */}
             <ul className="grid grid-cols-5 gap-1">
               {LEVELS.map((level) => (
