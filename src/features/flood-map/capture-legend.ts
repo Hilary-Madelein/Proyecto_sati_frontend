@@ -35,7 +35,7 @@ export interface CaptureLegendGroup {
 
 /** Lo que hay en el mapa al capturar. */
 export interface CaptureLegendInput {
-  riskLayers: ReadonlyArray<{ style: RiskLayerStyle; colored: boolean }>;
+  riskLayers: ReadonlyArray<{ style: RiskLayerStyle; colored: boolean; hidden?: readonly string[] }>;
   /** Severidades de los eventos dibujados (vacío = no hay eventos en el mapa). */
   eventSeverities: ReadonlySet<EventSeverity>;
   /** Niveles de las parroquias en alerta dibujadas; null = no están en el mapa. */
@@ -129,9 +129,10 @@ export function buildCaptureLegend(input: CaptureLegendInput): CaptureLegendGrou
   if (input.provincialRoads) {
     groups.push({ title: "Red vial provincial", items: [{ label: "Vía provincial", color: PROVINCIAL_ROADS_LAYER.color, symbol: "line" }] });
   }
-  for (const { style, colored } of input.riskLayers) {
+  for (const { style, colored, hidden = [] } of input.riskLayers) {
     const symbol = riskSymbol(style);
-    const classes = style.classify && (!style.plainColor || colored) ? style.classify.classes : null;
+    // Sin las clases ocultas desde la leyenda: no están en el mapa.
+    const classes = style.classify && (!style.plainColor || colored) ? style.classify.classes.filter((item) => !hidden.includes(item.label)) : null;
     groups.push({
       title: style.title,
       items: classes

@@ -30,13 +30,16 @@ interface RiskLayersSectionProps {
   onColoredChange: (id: string, colored: boolean) => void;
   opacityOf: (layer: RiskLayerStyle) => number;
   onOpacityChange: (id: string, opacity: number) => void;
+  /** Clases ocultas en el mapa de las capas con `toggleClasses`, y mostrar u ocultar una. */
+  hiddenClassesOf: (layer: RiskLayerStyle) => readonly string[];
+  onToggleClass: (id: string, label: string) => void;
 }
 
 /**
  * Capas de la pestaña (amenaza, exposición, preparación o respuesta) agrupadas
  * por sección, y al final las previstas que aún no tienen datos.
  */
-export function RiskLayersSection({ component, rowsAfter, enabled, onToggle, stateOf, periodOf, onPeriodChange, isColored, onColoredChange, opacityOf, onOpacityChange }: RiskLayersSectionProps) {
+export function RiskLayersSection({ component, rowsAfter, enabled, onToggle, stateOf, periodOf, onPeriodChange, isColored, onColoredChange, opacityOf, onOpacityChange, hiddenClassesOf, onToggleClass }: RiskLayersSectionProps) {
   const layers = RISK_LAYER_STYLES.filter((layer) => layer.component === component && layer.listed !== false);
   const sections = [...new Set(layers.map((layer) => layer.section))];
   const planned = PLANNED_LAYERS[component];
@@ -62,6 +65,8 @@ export function RiskLayersSection({ component, rowsAfter, enabled, onToggle, sta
                     onColoredChange={(colored) => onColoredChange(layer.id, colored)}
                     opacity={opacityOf(layer)}
                     onOpacityChange={(value) => onOpacityChange(layer.id, value)}
+                    hiddenClasses={hiddenClassesOf(layer)}
+                    onToggleClass={(label) => onToggleClass(layer.id, label)}
                   />
                   {rowsAfter?.[layer.id]}
                 </Fragment>
@@ -90,6 +95,8 @@ function RiskLayerRow({
   onColoredChange,
   opacity,
   onOpacityChange,
+  hiddenClasses,
+  onToggleClass,
 }: {
   layer: RiskLayerStyle;
   visible: boolean;
@@ -101,6 +108,8 @@ function RiskLayerRow({
   onColoredChange: (colored: boolean) => void;
   opacity: number;
   onOpacityChange: (opacity: number) => void;
+  hiddenClasses: readonly string[];
+  onToggleClass: (label: string) => void;
 }) {
   const Icon = PLANNED_LAYER_ICONS[layer.icon];
   const { data, error, isLoading } = state;
@@ -163,6 +172,8 @@ function RiskLayerRow({
                   glyph={layer.pointGlyph}
                   count={item.count}
                   dashed={item.dashed}
+                  onToggle={layer.toggleClasses ? () => onToggleClass(item.label) : undefined}
+                  hidden={hiddenClasses.includes(item.label)}
                 />
               ))}
             </ul>

@@ -205,6 +205,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       else next.delete(id);
       return next;
     });
+  // Clases ocultas en el mapa de las capas que se filtran desde su leyenda (centrales por tipo).
+  const [hiddenClasses, setHiddenClasses] = useState<Record<string, readonly string[]>>({});
+  const hiddenClassesOf = (style: RiskLayerStyle) => hiddenClasses[style.id] ?? [];
+  const toggleClass = (id: string, label: string) =>
+    setHiddenClasses((current) => {
+      const hidden = current[id] ?? [];
+      return { ...current, [id]: hidden.includes(label) ? hidden.filter((item) => item !== label) : [...hidden, label] };
+    });
   const [layerOpacity, setLayerOpacity] = useState<Record<string, number>>({});
   const opacityOfLayer = (id: string) => layerOpacity[id] ?? 1;
   const setOpacityOfLayer = (id: string, value: number) => setLayerOpacity((current) => ({ ...current, [id]: value }));
@@ -344,7 +352,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       return [{ style, data: { ...data, features, view: `closures:${JSON.stringify(closureFilters)}` } }];
     }
     const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
-    return data ? [{ style: styleForMap(style, isColored(style)), data: layerInProvince(data, province), opacity: opacityOfLayer(style.id) }] : [];
+    if (!data) return [];
+    const inProvince = layerInProvince(data, province);
+    // Sin las clases que se ocultaron desde la leyenda (p. ej. un tipo de central).
+    const hidden = hiddenClassesOf(style);
+    const shown = hidden.length
+      ? { ...inProvince, features: inProvince.features.filter((feature) => !hidden.includes(riskClassOf(style, feature)?.label ?? "")), view: `${inProvince.view ?? ""}|sin:${hidden.join(",")}` }
+      : inProvince;
+    return [{ style: styleForMap(style, isColored(style)), data: shown, opacity: opacityOfLayer(style.id) }];
   });
   // Panel de detalle al tocar una entidad de esas capas.
   // Los cierres viales no se encienden como capa: se ven con su pestaña abierta.
@@ -660,7 +675,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 ],
                 // Qué es cada color y símbolo de lo dibujado, para quien vea la imagen sin el panel.
                 buildCaptureLegend({
-                  riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({ style, colored: isColored(style) })),
+                  riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({ style, colored: isColored(style), hidden: hiddenClassesOf(style) })),
                   eventSeverities: new Set(eventsTab === "events" && showEventsOnMap ? filteredEvents.map((event) => event.severity) : []),
                   parishLevels:
                     eventsTab === "analysis" && showParishesOnMap && parishAlerts
@@ -813,6 +828,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   stateOf={riskViewState}
                   periodOf={periodOf}
                   isColored={isColored}
+                  hiddenClassesOf={hiddenClassesOf}
+                  onToggleClass={toggleClass}
                   onColoredChange={setColored}
                   opacityOf={(layer) => opacityOfLayer(layer.id)}
                   onOpacityChange={setOpacityOfLayer}
@@ -847,6 +864,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   stateOf={riskViewState}
                   periodOf={periodOf}
                   isColored={isColored}
+                  hiddenClassesOf={hiddenClassesOf}
+                  onToggleClass={toggleClass}
                   onColoredChange={setColored}
                   opacityOf={(layer) => opacityOfLayer(layer.id)}
                   onOpacityChange={setOpacityOfLayer}

@@ -57,6 +57,8 @@ export interface RiskLayerStyle {
    * Con `endField` (trabajos con inicio y fin): los que estuvieron en curso en esos días.
    */
   period?: { field: string; endField?: string; defaultDays: RiskPeriodDays };
+  /** Cada clase de la leyenda es un botón que la muestra u oculta en el mapa (p. ej. centrales por tipo). */
+  toggleClasses?: boolean;
   /** Con esto se dibuja de un solo color; su clasificación queda como opción ("Colorear por …"). */
   plainColor?: string;
   /** Forma de los puntos en el mapa; por defecto, círculos. */
@@ -82,7 +84,8 @@ export function riskPeriodLabel(days: RiskPeriodDays): string {
 
 export const BRIDGES_LAYER_ID = "bridges";
 /** Red Vial Estatal: café oscuro, el color habitual de las vías en los mapas. */
-const ROAD_NETWORK_COLOR = "#5b3a1e";
+/** Red Vial Estatal de un solo color: negro (se lee sobre el mapa base y sobre las capas de color). */
+const ROAD_NETWORK_COLOR = "#111111";
 const GOOD = "#16a34a";
 const FAIR = "#d97706";
 const BAD = "#dc2626";
@@ -430,6 +433,8 @@ export const RISK_LAYER_STYLES: readonly RiskLayerStyle[] = [
     pointGlyph: "power",
     color: "#64748b",
     pointScale: 1.3,
+    // Cada tipo de central se muestra u oculta desde su leyenda.
+    toggleClasses: true,
     classify: {
       field: "Tipo_Cen_1",
       classes: [

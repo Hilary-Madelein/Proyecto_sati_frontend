@@ -17,11 +17,14 @@ interface LegendItemProps {
   dashed?: boolean;
   /** Punto con dibujo (puente, maquinaria, cierre): se muestra así, como en el mapa de cerca. */
   glyph?: MapGlyph;
+  /** Con esto la clase es un botón que la muestra u oculta en el mapa; `hidden`: está oculta. */
+  onToggle?: () => void;
+  hidden?: boolean;
 }
 
-export function LegendItem({ label, color, borderColor, shape = "circle", count, sizePx, hollow, dashed, glyph }: LegendItemProps) {
-  return (
-    <li className="flex items-center gap-2 text-xs text-slate-600">
+export function LegendItem({ label, color, borderColor, shape = "circle", count, sizePx, hollow, dashed, glyph, onToggle, hidden }: LegendItemProps) {
+  const content = (
+    <>
       {glyph ? (
         <GlyphDot glyph={glyph} color={color} />
       ) : shape === "diamond" && sizePx ? (
@@ -51,10 +54,27 @@ export function LegendItem({ label, color, borderColor, shape = "circle", count,
           style={{ backgroundColor: shape === "square" && dashed ? "transparent" : color, borderColor }}
         />
       )}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className={cn("min-w-0 flex-1 truncate", hidden && "text-slate-400 line-through")}>{label}</span>
       {count !== undefined && (
-        <span className="font-semibold text-slate-900 tabular-nums">{count}</span>
+        <span className={cn("font-semibold tabular-nums", hidden ? "text-slate-400" : "text-slate-900")}>{count}</span>
       )}
+    </>
+  );
+  if (!onToggle) return <li className="flex items-center gap-2 text-xs text-slate-600">{content}</li>;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={!hidden}
+        title={`${hidden ? "Mostrar" : "Ocultar"}: ${label.toLowerCase()}`}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left text-xs text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600",
+          hidden && "opacity-60",
+        )}
+      >
+        {content}
+      </button>
     </li>
   );
 }
