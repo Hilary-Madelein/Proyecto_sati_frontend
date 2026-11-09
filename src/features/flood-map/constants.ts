@@ -46,7 +46,7 @@ const ESRI_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services";
  * propios (ver ProvinceBoundaries); null = nunca, porque el mapa ya los trae.
  */
 export const BASEMAPS: Record<
-  "light" | "streets",
+  "light" | "streets" | "satellite",
   {
     label: string;
     url: string;
@@ -71,6 +71,15 @@ export const BASEMAPS: Record<
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     provinceLinesMaxZoom: null,
+  },
+  // Imágenes satelitales: se aprecia si el lugar es montaña, ciudad, río o cultivo. Los nombres van en una capa aparte.
+  satellite: {
+    label: "Satélite",
+    url: `${ESRI_TILES}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
+    labelsUrl: `${ESRI_TILES}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`,
+    maxNativeZoom: 18,
+    attribution: "Esri, Maxar, Earthstar Geographics",
+    provinceLinesMaxZoom: 7,
   },
 };
 export type BasemapId = keyof typeof BASEMAPS;

@@ -699,6 +699,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                       ? { label: RANK_INDICATORS.find((item) => item.id === rankIndicator)?.unit ?? "", colors: SHADING_COLORS }
                       : null,
                 }),
+                province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Ecuador",
               );
             } catch (error) {
               window.alert(`No se pudo capturar la imagen: ${(error as Error).message}`);

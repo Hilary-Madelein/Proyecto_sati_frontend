@@ -5,6 +5,7 @@ import { drawGlyph } from "./map-glyphs";
 /** Lo que no va en la imagen: paneles y botones (se marcan con `data-capture-ignore`). */
 const IGNORED = "[data-map-overlay], [data-capture-ignore]";
 const FOOTER_PX = 52;
+const HEADER_PX = 40;
 
 const timeFormat = new Intl.DateTimeFormat("es-EC", {
   day: "2-digit",
@@ -158,7 +159,13 @@ function drawLegend(context: CanvasRenderingContext2D, groups: readonly CaptureL
  * botones), con la leyenda de todo lo dibujado (qué es cada color y símbolo) y una
  * franja abajo: las capas visibles y la fecha y hora de la captura.
  */
-export async function captureMap(area: HTMLElement, layers: readonly string[], legend: readonly CaptureLegendGroup[] = []): Promise<void> {
+export async function captureMap(
+  area: HTMLElement,
+  layers: readonly string[],
+  legend: readonly CaptureLegendGroup[] = [],
+  /** Título de la imagen: la provincia que se está viendo (o todo el Ecuador). */
+  title = "",
+): Promise<void> {
   const takenAt = new Date();
   const scale = Math.min(window.devicePixelRatio || 1, 2);
   const map = await toCanvas(area, {
@@ -171,12 +178,22 @@ export async function captureMap(area: HTMLElement, layers: readonly string[], l
   const legendHeight = layoutLegend(legend, map.width / scale).height * scale;
   const canvas = document.createElement("canvas");
   canvas.width = map.width;
-  canvas.height = map.height + legendHeight + footer;
+  const header = title ? HEADER_PX * scale : 0;
+  canvas.height = header + map.height + legendHeight + footer;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("El navegador no permite crear la imagen");
-  context.drawImage(map, 0, 0);
-  if (legend.length > 0) drawLegend(context, legend, canvas.width, map.height, scale);
-  const footerTop = map.height + legendHeight;
+  if (title) {
+    // Franja de título arriba: de qué provincia es la imagen.
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, header);
+    context.fillStyle = "#0f172a";
+    context.textBaseline = "middle";
+    context.font = `700 ${16 * scale}px system-ui, sans-serif`;
+    context.fillText(fit(context, title, canvas.width - 32 * scale), 16 * scale, header / 2);
+  }
+  context.drawImage(map, 0, header);
+  if (legend.length > 0) drawLegend(context, legend, canvas.width, header + map.height, scale);
+  const footerTop = header + map.height + legendHeight;
   context.fillStyle = "#0f172a";
   context.fillRect(0, footerTop, canvas.width, footer);
 
