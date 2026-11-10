@@ -131,11 +131,15 @@ function drawLegend(context: CanvasRenderingContext2D, groups: readonly CaptureL
       group.ramp.colors.forEach((color, index) => bar.addColorStop(index / Math.max(1, group.ramp!.colors.length - 1), color));
       context.fillStyle = bar;
       context.fillRect(left, cursor + 2 * s, inner, 9 * s);
-      context.fillStyle = "#64748b";
+      // Los valores de la escala, repartidos a lo largo de la barra (el primero alineado a la izquierda, el último a la derecha).
+      context.fillStyle = "#475569";
       context.font = `${10 * s}px system-ui, sans-serif`;
-      context.fillText(group.ramp.min, left, cursor + 20 * s);
-      const maxWidth = context.measureText(group.ramp.max).width;
-      context.fillText(group.ramp.max, left + inner - maxWidth, cursor + 20 * s);
+      for (const tick of group.ramp.ticks) {
+        const width = context.measureText(tick.label).width;
+        const x = left + inner * tick.at;
+        const at = tick.at <= 0 ? x : tick.at >= 1 ? x - width : x - width / 2;
+        context.fillText(tick.label, at, cursor + 20 * s);
+      }
       cursor += LEGEND.rampHeight * s;
     }
     context.font = `${11 * s}px system-ui, sans-serif`;
@@ -146,8 +150,18 @@ function drawLegend(context: CanvasRenderingContext2D, groups: readonly CaptureL
       } else {
         drawSymbol(context, item.symbol, item.color, left + 8 * s, cursor + (LEGEND.row / 2) * s, s);
       }
+      // La cantidad a la derecha, en negrita (como en la leyenda del panel).
+      let countWidth = 0;
+      if (item.count !== undefined) {
+        const count = item.count.toLocaleString("es-EC");
+        context.font = `700 ${11 * s}px system-ui, sans-serif`;
+        context.fillStyle = "#0f172a";
+        countWidth = context.measureText(count).width + 8 * s;
+        context.fillText(count, left + inner - countWidth + 8 * s, cursor + (LEGEND.row / 2) * s);
+        context.font = `${11 * s}px system-ui, sans-serif`;
+      }
       context.fillStyle = "#334155";
-      context.fillText(fit(context, item.label, inner - 22 * s), left + 22 * s, cursor + (LEGEND.row / 2) * s);
+      context.fillText(fit(context, item.label, inner - 22 * s - countWidth), left + 22 * s, cursor + (LEGEND.row / 2) * s);
       cursor += LEGEND.row * s;
     }
   }

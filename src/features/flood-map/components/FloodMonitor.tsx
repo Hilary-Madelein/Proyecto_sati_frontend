@@ -45,7 +45,7 @@ import { closuresForMap, conditionOf, DEFAULT_CLOSURE_FILTERS, isClosed, ROAD_CL
 import { alertLevelForDay, filterEvents } from "../utils";
 import { cantonTotals, headlineFigures, provinceValues, RANK_INDICATORS, rankProvinces, SHADING_COLORS, type RankIndicator } from "../province-summary";
 import type { RiverTarget } from "../hooks/useRiverForecast";
-import type { EventSeverity, Semaphore,
+import type { EventSeverity, FlashFloodLikelihood, Semaphore,
   ActiveLayer,
   ParishAlert,
   EventFilters,
@@ -675,11 +675,23 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                 ],
                 // Qué es cada color y símbolo de lo dibujado, para quien vea la imagen sin el panel.
                 buildCaptureLegend({
-                  riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({ style, colored: isColored(style), hidden: hiddenClassesOf(style) })),
-                  eventSeverities: new Set(eventsTab === "events" && showEventsOnMap ? filteredEvents.map((event) => event.severity) : []),
-                  parishLevels:
+                  // Con lo dibujado en el mapa en este momento (si hay provincia, solo lo de ella): así salen las cantidades.
+                  riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({
+                    style,
+                    colored: isColored(style),
+                    hidden: hiddenClassesOf(style),
+                    features: visibleRiskLayers.find((layer) => layer.style.id === style.id)?.data.features ?? [],
+                  })),
+                  events:
+                    eventsTab === "events" && showEventsOnMap
+                      ? filteredEvents.reduce<Partial<Record<EventSeverity, number>>>((acc, event) => ({ ...acc, [event.severity]: (acc[event.severity] ?? 0) + 1 }), {})
+                      : {},
+                  parishes:
                     eventsTab === "analysis" && showParishesOnMap && parishAlerts
-                      ? (["red", "orange", "yellow", "green"] as const).filter((level) => parishFilters.levels.includes(level))
+                      ? {
+                          levels: (["red", "orange", "yellow", "green"] as const).filter((level) => parishFilters.levels.includes(level)),
+                          counts: parishAlerts.listed.reduce<Partial<Record<Semaphore, number>>>((acc, parish) => ({ ...acc, [parish.semaphore]: (acc[parish.semaphore] ?? 0) + 1 }), {}),
+                        }
                       : null,
                   rain: rainLegends.map((legend) => ({
                     title: `Lluvia · ${rainSources.find((source) => source.layerId === legend.id)?.label ?? ""}`.trim(),
@@ -689,8 +701,17 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   imerg: showImerg,
                   stations: showStations,
                   riverNetwork: layers.riverNetwork,
-                  riverAlerts: layers.riverAlerts && !!data.riverAlerts,
-                  flashFloods: layers.flashFloods && !!data.floodHub?.flashFloods?.length,
+                  riverAlerts:
+                    layers.riverAlerts && mapData.riverAlerts
+                      ? mapData.riverAlerts.alerts.reduce((acc, alert) => {
+                          const level = alertLevelForDay(alert, alertDayIndex);
+                          return level > 0 ? acc.set(level, (acc.get(level) ?? 0) + 1) : acc;
+                        }, new Map<number, number>())
+                      : null,
+                  flashFloods:
+                    layers.flashFloods && mapData.floodHub?.flashFloods?.length
+                      ? mapData.floodHub.flashFloods.reduce<Partial<Record<FlashFloodLikelihood, number>>>((acc, area) => ({ ...acc, [area.likelihood]: (acc[area.likelihood] ?? 0) + 1 }), {})
+                      : null,
                   watersheds: layers.watersheds,
                   preparedness: showPreparedness,
                   provincialRoads: showProvincialRoads,
