@@ -16,8 +16,8 @@ const outlineStyle = (contrast: boolean) => {
   const color = contrast ? PROVINCE_OUTLINE_COLORS.contrast : PROVINCE_OUTLINE_COLORS.normal;
   return { color, weight: contrast ? 3 : 2, opacity: contrast ? 1 : 0.9, fill: true, fillColor: color, fillOpacity: contrast ? 0.08 : 0.05 };
 };
-/** Borde blanco debajo del contorno fucsia, para que se lea sobre cualquier color. */
-const CASING = { color: "#ffffff", weight: 6, opacity: 0.85, fill: false } as const;
+/** Borde oscuro debajo del contorno blanco, para que se lea sobre cualquier color (también sobre el mapa claro). */
+const CASING = { color: PROVINCE_OUTLINE_COLORS.casing, weight: 6, opacity: 0.85, fill: false } as const;
 /** Ya se ve casi todo Ecuador: no hace falta ofrecer volver. */
 const HOME_TOLERANCE = 0.25;
 

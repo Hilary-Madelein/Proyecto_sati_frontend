@@ -37,8 +37,8 @@ const hoverStyle = (contrast: boolean) => {
   const color = contrast ? PROVINCE_OUTLINE_COLORS.contrast : PROVINCE_OUTLINE_COLORS.normal;
   return { color, weight: contrast ? 2.5 : 1.5, opacity: contrast ? 1 : 0.8, dashArray: "4 4", fill: true, fillColor: color, fillOpacity: contrast ? 0.1 : 0.06 };
 };
-/** Borde blanco debajo del contorno fucsia, para que se lea sobre cualquier color. */
-const CASING = { color: "#ffffff", weight: 5, opacity: 0.85, fill: false } as const;
+/** Borde oscuro debajo del contorno blanco, para que se lea sobre cualquier color (también sobre el mapa claro). */
+const CASING = { color: PROVINCE_OUTLINE_COLORS.casing, weight: 5, opacity: 0.85, fill: false } as const;
 
 interface ProvincePickerProps {
   provinces: readonly ProvinceFeature[] | null;

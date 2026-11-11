@@ -92,10 +92,10 @@ export const PROVINCE_BOUNDARIES_URL = "/data/provincias-ecuador.geojson";
 
 /**
  * Contorno de la provincia (al pasar el mouse y la elegida). Azul, salvo sobre capas
- * azules (lluvia, mar, ríos, caudales): ahí fucsia con borde blanco, que no está en
- * ninguna de sus escalas y se distingue.
+ * de color (lluvia, mar, ríos, caudales): ahí blanco con borde oscuro (`casing`). Ninguna
+ * capa usa líneas blancas, resalta sobre la lluvia y el borde lo deja ver sobre el mapa claro.
  */
-export const PROVINCE_OUTLINE_COLORS = { normal: "#2563eb", contrast: "#c026d3" } as const;
+export const PROVINCE_OUTLINE_COLORS = { normal: "#2563eb", contrast: "#ffffff", casing: "#0f172a" } as const;
 
 /**
  * Cuencas hidrográficas: unidades Pfafstetter de nivel 3 del MAE (nivel 5 agrupado,
