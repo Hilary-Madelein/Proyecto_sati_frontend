@@ -2,10 +2,11 @@
 
 import L from "leaflet";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useMap } from "react-leaflet";
+import { useMap, useMapEvents } from "react-leaflet";
 import { cn } from "@/lib/cn";
 import { CameraIcon, CheckIcon, MapIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@/components/ui/icons";
 import { BASEMAPS, type BasemapId } from "../../constants";
+import { northOnScreen } from "./north";
 import { goHome } from "./province-focus";
 
 interface MapControlsProps {
@@ -13,8 +14,8 @@ interface MapControlsProps {
   onBasemapChange: (basemap: BasemapId) => void;
   /** Al volver a todo Ecuador: se cierra lo que estaba abierto. */
   onGoHome: () => void;
-  /** Descarga una imagen del mapa con sus capas. */
-  onCapture: () => Promise<void>;
+  /** Descarga una imagen del mapa con sus capas; `north`: hacia dónde queda el norte en pantalla (grados), para la brújula de la imagen. */
+  onCapture: (north: number) => Promise<void>;
 }
 
 /** Zoom, "volver a Ecuador" y mapa base (gris claro o calles), con el mismo estilo vidrio que los paneles. */
@@ -23,6 +24,10 @@ export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: M
   const map = useMap();
   const ref = useRef<HTMLDivElement>(null);
   const [choosing, setChoosing] = useState(false);
+  // Hacia dónde queda el norte en pantalla (0 = arriba): la aguja de la brújula lo sigue al girar el mapa.
+  const [north, setNorth] = useState(0);
+  useMapEvents({ rotate: () => setNorth(northOnScreen(map)), moveend: () => setNorth(northOnScreen(map)) });
+  const rotateBy = (degrees: number) => map.setBearing(map.getBearing() + degrees);
 
   // Evita que los clics y la rueda del ratón sobre los botones muevan el mapa.
   useEffect(() => {
@@ -52,6 +57,27 @@ export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: M
         </ControlButton>
       </div>
 
+      {/*
+        Brújula: la aguja roja apunta al norte aunque el mapa esté girado; tocarla deja el norte arriba.
+        Para girar: Shift + rueda del mouse, dos dedos en el celular o los botones de al lado (escritorio).
+      */}
+      <div className="flex flex-col divide-y divide-slate-200 overflow-hidden rounded-xl bg-white/90 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
+        <ControlButton
+          label={north === 0 ? "Norte arriba · para girar: Shift + rueda del mouse o dos dedos" : `Mapa girado ${Math.round(Math.abs(north))}° · tocar para dejar el norte arriba`}
+          onClick={() => map.setBearing(0)}
+        >
+          <CompassNeedle angle={north} />
+        </ControlButton>
+        <span className="hidden lg:contents">
+          <ControlButton label="Girar 15° a la izquierda" onClick={() => rotateBy(-15)}>
+            <RotateIcon direction="left" />
+          </ControlButton>
+          <ControlButton label="Girar 15° a la derecha" onClick={() => rotateBy(15)}>
+            <RotateIcon direction="right" />
+          </ControlButton>
+        </span>
+      </div>
+
       <div className="relative" onKeyDown={(event) => event.key === "Escape" && setChoosing(false)}>
         <div className="overflow-hidden rounded-xl bg-white/90 shadow-lg ring-1 shadow-slate-900/10 ring-slate-900/10 backdrop-blur-md">
           <ControlButton label="Mapa base" onClick={() => setChoosing((open) => !open)} expanded={choosing}>
@@ -65,7 +91,7 @@ export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: M
               if (capturing) return;
               setCapturing(true);
               try {
-                await onCapture();
+                await onCapture(northOnScreen(map));
               } finally {
                 setCapturing(false);
               }
@@ -133,5 +159,26 @@ function ControlButton({
     >
       {children}
     </button>
+  );
+}
+
+/** Aguja de brújula: mitad roja hacia el norte, girada `angle` grados (sentido horario). */
+function CompassNeedle({ angle }: { angle: number }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 transition-transform" style={{ transform: `rotate(${angle}deg)` }}>
+      <path d="M12 2.5l4 9.5h-8z" fill="#dc2626" />
+      <path d="M12 21.5l-4-9.5h8z" fill="#94a3b8" />
+      <circle cx="12" cy="12" r="1.4" fill="#ffffff" stroke="#475569" strokeWidth="0.8" />
+    </svg>
+  );
+}
+
+/** Flecha de giro, a la izquierda o a la derecha. */
+function RotateIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" style={direction === "right" ? { transform: "scaleX(-1)" } : undefined}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+    </svg>
   );
 }

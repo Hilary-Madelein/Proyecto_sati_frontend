@@ -2,6 +2,8 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+// Agrega a Leaflet la posibilidad de girar el mapa (Shift + rueda, o dos dedos en el celular), con nuestras capas dentro de lo que gira.
+import "./rotate-panes";
 import { useState } from "react";
 import { MapContainer, Pane, TileLayer } from "react-leaflet";
 import {
@@ -113,8 +115,8 @@ export interface FloodMapProps {
   provincialRoads: boolean;
   /** Dónde va el recuadro de Galápagos: junto a los controles, sobre las leyendas. */
   galapagosSlot: HTMLElement | null;
-  /** Descarga una imagen del mapa (botón de los controles). */
-  onCapture: () => Promise<void>;
+  /** Descarga una imagen del mapa (botón de los controles); `north`: hacia dónde queda el norte en pantalla, en grados. */
+  onCapture: (north: number) => Promise<void>;
   /** Provincias para elegir una en el mapa (y la elegida). */
   provinces: readonly ProvinceFeature[] | null;
   selectedProvince: ProvinceFeature | null;
@@ -195,7 +197,6 @@ export default function FloodMap({
   // Sin provincia elegida, un clic en el mapa la elige (también con lluvia, mar o ríos);
   // ya dentro de ella, el clic muestra el valor de la lluvia o el río, como siempre.
   const pickingProvince = !selectedProvince && !!provinces?.length;
-  const blueLayersOn = !!rainForecast || !!observedRain || showImerg || !!seaTemperature || layers.riverNetwork || layers.riverAlerts;
   const valueLabel = rainForecast || observedRain ? "la lluvia" : seaTemperature ? "la temperatura del mar" : layers.riverNetwork ? "el río" : null;
   const overlays: OverlayProps = {
     data,
@@ -243,6 +244,12 @@ export default function FloodMap({
       maxZoom={MAP_CONFIG.maxZoom}
       zoomControl={false}
       preferCanvas
+      // Se puede girar: Shift + rueda del mouse o dos dedos; la brújula (MapControls) lo devuelve al norte.
+      rotate
+      bearing={0}
+      rotateControl={false}
+      touchRotate
+      shiftKeyRotate
       className="size-full bg-slate-100"
     >
       <TileLayer
@@ -260,20 +267,12 @@ export default function FloodMap({
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
       <MapLimits />
       <CanvasZoomGuard />
-      {/* Con capas azules encendidas, el contorno de la provincia va de otro tono (ver PROVINCE_OUTLINE_COLORS). */}
-      <ProvinceFocusBar
-        slot={provinceBarSlot}
-        onGoHome={onGoHome}
-        onProvinceChange={onProvinceFocus}
-        onOpenSummary={onOpenSummary}
-        contrast={blueLayersOn}
-      />
+      <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} onProvinceChange={onProvinceFocus} onOpenSummary={onOpenSummary} />
       <ProvincePicker
         provinces={provinces}
         selected={selectedProvince}
         onSelect={onPickProvince}
         enabled
-        contrast={blueLayersOn}
         hint={valueLabel ? `Clic para elegirla; después, toca para ver ${valueLabel}` : "Clic para ver su resumen"}
       />
       {/* Solo con todo Ecuador a la vista: con una provincia elegida, sobra. */}

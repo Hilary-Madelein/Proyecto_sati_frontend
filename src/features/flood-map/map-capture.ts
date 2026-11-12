@@ -168,6 +168,41 @@ function drawLegend(context: CanvasRenderingContext2D, groups: readonly CaptureL
   return height * s;
 }
 
+/** Brújula de la imagen: círculo blanco con la aguja (roja al norte) y la "N", girada hacia el norte real. */
+function drawCompass(context: CanvasRenderingContext2D, x: number, y: number, s: number, north: number) {
+  const r = 24 * s;
+  context.save();
+  context.fillStyle = "rgba(255,255,255,0.92)";
+  context.strokeStyle = "#cbd5e1";
+  context.lineWidth = 1 * s;
+  context.beginPath();
+  context.arc(x, y, r, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.translate(x, y);
+  context.rotate((north * Math.PI) / 180);
+  context.fillStyle = "#dc2626";
+  context.beginPath();
+  context.moveTo(0, -r * 0.62);
+  context.lineTo(r * 0.24, 0);
+  context.lineTo(-r * 0.24, 0);
+  context.closePath();
+  context.fill();
+  context.fillStyle = "#94a3b8";
+  context.beginPath();
+  context.moveTo(0, r * 0.62);
+  context.lineTo(r * 0.24, 0);
+  context.lineTo(-r * 0.24, 0);
+  context.closePath();
+  context.fill();
+  context.fillStyle = "#0f172a";
+  context.font = `700 ${10 * s}px system-ui, sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("N", 0, -r * 0.8);
+  context.restore();
+}
+
 /**
  * Descarga una imagen PNG del mapa como se ve (capas y leyendas, sin paneles ni
  * botones), con la leyenda de todo lo dibujado (qué es cada color y símbolo) y una
@@ -179,6 +214,8 @@ export async function captureMap(
   legend: readonly CaptureLegendGroup[] = [],
   /** Título de la imagen: la provincia que se está viendo (o todo el Ecuador). */
   title = "",
+  /** Hacia dónde queda el norte en la imagen, en grados (0 = arriba): para la brújula. */
+  north = 0,
 ): Promise<void> {
   const takenAt = new Date();
   const scale = Math.min(window.devicePixelRatio || 1, 2);
@@ -206,6 +243,7 @@ export async function captureMap(
     context.fillText(fit(context, title, canvas.width - 32 * scale), 16 * scale, header / 2);
   }
   context.drawImage(map, 0, header);
+  drawCompass(context, canvas.width - 40 * scale, header + 40 * scale, scale, north);
   if (legend.length > 0) drawLegend(context, legend, canvas.width, header + map.height, scale);
   const footerTop = header + map.height + legendHeight;
   context.fillStyle = "#0f172a";

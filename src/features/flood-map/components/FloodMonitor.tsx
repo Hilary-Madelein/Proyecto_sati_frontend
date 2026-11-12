@@ -661,7 +661,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           layerOpacity={opacityOfLayer}
           provincialRoads={showProvincialRoads}
           galapagosSlot={galapagosSlot}
-          onCapture={async () => {
+          onCapture={async (north) => {
             if (!mapAreaRef.current) return;
             try {
               const drawnRiskIds = new Set(visibleRiskLayers.map((layer) => layer.style.id));
@@ -721,6 +721,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                       : null,
                 }),
                 province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Ecuador",
+                north,
               );
             } catch (error) {
               window.alert(`No se pudo capturar la imagen: ${(error as Error).message}`);

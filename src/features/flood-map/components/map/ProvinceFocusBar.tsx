@@ -12,10 +12,7 @@ import { PROVINCE_NAMES } from "../../province-geometry";
 import { goHome, homeZoom, PROVINCE_FOCUS_EVENT, type ProvinceFocusEvent } from "./province-focus";
 
 const PANE = "provinceFocus";
-const outlineStyle = (contrast: boolean) => {
-  const color = contrast ? PROVINCE_OUTLINE_COLORS.contrast : PROVINCE_OUTLINE_COLORS.normal;
-  return { color, weight: contrast ? 3 : 2, opacity: contrast ? 1 : 0.9, fill: true, fillColor: color, fillOpacity: contrast ? 0.08 : 0.05 };
-};
+const OUTLINE = { color: PROVINCE_OUTLINE_COLORS.line, weight: 3, opacity: 1, fill: true, fillColor: PROVINCE_OUTLINE_COLORS.line, fillOpacity: 0.08 } as const;
 /** Borde oscuro debajo del contorno blanco, para que se lea sobre cualquier color (también sobre el mapa claro). */
 const CASING = { color: PROVINCE_OUTLINE_COLORS.casing, weight: 6, opacity: 0.85, fill: false } as const;
 /** Ya se ve casi todo Ecuador: no hace falta ofrecer volver. */
@@ -32,7 +29,6 @@ export function ProvinceFocusBar({
   onGoHome,
   onProvinceChange,
   onOpenSummary,
-  contrast,
 }: {
   slot: HTMLElement | null;
   onGoHome: () => void;
@@ -40,8 +36,6 @@ export function ProvinceFocusBar({
   onProvinceChange: (province: ProvinceFeature | null) => void;
   /** Solo en el celular (menos de 768 px): ahí el resumen no se abre solo (taparía el mapa), se abre con este botón. */
   onOpenSummary: () => void;
-  /** Hay capas azules encendidas (lluvia, mar, ríos, caudales): contorno de otro tono. */
-  contrast: boolean;
 }) {
   const map = useMap();
   // undefined = sin acercamiento; null = se acercó, pero no se reconoció la provincia.
@@ -89,8 +83,8 @@ export function ProvinceFocusBar({
         // Sin capturar clics: su lienzo cubre todo el mapa y taparía a las capas de abajo.
         <Pane name={PANE} style={{ zIndex: 395, pointerEvents: "none" }}>
           <>
-            {contrast && <GeoJSON key={`c${province.key}`} data={province.geometry} style={CASING} interactive={false} />}
-            <GeoJSON key={`${province.key}${contrast ? ":c" : ""}`} data={province.geometry} style={outlineStyle(contrast)} interactive={false} />
+            <GeoJSON key={`c${province.key}`} data={province.geometry} style={CASING} interactive={false} />
+            <GeoJSON key={province.key} data={province.geometry} style={OUTLINE} interactive={false} />
           </>
         </Pane>
       )}
