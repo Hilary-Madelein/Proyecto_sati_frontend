@@ -285,3 +285,17 @@ html .leaflet-tooltip.map-place-label.map-place-card::before {
     pointer-events: none;
   }
 }
+
+/* Escala del mapa (ver MapScale): más legible, y en celular y tableta por encima de la barra de abajo y de "Eventos por día". */
+.leaflet-control-scale-line {
+  border-color: #334155;
+  background: rgb(255 255 255 / 0.85);
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 1023.98px) {
+  .leaflet-bottom.leaflet-right .leaflet-control-scale {
+    margin-bottom: 7.75rem;
+  }
+}

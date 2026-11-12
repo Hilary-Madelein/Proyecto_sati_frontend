@@ -43,6 +43,8 @@ export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: M
         <ControlButton label="Acercar" onClick={() => map.zoomIn()}>
           <PlusIcon className="size-4" />
         </ControlButton>
+        {/* Barra para el zoom (como Google Earth): arrastrar acerca o aleja con precisión. En el celular se usan los dedos. */}
+        <ZoomSlider />
         <ControlButton label="Alejar" onClick={() => map.zoomOut()}>
           <MinusIcon className="size-4" />
         </ControlButton>
@@ -91,6 +93,7 @@ export function MapControls({ basemap, onBasemapChange, onGoHome, onCapture }: M
               if (capturing) return;
               setCapturing(true);
               try {
+                await tilesLoaded(map);
                 await onCapture(northOnScreen(map));
               } finally {
                 setCapturing(false);
@@ -181,4 +184,52 @@ function RotateIcon({ direction }: { direction: "left" | "right" }) {
       <path d="M3 4v5h5" />
     </svg>
   );
+}
+
+/**
+ * Barra vertical de zoom, entre "+" y "−": arriba acerca, abajo aleja, en pasos
+ * de 1/4. Mientras se arrastra, el mapa sigue al instante (sin animación).
+ * Solo desde tabletas: en el celular el zoom es con los dedos y la columna de botones ya es larga.
+ */
+function ZoomSlider() {
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useMapEvents({ zoom: () => setZoom(map.getZoom()), zoomend: () => setZoom(map.getZoom()) });
+  return (
+    <div className="hidden h-28 place-items-center py-2 md:grid">
+      <input
+        type="range"
+        min={map.getMinZoom()}
+        max={map.getMaxZoom()}
+        step={0.25}
+        value={zoom}
+        onChange={(event) => {
+          const value = Number(event.target.value);
+          setZoom(value);
+          map.setZoom(value, { animate: false });
+        }}
+        aria-label="Zoom del mapa"
+        title={`Zoom ${zoom.toLocaleString("es-EC")} · arrastra para acercar o alejar`}
+        // Vertical, con el máximo arriba.
+        className="h-full w-4 cursor-pointer accent-blue-600 [direction:rtl] [writing-mode:vertical-lr]"
+      />
+    </div>
+  );
+}
+
+/**
+ * Espera a que las capas de teselas (mapa base, nombres, lluvia…) terminen de cargar
+ * lo que se ve, para que la imagen no salga con cuadros grises (p. ej. justo después
+ * de un salto de zoom). Como máximo 8 s: si una capa no termina, se captura igual.
+ */
+function tilesLoaded(map: L.Map): Promise<void> {
+  const loading: L.GridLayer[] = [];
+  map.eachLayer((layer) => {
+    if (layer instanceof L.GridLayer && (layer as L.GridLayer & { isLoading?: () => boolean }).isLoading?.()) loading.push(layer);
+  });
+  // Tras cargar, Leaflet hace aparecer cada tesela con un fundido (~200 ms): se espera a que termine.
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 400));
+  if (loading.length === 0) return settle();
+  const waits = loading.map((layer) => new Promise<void>((resolve) => layer.once("load", () => resolve())));
+  return Promise.race([Promise.all(waits).then(settle), new Promise<void>((resolve) => setTimeout(resolve, 8000))]);
 }

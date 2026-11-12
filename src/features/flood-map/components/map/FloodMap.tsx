@@ -46,6 +46,7 @@ import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
 import { MapPopupWatcher } from "./MapPopupWatcher";
 import { MapResizeWatcher } from "./MapResizeWatcher";
+import { MapScale } from "./MapScale";
 import { ProvinceFocusBar } from "./ProvinceFocusBar";
 import { ProvincePicker } from "./ProvincePicker";
 import { ProvinceShadingLayer } from "./ProvinceShadingLayer";
@@ -287,6 +288,7 @@ export default function FloodMap({
 
       <MapResizeWatcher />
       <MapPopupWatcher />
+      <MapScale />
       {provinceShading && provinces && !selectedProvince && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
       <MapOverlays {...overlays} />
     </MapContainer>

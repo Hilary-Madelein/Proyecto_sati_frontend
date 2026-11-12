@@ -3,7 +3,8 @@ import type { CaptureLegendGroup, LegendSymbol } from "./capture-legend";
 import { drawGlyph } from "./map-glyphs";
 
 /** Lo que no va en la imagen: paneles y botones (se marcan con `data-capture-ignore`). */
-const IGNORED = "[data-map-overlay], [data-capture-ignore]";
+// También los avisos que aparecen al pasar el cursor: no son parte del mapa (sí las etiquetas fijas, `.map-place-label`).
+const IGNORED = "[data-map-overlay], [data-capture-ignore], .leaflet-tooltip:not(.map-place-label)";
 const FOOTER_PX = 52;
 const HEADER_PX = 40;
 
