@@ -113,10 +113,10 @@ export function SituationAnalysisCard({ provinceKey, placeName }: SituationAnaly
         <div className="space-y-3 px-3 pt-3 pb-3">
           <div aria-live="polite" className="space-y-2">
             <p className="text-[13px] leading-snug font-semibold text-slate-900">{state.analysis.headline}</p>
-            <Part title="Lo medido y reportado" text={state.analysis.observed} accent="bg-yellow-50" />
-            <Part title="Lo que se espera" text={state.analysis.expected} accent="bg-blue-50" />
-            <Part title="Qué significa" text={state.analysis.meaning} accent="bg-red-50" />
-            {state.analysis.vulnerability && <Part title="Vulnerabilidad del lugar" text={state.analysis.vulnerability} accent="bg-red-50" />}
+            <Part title="Lo medido y reportado" text={state.analysis.observed} accent="border-yellow-400" />
+            <Part title="Lo que se espera" text={state.analysis.expected} accent="border-blue-600" />
+            <Part title="Qué significa" text={state.analysis.meaning} accent="border-red-600" />
+            {state.analysis.vulnerability && <Part title="Vulnerabilidad del lugar" text={state.analysis.vulnerability} accent="border-orange-500" />}
           </div>
           <Questions provinceKey={provinceKey} />
           <p className="rounded-lg bg-white/60 px-2.5 py-2 text-[10px] leading-relaxed text-slate-500">
@@ -234,7 +234,10 @@ function Waiting({ text }: { text: string }) {
   );
 }
 
-/** Una parte del análisis, en su recuadro: título arriba y el texto debajo, con una franja de color (amarillo, azul y rojo, como la bandera). */
+/**
+ * Una parte del análisis, en su recuadro blanco: título arriba y el texto debajo, con una
+ * franja de color en el borde (`accent`: amarillo, azul y rojo, como la bandera; naranja la vulnerabilidad).
+ */
 function Part({ title, text, accent }: { title: string; text: string; accent: string }) {
   return (
     <section className={`rounded-xl border-l-4 bg-white px-3 py-2 shadow-sm ${accent}`}>
