@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CloseIcon, SendIcon, SparklesIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 
-/** Respuesta de GET /situation-analysis: el análisis del momento en cuatro partes. */
+/** Respuesta de GET /situation-analysis: el análisis del momento por partes. */
 interface SituationAnalysis {
   /** Lugar analizado, como va tras "en": "Ecuador", "la provincia de Manabí". */
   place: string;
@@ -14,6 +14,8 @@ interface SituationAnalysis {
   observed: string;
   expected: string;
   meaning: string;
+  /** Vulnerabilidad del lugar según las capas de exposición y preparación. */
+  vulnerability?: string;
   /** "ai": lo redactó Gemini; "template": resumen automático porque la IA no respondió. */
   writer: "ai" | "template";
   sources: string;
@@ -110,10 +112,11 @@ export function SituationAnalysisCard({ provinceKey, placeName }: SituationAnaly
       ) : (
         <div className="space-y-3 px-3 pt-3 pb-3">
           <div aria-live="polite" className="space-y-2">
-            <h3 className="text-[14px] leading-snug font-semibold text-slate-900">{state.analysis.headline}</h3>
-            <Part title="Lo medido y reportado" text={state.analysis.observed} accent="border-yellow-400" />
-            <Part title="Lo que se espera" text={state.analysis.expected} accent="border-blue-600" />
-            <Part title="Qué significa" text={state.analysis.meaning} accent="border-red-600" />
+            <p className="text-[13px] leading-snug font-semibold text-slate-900">{state.analysis.headline}</p>
+            <Part title="Lo medido y reportado" text={state.analysis.observed} accent="bg-yellow-50" />
+            <Part title="Lo que se espera" text={state.analysis.expected} accent="bg-blue-50" />
+            <Part title="Qué significa" text={state.analysis.meaning} accent="bg-red-50" />
+            {state.analysis.vulnerability && <Part title="Vulnerabilidad del lugar" text={state.analysis.vulnerability} accent="bg-red-50" />}
           </div>
           <Questions provinceKey={provinceKey} />
           <p className="rounded-lg bg-white/60 px-2.5 py-2 text-[10px] leading-relaxed text-slate-500">
