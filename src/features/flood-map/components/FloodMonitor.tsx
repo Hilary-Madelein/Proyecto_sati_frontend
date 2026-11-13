@@ -23,14 +23,18 @@ import {
   EVENT_PERIODS,
   observedRainLegendLayer,
   RAIN_FORECAST_LEGEND_LAYER,
+  FORECAST_WINDOW_HOURS,
+  FORECAST_DAYS,
+  RAIN_FADE_MS,
 } from "../constants";
-import { useRainImage } from "../hooks/useRainImage";
+import { prefetchRainImage, useRainImage } from "../hooks/useRainImage";
 import { useRainLegends } from "../hooks/useRainLegends";
 import { DEFAULT_PARISH_FILTERS, filterParishes, type ParishFilters } from "../parish-filters";
 import { useCantonAnalysis } from "../hooks/useCantonAnalysis";
 import { useProvinceGeometries } from "../hooks/useProvinceGeometries";
 import { buildCaptureLegend } from "../capture-legend";
-import { captureMap } from "../map-capture";
+import { captureMap, captureStamp, downloadGif, northOf, renderMapImageWithLayout, tilesLoaded, type RenderedMapImage } from "../map-capture";
+import type { Map as LeafletMap } from "leaflet";
 import { useProvinces, type ProvinceFeature } from "../hooks/useProvinceGeometries";
 import { isSameProvince, layerInProvince } from "../province-filter";
 import { ProvinceSummaryPanel, type ProvinceSummary, type SummaryTarget } from "./panels/ProvinceSummaryPanel";
@@ -104,6 +108,32 @@ const FloodMap = dynamic(() => import("./map/FloodMap"), {
 
 type PanelId = "layers" | "events";
 
+/** Animación de la lluvia: cuánto se ve cada paso en el mapa, y en el GIF (más el fundido entre uno y otro). */
+const RAIN_ANIMATION_STEP_MS = 1500;
+const RAIN_GIF_HOLD_MS = 1200;
+const RAIN_GIF_FADE_FRAMES = 6;
+const RAIN_GIF_FADE_FRAME_MS = 60;
+
+/** Qué recorre la animación: las ventanas de las próximas horas o los días de la corrida. */
+type RainAnimationMode = "hours" | "days";
+type RainStep = { kind: "hours"; hours: ForecastWindowHours } | { kind: "day"; day: ForecastDay };
+const stepKey = (step: RainStep) => (step.kind === "hours" ? `h${step.hours}` : `d${step.day}`);
+
+/** Espera a que `ready()` se cumpla dos veces seguidas (estable), revisando cada 250 ms; error si pasa `maxMs`. */
+function waitUntil(ready: () => boolean, maxMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    let hits = 0;
+    const check = () => {
+      hits = ready() ? hits + 1 : 0;
+      if (hits >= 2) return resolve();
+      if (Date.now() - started > maxMs) return reject(new Error("la lluvia de esa ventana no terminó de cargar"));
+      setTimeout(check, 250);
+    };
+    check();
+  });
+}
+
 const POWER_PLANTS_LAYER_ID = "power-plants";
 
 /** La capa que enciende cada cuadro del resumen que abre una capa. */
@@ -132,6 +162,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Apagada al inicio para que la vista inicial muestre solo la red de ríos.
   const [showRain, setShowRain] = useState(false);
   const [rainLoading, setRainLoading] = useState(false);
+  // Animación de las ventanas del pronóstico (3 → 6 → 12 → 24 h) y su descarga como GIF.
+  const [animatingRain, setAnimatingRain] = useState(false);
+  const [rainExport, setRainExport] = useState<{ done: number; total: number } | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
   // Lluvia observada (satélite). Apagada al inicio, como la pronosticada.
   const [showObservedRain, setShowObservedRain] = useState(false);
   const [observedProduct, setObservedProduct] = useState<ObservedRainProduct>(() => initialObservedProduct(data.observedRain));
@@ -275,10 +309,17 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     data.rain?.run ? `${data.rain.run}:${forecastBlock}` : null,
   );
   const forecast = forecastHours ? forecastWindow : forecastDayImage;
+  type RainImageData = NonNullable<typeof forecastWindow.data> | NonNullable<typeof forecastDayImage.data>;
   const forecastLabel = forecastHours ? `en las próximas ${forecastHours} h` : FORECAST_DAY_LABELS[forecastDay].range;
-  const rainForecast: RainForecastLayer | null = forecast.data
+  // Mientras carga la ventana o el día siguiente, se sigue mostrando la imagen anterior
+  // (sin dejar el mapa en blanco): la nueva aparece encima con un fundido (ver AccumulatedRainLayer).
+  const [heldRain, setHeldRain] = useState<RainImageData | null>(null);
+  if (forecast.data && forecast.data !== heldRain) setHeldRain(forecast.data);
+  if (!showRain && heldRain) setHeldRain(null);
+  const shownRain = showRain ? (forecast.data ?? heldRain) : null;
+  const rainForecast: RainForecastLayer | null = shownRain
     ? {
-        data: forecast.data,
+        data: shownRain,
         attribution: data.rain?.attribution ?? "",
         label: forecastLabel,
         valuePath: forecastHours ? `/rain-forecast/windows/${forecastHours}/value` : `/rain-forecast/days/${forecastDay}/value`,
@@ -568,6 +609,160 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
       if (!active) closeSummaryIfNarrow();
     }
   };
+  // Animación: recorre las ventanas (3 → 24 h) o los días de la corrida (24 → 72 h), según lo que esté elegido.
+  const rainMode: RainAnimationMode = forecastHours !== null ? "hours" : "days";
+  const rainSteps: RainStep[] =
+    rainMode === "hours"
+      ? FORECAST_WINDOW_HOURS.map((hours) => ({ kind: "hours" as const, hours }))
+      : FORECAST_DAYS.filter((day) => data.rain?.days.find((item) => item.day === day)?.available).map((day) => ({ kind: "day" as const, day }));
+  const currentRainStep = forecastHours !== null ? `h${forecastHours}` : `d${forecastDay}`;
+  // El paso actual ya dibujado (datos e imagen cargados): la animación avanza y la descarga captura recién ahí.
+  const rainStepReady =
+    showRain &&
+    !rainLoading &&
+    (forecastHours !== null
+      ? forecastWindow.data?.hours === forecastHours && !forecastWindow.isLoading
+      : forecastDayImage.data?.day === forecastDay && !forecastDayImage.isLoading)
+      ? currentRainStep
+      : null;
+  const applyRainStep = (step: RainStep) => {
+    if (step.kind === "hours") setForecastHours(step.hours);
+    else {
+      setForecastHours(null);
+      setForecastDay(step.day);
+    }
+  };
+  const nextRainStep = () => {
+    const index = rainSteps.findIndex((step) => stepKey(step) === currentRainStep);
+    return rainSteps[(index + 1) % rainSteps.length];
+  };
+  useEffect(() => {
+    if (!animatingRain || rainStepReady === null || rainExport || rainSteps.length < 2) return;
+    const timer = setTimeout(() => applyRainStep(nextRainStep()), RAIN_ANIMATION_STEP_MS);
+    return () => clearTimeout(timer);
+    // Avanza cuando el paso actual terminó de dibujarse.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animatingRain, rainStepReady, rainExport]);
+  // Al animar (o descargar) se piden de una vez todos los pasos: así no hay esperas entre uno y otro.
+  const prefetchRainSteps = () => {
+    for (const step of rainSteps) {
+      if (step.kind === "hours") {
+        if (data.rain?.run) prefetchRainImage(`/rain-forecast/windows/${step.hours}`, `${data.rain.run}:${forecastBlock}`);
+      } else if (data.rain?.run) prefetchRainImage(`/rain-forecast/days/${step.day}`, data.rain.run);
+    }
+  };
+  const toggleRainAnimation = () => {
+    if (!animatingRain) prefetchRainSteps();
+    setAnimatingRain(!animatingRain);
+  };
+
+  /** Lo que va en una imagen del mapa además del mapa: capas encendidas, leyenda y título (provincia). */
+  const captureContent = () => {
+    const drawnRiskIds = new Set(visibleRiskLayers.map((layer) => layer.style.id));
+    return {
+      layers: [
+        ...activeLayers.map((layer) => layer.label),
+        ...(eventsTab === "events" && showEventsOnMap ? ["Eventos críticos (SNGR)"] : []),
+        ...(eventsTab === "analysis" && showParishesOnMap ? ["Alerta de inundación por parroquia"] : []),
+        ...(eventsTab === "closures" && showClosuresOnMap ? ["Cierres viales (MIT)"] : []),
+      ],
+      // Qué es cada color y símbolo de lo dibujado, para quien vea la imagen sin el panel.
+      legend: buildCaptureLegend({
+        // Con lo dibujado en el mapa en este momento (si hay provincia, solo lo de ella): así salen las cantidades.
+        riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({
+          style,
+          colored: isColored(style),
+          hidden: hiddenClassesOf(style),
+          features: visibleRiskLayers.find((layer) => layer.style.id === style.id)?.data.features ?? [],
+        })),
+        events:
+          eventsTab === "events" && showEventsOnMap
+            ? filteredEvents.reduce<Partial<Record<EventSeverity, number>>>((acc, event) => ({ ...acc, [event.severity]: (acc[event.severity] ?? 0) + 1 }), {})
+            : {},
+        parishes:
+          eventsTab === "analysis" && showParishesOnMap && parishAlerts
+            ? {
+                levels: (["red", "orange", "yellow", "green"] as const).filter((level) => parishFilters.levels.includes(level)),
+                counts: parishAlerts.listed.reduce<Partial<Record<Semaphore, number>>>((acc, parish) => ({ ...acc, [parish.semaphore]: (acc[parish.semaphore] ?? 0) + 1 }), {}),
+              }
+            : null,
+        rain: rainLegends.map((legend) => ({
+          title: `Lluvia · ${rainSources.find((source) => source.layerId === legend.id)?.label ?? ""}`.trim(),
+          legend,
+        })),
+        sea: showSea && data.seaTemperature ? data.seaTemperature.legend : null,
+        imerg: showImerg,
+        stations: showStations,
+        riverNetwork: layers.riverNetwork,
+        riverAlerts:
+          layers.riverAlerts && mapData.riverAlerts
+            ? mapData.riverAlerts.alerts.reduce((acc, alert) => {
+                const level = alertLevelForDay(alert, alertDayIndex);
+                return level > 0 ? acc.set(level, (acc.get(level) ?? 0) + 1) : acc;
+              }, new Map<number, number>())
+            : null,
+        flashFloods:
+          layers.flashFloods && mapData.floodHub?.flashFloods?.length
+            ? mapData.floodHub.flashFloods.reduce<Partial<Record<FlashFloodLikelihood, number>>>((acc, area) => ({ ...acc, [area.likelihood]: (acc[area.likelihood] ?? 0) + 1 }), {})
+            : null,
+        watersheds: layers.watersheds,
+        preparedness: showPreparedness,
+        provincialRoads: showProvincialRoads,
+        shading:
+          shadeProvinces && !province
+            ? { label: RANK_INDICATORS.find((item) => item.id === rankIndicator)?.unit ?? "", colors: SHADING_COLORS }
+            : null,
+      }),
+      title: province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Ecuador",
+    };
+  };
+  // Lo último de cada render: la descarga de la animación lo lee entre cuadros (con los datos de esa ventana ya cargados).
+  const captureContentRef = useRef(captureContent);
+  const rainStepReadyRef = useRef<string | null>(null);
+  const rainPeriodRef = useRef<{ from: string; to: string } | null>(null);
+  useEffect(() => {
+    captureContentRef.current = captureContent;
+    rainStepReadyRef.current = rainStepReady;
+    rainPeriodRef.current = forecast.data;
+  });
+
+  /** Una imagen por paso (ventanas 3 → 24 h o días 24 → 72 h), con su leyenda y su periodo, y las descarga como GIF con fundidos. */
+  const exportRainAnimation = async () => {
+    const area = mapAreaRef.current;
+    const map = mapRef.current;
+    if (!area || !map || rainExport || rainSteps.length === 0) return;
+    const previousHours = forecastHours;
+    const previousDay = forecastDay;
+    const steps = rainSteps;
+    setAnimatingRain(false);
+    prefetchRainSteps();
+    setRainExport({ done: 0, total: steps.length });
+    try {
+      const frames: RenderedMapImage[] = [];
+      for (const step of steps) {
+        applyRainStep(step);
+        await waitUntil(() => rainStepReadyRef.current === stepKey(step), 45_000);
+        // Que termine el fundido de la imagen nueva y carguen las teselas.
+        await new Promise((resolve) => setTimeout(resolve, RAIN_FADE_MS + 150));
+        await tilesLoaded(map);
+        const content = captureContentRef.current();
+        const period = rainPeriodRef.current;
+        const when = period ? ` (${formatDateTime(period.from)} – ${formatDateTime(period.to)})` : "";
+        const what = step.kind === "hours" ? `en las próximas ${step.hours} h` : FORECAST_DAY_LABELS[step.day].range;
+        frames.push(await renderMapImageWithLayout(area, { ...content, title: `${content.title} · lluvia ${what}${when}`, north: northOf(map), scale: 1 }));
+        setRainExport({ done: frames.length, total: steps.length });
+      }
+      const name = rainMode === "hours" ? "3-6-12-24h" : "24-48-72h";
+      await downloadGif(frames, { holdMs: RAIN_GIF_HOLD_MS, fadeFrames: RAIN_GIF_FADE_FRAMES, fadeFrameMs: RAIN_GIF_FADE_FRAME_MS }, `sati-lluvia-${name}-${captureStamp()}.gif`);
+    } catch (error) {
+      window.alert(`No se pudo generar la animación: ${(error as Error).message}`);
+    } finally {
+      setRainExport(null);
+      setForecastDay(previousDay);
+      setForecastHours(previousHours);
+    }
+  };
+
   return (
     <div className="flex size-full flex-col">
       <RiskComponentBar value={riskTab} onSelect={selectRiskComponent} activeCounts={activeCounts} onOpenTimeline={() => openTimeline()} />
@@ -664,68 +859,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onCapture={async (north) => {
             if (!mapAreaRef.current) return;
             try {
-              const drawnRiskIds = new Set(visibleRiskLayers.map((layer) => layer.style.id));
-              await captureMap(
-                mapAreaRef.current,
-                [
-                  ...activeLayers.map((layer) => layer.label),
-                  ...(eventsTab === "events" && showEventsOnMap ? ["Eventos críticos (SNGR)"] : []),
-                  ...(eventsTab === "analysis" && showParishesOnMap ? ["Alerta de inundación por parroquia"] : []),
-                  ...(eventsTab === "closures" && showClosuresOnMap ? ["Cierres viales (MIT)"] : []),
-                ],
-                // Qué es cada color y símbolo de lo dibujado, para quien vea la imagen sin el panel.
-                buildCaptureLegend({
-                  // Con lo dibujado en el mapa en este momento (si hay provincia, solo lo de ella): así salen las cantidades.
-                  riskLayers: RISK_LAYER_STYLES.filter((style) => drawnRiskIds.has(style.id)).map((style) => ({
-                    style,
-                    colored: isColored(style),
-                    hidden: hiddenClassesOf(style),
-                    features: visibleRiskLayers.find((layer) => layer.style.id === style.id)?.data.features ?? [],
-                  })),
-                  events:
-                    eventsTab === "events" && showEventsOnMap
-                      ? filteredEvents.reduce<Partial<Record<EventSeverity, number>>>((acc, event) => ({ ...acc, [event.severity]: (acc[event.severity] ?? 0) + 1 }), {})
-                      : {},
-                  parishes:
-                    eventsTab === "analysis" && showParishesOnMap && parishAlerts
-                      ? {
-                          levels: (["red", "orange", "yellow", "green"] as const).filter((level) => parishFilters.levels.includes(level)),
-                          counts: parishAlerts.listed.reduce<Partial<Record<Semaphore, number>>>((acc, parish) => ({ ...acc, [parish.semaphore]: (acc[parish.semaphore] ?? 0) + 1 }), {}),
-                        }
-                      : null,
-                  rain: rainLegends.map((legend) => ({
-                    title: `Lluvia · ${rainSources.find((source) => source.layerId === legend.id)?.label ?? ""}`.trim(),
-                    legend,
-                  })),
-                  sea: showSea && data.seaTemperature ? data.seaTemperature.legend : null,
-                  imerg: showImerg,
-                  stations: showStations,
-                  riverNetwork: layers.riverNetwork,
-                  riverAlerts:
-                    layers.riverAlerts && mapData.riverAlerts
-                      ? mapData.riverAlerts.alerts.reduce((acc, alert) => {
-                          const level = alertLevelForDay(alert, alertDayIndex);
-                          return level > 0 ? acc.set(level, (acc.get(level) ?? 0) + 1) : acc;
-                        }, new Map<number, number>())
-                      : null,
-                  flashFloods:
-                    layers.flashFloods && mapData.floodHub?.flashFloods?.length
-                      ? mapData.floodHub.flashFloods.reduce<Partial<Record<FlashFloodLikelihood, number>>>((acc, area) => ({ ...acc, [area.likelihood]: (acc[area.likelihood] ?? 0) + 1 }), {})
-                      : null,
-                  watersheds: layers.watersheds,
-                  preparedness: showPreparedness,
-                  provincialRoads: showProvincialRoads,
-                  shading:
-                    shadeProvinces && !province
-                      ? { label: RANK_INDICATORS.find((item) => item.id === rankIndicator)?.unit ?? "", colors: SHADING_COLORS }
-                      : null,
-                }),
-                province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Ecuador",
-                north,
-              );
+              const content = captureContent();
+              await captureMap(mapAreaRef.current, content.layers, content.legend, content.title, north);
             } catch (error) {
               window.alert(`No se pudo capturar la imagen: ${(error as Error).message}`);
             }
+          }}
+          onMapReady={(map) => {
+            mapRef.current = map;
           }}
           provinceShading={shadeProvinces && !province ? rankValues : null}
           // Acercarse a la provincia de un punto (o del panel) la elige: la barra, el resumen y las capas dicen lo mismo.
@@ -788,11 +929,20 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
                   rain={data.rain}
                   day={forecastDay}
                   onDayChange={(day) => {
+                    setAnimatingRain(false);
                     setForecastDay(day);
                     setForecastHours(null);
                   }}
                   hours={forecastHours}
-                  onHoursChange={setForecastHours}
+                  onHoursChange={(hours) => {
+                    setAnimatingRain(false);
+                    setForecastHours(hours);
+                  }}
+                  animating={animatingRain}
+                  animationLabel={rainMode === "hours" ? "Animar 3 → 24 h" : "Animar 24 → 72 h"}
+                  onToggleAnimation={toggleRainAnimation}
+                  exportProgress={rainExport}
+                  onExportAnimation={exportRainAnimation}
                   windowPeriod={forecastWindow.data}
                   visible={showRain}
                   onVisibleChange={setShowRain}

@@ -204,22 +204,40 @@ function drawCompass(context: CanvasRenderingContext2D, x: number, y: number, s:
   context.restore();
 }
 
-/**
- * Descarga una imagen PNG del mapa como se ve (capas y leyendas, sin paneles ni
- * botones), con la leyenda de todo lo dibujado (qué es cada color y símbolo) y una
- * franja abajo: las capas visibles y la fecha y hora de la captura.
- */
-export async function captureMap(
-  area: HTMLElement,
-  layers: readonly string[],
-  legend: readonly CaptureLegendGroup[] = [],
+/** Lo que lleva una imagen del mapa además del mapa mismo. */
+export interface MapImageOptions {
+  layers: readonly string[];
+  legend?: readonly CaptureLegendGroup[];
   /** Título de la imagen: la provincia que se está viendo (o todo el Ecuador). */
-  title = "",
+  title?: string;
   /** Hacia dónde queda el norte en la imagen, en grados (0 = arriba): para la brújula. */
-  north = 0,
-): Promise<void> {
+  north?: number;
+  /** Píxeles por punto de pantalla; por defecto, los de la pantalla (máximo 2). La animación usa 1 (archivo más liviano). */
+  scale?: number;
+}
+
+/**
+ * Arma la imagen del mapa como se ve (capas y leyendas, sin paneles ni botones), con
+ * la leyenda de todo lo dibujado (qué es cada color y símbolo) y una franja abajo: las
+ * capas visibles y la fecha y hora de la captura.
+ */
+/** La imagen y dónde quedó el mapa dentro de ella (para fundir solo el mapa entre cuadros de una animación). */
+export interface RenderedMapImage {
+  canvas: HTMLCanvasElement;
+  mapTop: number;
+  mapHeight: number;
+}
+
+export async function renderMapImage(area: HTMLElement, options: MapImageOptions): Promise<HTMLCanvasElement> {
+  return (await renderMapImageWithLayout(area, options)).canvas;
+}
+
+export async function renderMapImageWithLayout(
+  area: HTMLElement,
+  { layers, legend = [], title = "", north = 0, scale: wanted }: MapImageOptions,
+): Promise<RenderedMapImage> {
   const takenAt = new Date();
-  const scale = Math.min(window.devicePixelRatio || 1, 2);
+  const scale = wanted ?? Math.min(window.devicePixelRatio || 1, 2);
   const map = await toCanvas(area, {
     pixelRatio: scale,
     cacheBust: false,
@@ -275,12 +293,121 @@ export async function captureMap(
   const list = layers.length > 0 ? `Capas: ${layers.join(" · ")}` : "Sin capas encendidas";
   context.fillText(fit(context, list, canvas.width - pad * 2), pad, row(oneLine ? 1 : 2));
 
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("No se pudo generar la imagen");
+  return { canvas, mapTop: header, mapHeight: map.height };
+}
+
+function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `sati-mapa-${fileStamp(takenAt)}.png`;
+  link.download = name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Descarga una imagen PNG del mapa como se ve (ver renderMapImage). */
+export async function captureMap(
+  area: HTMLElement,
+  layers: readonly string[],
+  legend: readonly CaptureLegendGroup[] = [],
+  title = "",
+  north = 0,
+): Promise<void> {
+  const canvas = await renderMapImage(area, { layers, legend, title, north });
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("No se pudo generar la imagen");
+  download(blob, `sati-mapa-${fileStamp(new Date())}.png`);
+}
+
+/** Tiempos de la animación GIF: cuánto se ve cada cuadro y cómo se funde con el siguiente. */
+export interface GifTiming {
+  holdMs: number;
+  /** Cuadros intermedios del fundido entre un cuadro y el siguiente (0 = corte directo). */
+  fadeFrames: number;
+  fadeFrameMs: number;
+}
+
+/**
+ * Descarga una animación GIF en bucle con los cuadros dados (del mismo tamaño). Entre
+ * uno y el siguiente (y del último al primero) se intercalan cuadros que funden solo el
+ * mapa: el título, la leyenda y la franja cambian de golpe, sin letras fantasma. Cada
+ * cuadro lleva su propia paleta de 256 colores: la escala de la lluvia se ve como en el mapa.
+ */
+export async function downloadGif(frames: readonly RenderedMapImage[], timing: GifTiming, name: string): Promise<void> {
+  if (frames.length === 0) throw new Error("No hay cuadros para la animación");
+  const { GIFEncoder, quantize, applyPalette } = await import("gifenc");
+  const width = Math.min(...frames.map((frame) => frame.canvas.width));
+  const height = Math.min(...frames.map((frame) => frame.canvas.height));
+  const gif = GIFEncoder();
+  let first = true;
+  const write = (canvas: HTMLCanvasElement, delay: number) => {
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("El navegador no permite leer la imagen");
+    const { data } = context.getImageData(0, 0, width, height);
+    const palette = quantize(data, 256);
+    gif.writeFrame(applyPalette(data, palette), width, height, { palette, delay, repeat: first ? 0 : undefined });
+    first = false;
+  };
+  const blend = document.createElement("canvas");
+  blend.width = width;
+  blend.height = height;
+  const blendContext = blend.getContext("2d");
+  if (!blendContext) throw new Error("El navegador no permite crear la imagen");
+
+  frames.forEach((frame, index) => {
+    write(frame.canvas, timing.holdMs);
+    const next = frames[(index + 1) % frames.length];
+    if (frames.length < 2 || timing.fadeFrames <= 0) return;
+    for (let step = 1; step <= timing.fadeFrames; step++) {
+      // Todo del siguiente cuadro, y encima el mapa del actual cada vez más transparente.
+      const t = step / (timing.fadeFrames + 1);
+      blendContext.globalAlpha = 1;
+      blendContext.drawImage(next.canvas, 0, 0);
+      blendContext.globalAlpha = 1 - t;
+      blendContext.drawImage(frame.canvas, 0, frame.mapTop, width, frame.mapHeight, 0, next.mapTop, width, next.mapHeight);
+      write(blend, timing.fadeFrameMs);
+    }
+  });
+  gif.finish();
+  download(new Blob([gif.bytes()], { type: "image/gif" }), name);
+}
+
+/** "2026-11-05-2140", para nombrar archivos (hora de Ecuador). */
+export const captureStamp = (date = new Date()) => fileStamp(date);
+
+/** Lo justo del mapa de Leaflet que usan `tilesLoaded` y `northOf` (sin importar Leaflet aquí). */
+interface MapLike {
+  eachLayer(fn: (layer: unknown) => void): unknown;
+  getCenter(): { lat: number; lng: number };
+  latLngToContainerPoint(latlng: [number, number]): { x: number; y: number };
+}
+
+/** Hacia dónde queda el norte en pantalla, en grados (0 = arriba): como northOnScreen, sin Leaflet. */
+export function northOf(map: MapLike): number {
+  const { lat, lng } = map.getCenter();
+  const a = map.latLngToContainerPoint([lat, lng]);
+  const b = map.latLngToContainerPoint([Math.min(lat + 0.5, 89), lng]);
+  const degrees = (Math.atan2(b.x - a.x, a.y - b.y) * 180) / Math.PI;
+  return Math.abs(degrees) < 0.5 ? 0 : degrees;
+}
+interface LoadingLayer {
+  isLoading(): boolean;
+  once(type: "load", fn: () => void): unknown;
+}
+
+/**
+ * Espera a que las capas de teselas (mapa base, nombres, lluvia…) terminen de cargar lo
+ * que se ve, y a que termine el fundido con que aparecen (~200 ms), para que la imagen no
+ * salga con cuadros grises. Como máximo `maxMs`: si una capa no termina, se sigue igual.
+ */
+export function tilesLoaded(map: MapLike, maxMs = 8000): Promise<void> {
+  const loading: LoadingLayer[] = [];
+  map.eachLayer((layer) => {
+    const candidate = layer as Partial<LoadingLayer>;
+    if (typeof candidate.isLoading === "function" && candidate.isLoading() && typeof candidate.once === "function") loading.push(candidate as LoadingLayer);
+  });
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 400));
+  if (loading.length === 0) return settle();
+  const waits = loading.map((layer) => new Promise<void>((resolve) => layer.once("load", () => resolve())));
+  return Promise.race([Promise.all(waits).then(settle), new Promise<void>((resolve) => setTimeout(resolve, maxMs))]);
 }

@@ -145,6 +145,9 @@ export const FORECAST_DAY_LABELS: Record<ForecastDay, { option: string; range: s
 };
 
 export const FORECAST_WINDOW_HOURS: readonly ForecastWindowHours[] = [3, 6, 12, 24];
+
+/** Lo que dura el fundido entre una imagen de lluvia y la siguiente (ver AccumulatedRainLayer y globals.css → .rain-fade). */
+export const RAIN_FADE_MS = 500;
 export const DEFAULT_FORECAST_DAY: ForecastDay = 1;
 
 /** Capa del backend cuya paleta usa la imagen de lluvia acumulada (para la leyenda). */

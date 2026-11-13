@@ -25,6 +25,14 @@ interface RainForecastSectionProps {
   isLoading: boolean;
   opacity: number;
   onOpacityChange: (opacity: number) => void;
+  /** Animación en el mapa de lo elegido: las ventanas (3 → 24 h) o los días (24 → 72 h). */
+  animating: boolean;
+  /** Texto del botón, p. ej. "Animar 3 → 24 h". */
+  animationLabel: string;
+  onToggleAnimation: () => void;
+  /** Descarga de la animación como GIF; `exportProgress`: cuántas ventanas van (null = no se está generando). */
+  exportProgress: { done: number; total: number } | null;
+  onExportAnimation: () => void;
 }
 
 /** Lluvia pronosticada por el modelo WRF del INAMHI: las próximas horas, o un día de la corrida (no acumulado). */
@@ -41,6 +49,11 @@ export function RainForecastSection({
   isLoading,
   opacity,
   onOpacityChange,
+  animating,
+  animationLabel,
+  onToggleAnimation,
+  exportProgress,
+  onExportAnimation,
 }: RainForecastSectionProps) {
   const period = hours ? windowPeriod : rain?.days.find((item) => item.day === day);
   const options = FORECAST_DAYS.map((option) => {
@@ -100,6 +113,58 @@ export function RainForecastSection({
                 onChange={(value) => onDayChange(Number(value) as ForecastDay)}
               />
             </div>
+            {/* Animar en el mapa lo elegido (las próximas horas o los días) y descargarlo como GIF: una sola fila. */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={onToggleAnimation}
+                disabled={exportProgress !== null}
+                aria-pressed={animating}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold whitespace-nowrap ring-1 transition focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50",
+                  animating ? "bg-blue-600 text-white ring-blue-600" : "bg-white text-blue-700 ring-blue-200 hover:bg-blue-50",
+                )}
+              >
+                <PlayPauseIcon playing={animating} />
+                {/* En pantallas angostas solo "Animar": el rango lo dice la opción elegida y el texto de abajo. */}
+                <span className="truncate">
+                  {animating ? (
+                    "Pausar"
+                  ) : (
+                    <>
+                      <span className="sm:hidden">Animar</span>
+                      <span className="max-sm:hidden">{animationLabel}</span>
+                    </>
+                  )}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={onExportAnimation}
+                disabled={exportProgress !== null}
+                title="Descargar la animación como GIF"
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-white px-2 py-1.5 whitespace-nowrap text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-60"
+              >
+                {exportProgress ? (
+                  <>
+                    <span aria-hidden="true" className="size-3 shrink-0 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                    <span className="truncate">Generando {exportProgress.done}/{exportProgress.total}</span>
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon />
+                    <span className="truncate">
+                      <span className="sm:hidden">GIF</span>
+                      <span className="max-sm:hidden">Descargar GIF</span>
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] leading-snug text-slate-500">
+              Se anima lo que tengas elegido: una opción de <strong className="font-semibold text-slate-600">Próximas horas</strong>{" "}
+              recorre 3 → 24 h; una de <strong className="font-semibold text-slate-600">Por día de la corrida</strong>, 24 → 72 h.
+            </p>
             <OpacitySlider value={opacity} onChange={onOpacityChange} layerName="la lluvia pronosticada" />
           </div>
         )}
@@ -139,5 +204,21 @@ export function Notice({ children }: { children: ReactNode }) {
       <AlertTriangleIcon className="mt-px size-3.5 shrink-0" />
       <span>{children}</span>
     </p>
+  );
+}
+
+function PlayPauseIcon({ playing }: { playing: boolean }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="size-3.5 shrink-0">
+      {playing ? <path d="M6 5h4v14H6zM14 5h4v14h-4z" /> : <path d="M7 4.5v15l12-7.5z" />}
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3.5 shrink-0">
+      <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+    </svg>
   );
 }

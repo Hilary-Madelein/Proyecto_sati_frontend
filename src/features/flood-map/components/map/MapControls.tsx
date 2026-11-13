@@ -6,6 +6,7 @@ import { useMap, useMapEvents } from "react-leaflet";
 import { cn } from "@/lib/cn";
 import { CameraIcon, CheckIcon, MapIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@/components/ui/icons";
 import { BASEMAPS, type BasemapId } from "../../constants";
+import { tilesLoaded } from "../../map-capture";
 import { northOnScreen } from "./north";
 import { goHome } from "./province-focus";
 
@@ -215,21 +216,4 @@ function ZoomSlider() {
       />
     </div>
   );
-}
-
-/**
- * Espera a que las capas de teselas (mapa base, nombres, lluvia…) terminen de cargar
- * lo que se ve, para que la imagen no salga con cuadros grises (p. ej. justo después
- * de un salto de zoom). Como máximo 8 s: si una capa no termina, se captura igual.
- */
-function tilesLoaded(map: L.Map): Promise<void> {
-  const loading: L.GridLayer[] = [];
-  map.eachLayer((layer) => {
-    if (layer instanceof L.GridLayer && (layer as L.GridLayer & { isLoading?: () => boolean }).isLoading?.()) loading.push(layer);
-  });
-  // Tras cargar, Leaflet hace aparecer cada tesela con un fundido (~200 ms): se espera a que termine.
-  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 400));
-  if (loading.length === 0) return settle();
-  const waits = loading.map((layer) => new Promise<void>((resolve) => layer.once("load", () => resolve())));
-  return Promise.race([Promise.all(waits).then(settle), new Promise<void>((resolve) => setTimeout(resolve, 8000))]);
 }

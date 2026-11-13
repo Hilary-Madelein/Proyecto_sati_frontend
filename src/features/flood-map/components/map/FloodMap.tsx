@@ -45,6 +45,7 @@ import { MapClickHandler } from "./MapClickHandler";
 import { MapControls } from "./MapControls";
 import { MapFocus } from "./MapFocus";
 import { MapPopupWatcher } from "./MapPopupWatcher";
+import { MapReady } from "./MapReady";
 import { MapResizeWatcher } from "./MapResizeWatcher";
 import { MapScale } from "./MapScale";
 import { ProvinceFocusBar } from "./ProvinceFocusBar";
@@ -128,6 +129,8 @@ export interface FloodMapProps {
   onProvinceFocus: (province: ProvinceFeature | null) => void;
   /** Abre el resumen (botón de la barra de la provincia, solo en móvil). */
   onOpenSummary: () => void;
+  /** Entrega la instancia del mapa (para la animación de la lluvia: norte y teselas cargadas). */
+  onMapReady?: (map: L.Map) => void;
   /** Provincias pintadas por el indicador del ranking del resumen (por su clave); null = sin pintar. */
   provinceShading: ReadonlyMap<string, number> | null;
 }
@@ -192,6 +195,7 @@ export default function FloodMap({
   onGoHome,
   onProvinceFocus,
   onOpenSummary,
+  onMapReady,
   provinceShading,
 }: FloodMapProps) {
   const [boundsOptions] = useState(getHomeBoundsOptions);
@@ -287,6 +291,7 @@ export default function FloodMap({
       <RainPointPopup forecast={rainForecast} observed={observedRain} sea={seaTemperature} active={!pickingProvince} />
 
       <MapResizeWatcher />
+      <MapReady onReady={onMapReady} />
       <MapPopupWatcher />
       <MapScale />
       {provinceShading && provinces && !selectedProvince && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
@@ -306,6 +311,7 @@ type OverlayProps = Omit<
   | "onGoHome"
   | "onProvinceFocus"
   | "onOpenSummary"
+  | "onMapReady"
   | "provinceShading"
 >;
 

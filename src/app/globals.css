@@ -299,3 +299,13 @@ html .leaflet-tooltip.map-place-label.map-place-card::before {
     margin-bottom: 7.75rem;
   }
 }
+
+/* Lluvia (ver AccumulatedRainLayer): la imagen nueva aparece con un fundido sobre la anterior. */
+.leaflet-image-layer.rain-fade {
+  transition: opacity 500ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .leaflet-image-layer.rain-fade {
+    transition: none;
+  }
+}

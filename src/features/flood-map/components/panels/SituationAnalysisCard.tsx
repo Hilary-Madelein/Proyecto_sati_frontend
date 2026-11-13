@@ -87,35 +87,37 @@ export function SituationAnalysisCard({ provinceKey, placeName }: SituationAnaly
   }
 
   return (
-    <section aria-label="Análisis con IA" className="rounded-xl bg-indigo-50 p-3 text-xs leading-relaxed text-slate-700 ring-1 ring-indigo-200">
-      <div className="mb-1.5 flex items-start justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-indigo-700 uppercase">
-          <SparklesIcon className="size-3.5" />
-          Análisis con IA · {placeName}
+    <section aria-label="Análisis con IA" className="overflow-hidden rounded-2xl bg-indigo-50 text-xs text-slate-700 shadow-sm ring-1 ring-indigo-200">
+      <header className="flex items-center justify-between gap-2 bg-indigo-100/80 px-3 py-2">
+        <p className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-indigo-700">
+          <SparklesIcon className="size-3.5 shrink-0" />
+          <span className="truncate">Análisis con IA · {placeName}</span>
         </p>
         <button
           type="button"
           onClick={close}
           aria-label="Cerrar el análisis"
-          className="rounded-md p-1 text-indigo-700 transition hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-indigo-600"
+          className="shrink-0 rounded-md p-1 text-indigo-700 transition hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-indigo-600"
         >
           <CloseIcon className="size-3" />
         </button>
-      </div>
+      </header>
 
       {state.status === "loading" ? (
-        <Waiting text="Analizando los datos del momento… tarda unos segundos." />
+        <div className="px-3 py-4">
+          <Waiting text="Analizando los datos del momento… tarda unos segundos." />
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3 px-3 pt-3 pb-3">
           <div aria-live="polite" className="space-y-2">
-            <p className="text-[13px] leading-snug font-semibold text-slate-900">{state.analysis.headline}</p>
-            <Part title="Lo medido y reportado" text={state.analysis.observed} />
-            <Part title="Lo que se espera" text={state.analysis.expected} />
-            <Part title="Qué significa" text={state.analysis.meaning} />
+            <h3 className="text-[14px] leading-snug font-semibold text-slate-900">{state.analysis.headline}</h3>
+            <Part title="Lo medido y reportado" text={state.analysis.observed} accent="border-yellow-400" />
+            <Part title="Lo que se espera" text={state.analysis.expected} accent="border-blue-600" />
+            <Part title="Qué significa" text={state.analysis.meaning} accent="border-red-600" />
           </div>
           <Questions provinceKey={provinceKey} />
-          <p className="border-t border-indigo-200 pt-2 text-[10px] leading-relaxed text-slate-500">
-            Datos de: {state.analysis.dataTime}. Fuentes: {state.analysis.sources}.
+          <p className="rounded-lg bg-white/60 px-2.5 py-2 text-[10px] leading-relaxed text-slate-500">
+            <span className="font-medium text-slate-600">Datos de {state.analysis.dataTime}</span> · {state.analysis.sources}.
             {state.analysis.missing.length > 0 && ` Sin datos ahora de: ${state.analysis.missing.join(", ")}.`} {state.analysis.note}
           </p>
         </div>
@@ -161,18 +163,22 @@ function Questions({ provinceKey }: { provinceKey: string | null }) {
   };
 
   return (
-    <div className="space-y-2 border-t border-indigo-200 pt-2">
+    <div className="space-y-2 border-t border-indigo-200/70 pt-3">
       {exchanges.length > 0 && (
         <ul aria-live="polite" className="space-y-2">
           {exchanges.map((exchange, index) => (
-            <li key={index} className="space-y-1">
-              <p className="ml-6 rounded-lg rounded-br-sm bg-indigo-600 px-2.5 py-1.5 text-white">{exchange.question}</p>
+            <li key={index} className="space-y-1.5">
+              <p className="ml-8 rounded-2xl rounded-br-md bg-indigo-600 px-3 py-1.5 text-white">{exchange.question}</p>
               {exchange.answer === null ? (
-                <Waiting text="Buscando en los datos…" />
+                <div className="mr-8 rounded-2xl rounded-bl-md bg-white px-3 py-2 shadow-sm">
+                  <Waiting text="Buscando en los datos…" />
+                </div>
               ) : (
-                <p className={exchange.failed ? "mr-6 rounded-lg rounded-bl-sm bg-red-50 px-2.5 py-1.5 text-red-800 ring-1 ring-red-200" : "mr-6 rounded-lg rounded-bl-sm bg-white px-2.5 py-1.5 ring-1 ring-indigo-200"}>
-                  {exchange.answer}
-                </p>
+                exchange.failed ? (
+                  <p className="mr-8 rounded-2xl rounded-bl-md bg-red-50 px-3 py-2 leading-relaxed text-red-800">{exchange.answer}</p>
+                ) : (
+                  <Justified className="mr-8 rounded-2xl rounded-bl-md bg-white px-3 py-2 leading-relaxed text-slate-700 shadow-sm">{exchange.answer}</Justified>
+                )
               )}
             </li>
           ))}
@@ -180,11 +186,12 @@ function Questions({ provinceKey }: { provinceKey: string | null }) {
       )}
 
       {left > 0 ? (
-        <form onSubmit={ask} className="space-y-1">
+        <form onSubmit={ask} className="space-y-1.5">
           <label htmlFor="situation-question" className="block text-[11px] font-semibold text-slate-700">
             ¿Tienes una pregunta sobre este análisis?
           </label>
-          <div className="flex gap-1.5">
+          {/* Campo y botón juntos, como un chat. */}
+          <div className="flex items-center gap-1 rounded-full bg-white py-1 pr-1 pl-3 shadow-sm ring-1 ring-indigo-200 focus-within:ring-2 focus-within:ring-indigo-500">
             <input
               id="situation-question"
               type="text"
@@ -193,19 +200,19 @@ function Questions({ provinceKey }: { provinceKey: string | null }) {
               maxLength={QUESTION_MAX_LENGTH}
               placeholder="Ej.: ¿dónde lloverá más?"
               autoComplete="off"
-              className="min-w-0 flex-1 rounded-lg bg-white px-2.5 py-1.5 text-xs text-slate-900 ring-1 ring-indigo-200 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-indigo-600"
+              className="min-w-0 flex-1 bg-transparent py-1 text-xs text-slate-900 outline-none placeholder:text-slate-400"
             />
             <button
               type="submit"
               disabled={waiting || draft.trim().length < 3}
               aria-label="Enviar la pregunta"
-              className="flex shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-2.5 text-white transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-indigo-300"
+              className="grid size-7 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-indigo-200"
             >
               <SendIcon className="size-3.5" />
             </button>
           </div>
           <p className="text-[10px] text-slate-500">
-            {left === MAX_QUESTIONS ? `Puedes hacer hasta ${MAX_QUESTIONS} preguntas.` : "Te queda 1 pregunta."} La IA responde solo con los datos de este análisis.
+            {left === MAX_QUESTIONS ? `Hasta ${MAX_QUESTIONS} preguntas` : "Te queda 1 pregunta"} · la IA responde solo con los datos de este análisis.
           </p>
         </form>
       ) : (
@@ -224,10 +231,25 @@ function Waiting({ text }: { text: string }) {
   );
 }
 
-function Part({ title, text }: { title: string; text: string }) {
+/** Una parte del análisis, en su recuadro: título arriba y el texto debajo, con una franja de color (amarillo, azul y rojo, como la bandera). */
+function Part({ title, text, accent }: { title: string; text: string; accent: string }) {
   return (
-    <p>
-      <strong className="font-semibold text-slate-900">{title}:</strong> {text}
+    <section className={`rounded-xl border-l-4 bg-white px-3 py-2 shadow-sm ${accent}`}>
+      <h4 className="mb-0.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">{title}</h4>
+      <Justified className="text-[12.5px] leading-relaxed text-slate-700">{text}</Justified>
+    </section>
+  );
+}
+
+/**
+ * Texto justificado para columnas angostas: corta con guion solo palabras largas (10
+ * letras o más, dejando al menos 5 antes y 4 después), así no quedan huecos grandes
+ * entre palabras ni cortes como "to-rrencial".
+ */
+function Justified({ className, children }: { className: string; children: string }) {
+  return (
+    <p lang="es" className={`text-justify hyphens-auto [hyphenate-limit-chars:10_5_4] ${className}`}>
+      {children}
     </p>
   );
 }
