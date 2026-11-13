@@ -52,8 +52,12 @@ export interface RainLegend {
 }
 
 // ── Lluvia observada por satélite ───────────────────────────────────────
-/** Hoy solo PERSIANN: el INAMHI dejó de publicar IMERG (marzo de 2026). */
-export type ObservedRainProduct = "persiann";
+/**
+ * PERSIANN (satélite, por el INAMHI) y PARDIG (lluvia estimada con IA por Google
+ * DeepMind, cada 15 minutos, con unas 6 horas de retraso). El INAMHI dejó de
+ * publicar IMERG en marzo de 2026.
+ */
+export type ObservedRainProduct = "persiann" | "pardig";
 
 export interface ObservedRainWindowStatus {
   hours: RainWindowHours;

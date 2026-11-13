@@ -115,7 +115,7 @@ export function ObservedRainSection({
             {productOptions.length > 1 && (
               <SegmentedControl
                 name="observed-rain-product"
-                label="Producto satelital"
+                label="Fuente de la lluvia observada"
                 value={product}
                 options={productOptions}
                 onChange={onProductChange}
@@ -126,7 +126,8 @@ export function ObservedRainSection({
             {availability && !anyAvailable && <Notice>Ningún satélite tiene datos recientes.</Notice>}
             {staleProducts.map((item) => (
               <Notice key={item.key}>
-                {item.name}: {staleHint(item).toLowerCase()} (el INAMHI no lo está publicando).
+                {item.name}: {staleHint(item).toLowerCase()}
+                {item.key === "pardig" ? " (se está cargando o Google no lo está publicando)." : " (el INAMHI no lo está publicando)."}
               </Notice>
             ))}
             {error && <Notice>{error}</Notice>}
@@ -142,7 +143,10 @@ export function ObservedRainSection({
             )}
             {status && !status.isStale && (
               <p className="text-[11px] text-slate-500">
-                Suma de la lluvia de cada hora estimada por satélite · {status.attribution.replace("Lluvia observada: ", "")}
+                {status.key === "pardig"
+                  ? "Lluvia estimada con inteligencia artificial a partir de satélites, cada 15 minutos; llega con unas 6 horas de retraso"
+                  : "Suma de la lluvia de cada hora estimada por satélite"}{" "}
+                · {status.attribution.replace("Lluvia observada: ", "")}
               </p>
             )}
           </div>

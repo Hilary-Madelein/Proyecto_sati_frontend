@@ -164,7 +164,8 @@ export const OBSERVED_RAIN_WINDOWS: readonly { value: `${RainWindowHours}`; labe
   { value: "72", label: "72h" },
 ];
 
-export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product}-24h`;
+/** PARDIG no tiene capa propia en el catálogo: el backend lo pinta con la paleta de PERSIANN, para poder compararlos. */
+export const observedRainLegendLayer = (product: ObservedRainProduct) => `${product === "pardig" ? "persiann" : product}-24h`;
 
 /** Opacidad inicial de cada capa de imagen (después se ajusta con su deslizador). */
 export const DEFAULT_OVERLAY_OPACITY = { forecast: 0.85, observed: 0.85, imerg: 0.85, sea: 0.85 } as const;
