@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CloseIcon, SendIcon, SparklesIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 
-/** Respuesta de GET /situation-analysis: el análisis del momento en cuatro partes. */
+/** Respuesta de GET /situation-analysis: el análisis del momento por partes. */
 interface SituationAnalysis {
   /** Lugar analizado, como va tras "en": "Ecuador", "la provincia de Manabí". */
   place: string;
@@ -14,6 +14,8 @@ interface SituationAnalysis {
   observed: string;
   expected: string;
   meaning: string;
+  /** Vulnerabilidad del lugar según las capas de exposición y preparación. */
+  vulnerability?: string;
   /** "ai": lo redactó Gemini; "template": resumen automático porque la IA no respondió. */
   writer: "ai" | "template";
   sources: string;
@@ -112,6 +114,7 @@ export function SituationAnalysisCard({ provinceKey, placeName }: SituationAnaly
             <Part title="Lo medido y reportado" text={state.analysis.observed} />
             <Part title="Lo que se espera" text={state.analysis.expected} />
             <Part title="Qué significa" text={state.analysis.meaning} />
+            {state.analysis.vulnerability && <Part title="Vulnerabilidad del lugar" text={state.analysis.vulnerability} />}
           </div>
           <Questions provinceKey={provinceKey} />
           <p className="border-t border-indigo-200 pt-2 text-[10px] leading-relaxed text-slate-500">
