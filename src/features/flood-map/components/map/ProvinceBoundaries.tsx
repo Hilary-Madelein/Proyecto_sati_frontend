@@ -5,7 +5,7 @@ import { GeoJSON, Pane, useMap, useMapEvents } from "react-leaflet";
 import { MAP_PANES, PROVINCE_BOUNDARIES_URL } from "../../constants";
 
 interface ProvinceBoundariesProps {
-  /** Se dibujan hasta este zoom: más cerca, el mapa base trae sus propias divisiones. */
+  /** Se dibujan hasta este zoom de teselas: más cerca, el mapa base trae sus propias divisiones. */
   maxZoom: number;
 }
 
@@ -30,7 +30,10 @@ export function ProvinceBoundaries({ maxZoom }: ProvinceBoundariesProps) {
     return () => controller.abort();
   }, []);
 
-  if (!data || zoom > maxZoom) return null;
+  // Con el zoom de las teselas, no el del mapa: Leaflet pide las del zoom redondeado, así
+  // que en 7,2 (la vista de todo Ecuador en una pantalla ancha) el mapa base todavía no trae
+  // las provincias. Antes se quitaban en 7,01 y quedaba un tramo sin ninguna división.
+  if (!data || Math.round(zoom) > maxZoom) return null;
   return (
     // Sin capturar clics: su lienzo cubre todo el mapa y taparía a las capas de abajo.
     <Pane name={MAP_PANES.provinces.name} style={{ zIndex: MAP_PANES.provinces.zIndex, pointerEvents: "none" }}>
