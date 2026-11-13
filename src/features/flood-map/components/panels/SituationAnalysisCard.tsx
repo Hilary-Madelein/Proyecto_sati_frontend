@@ -4,18 +4,19 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CloseIcon, SendIcon, SparklesIcon } from "@/components/ui/icons";
 import { satiClientGet } from "@/lib/api/sati-client";
 
-/** Respuesta de GET /situation-analysis: el análisis del momento por partes. */
+/** Respuesta de GET /situation-analysis: el titular y los dos párrafos del análisis del momento. */
 interface SituationAnalysis {
   /** Lugar analizado, como va tras "en": "Ecuador", "la provincia de Manabí". */
   place: string;
   /** Hora de los datos, ya escrita para mostrar. */
   dataTime: string;
   headline: string;
-  observed: string;
-  expected: string;
-  meaning: string;
-  /** Vulnerabilidad del lugar según las capas de exposición y preparación. */
-  vulnerability?: string;
+  /** Primer párrafo: el pronóstico de lluvia y lo que podría afectar (antecedentes, vías, puentes, deslizamientos, vecinos de la misma cuenca). */
+  situation: string;
+  /** Segundo párrafo: el plan de contingencia con lo que se tiene. */
+  plan: string;
+  /** Solo con lluvia excepcional: referencia de los episodios anteriores de El Niño (la escribe el sistema, no la IA). */
+  reference?: string | null;
   /** "ai": lo redactó Gemini; "template": resumen automático porque la IA no respondió. */
   writer: "ai" | "template";
   sources: string;
@@ -40,7 +41,9 @@ interface SituationAnalysisCardProps {
 
 /**
  * "Analizar con IA": a pedido, el backend junta los datos del momento del lugar
- * (pronóstico, lluvia medida, crecidas, ríos y eventos) y Gemini los redacta. No
+ * (pronóstico, lluvia medida, crecidas, ríos, eventos, antecedentes, red vial,
+ * deslizamientos y los vecinos de la misma cuenca) y Gemini los redacta en dos
+ * párrafos: qué se espera y qué podría afectar, y el plan de contingencia. No
  * se pide solo: cada análisis es una consulta a la IA. Debajo, hasta dos preguntas
  * sobre ese análisis.
  */
@@ -113,10 +116,9 @@ export function SituationAnalysisCard({ provinceKey, placeName }: SituationAnaly
         <div className="space-y-3 px-3 pt-3 pb-3">
           <div aria-live="polite" className="space-y-2">
             <p className="text-[13px] leading-snug font-semibold text-slate-900">{state.analysis.headline}</p>
-            <Part title="Lo medido y reportado" text={state.analysis.observed} accent="border-yellow-400" />
-            <Part title="Lo que se espera" text={state.analysis.expected} accent="border-blue-600" />
-            <Part title="Qué significa" text={state.analysis.meaning} accent="border-red-600" />
-            {state.analysis.vulnerability && <Part title="Vulnerabilidad del lugar" text={state.analysis.vulnerability} accent="border-orange-500" />}
+            <Part title="Pronóstico y posibles afectaciones" text={state.analysis.situation} accent="border-blue-600" />
+            <Part title="Plan de contingencia" text={state.analysis.plan} accent="border-red-600" />
+            {state.analysis.reference && <Part title="Referencia: episodios anteriores de El Niño" text={state.analysis.reference} accent="border-yellow-400" />}
           </div>
           <Questions provinceKey={provinceKey} />
           <p className="rounded-lg bg-white/60 px-2.5 py-2 text-[10px] leading-relaxed text-slate-500">
@@ -236,7 +238,7 @@ function Waiting({ text }: { text: string }) {
 
 /**
  * Una parte del análisis, en su recuadro blanco: título arriba y el texto debajo, con una
- * franja de color en el borde (`accent`: amarillo, azul y rojo, como la bandera; naranja la vulnerabilidad).
+ * franja de color en el borde (`accent`: azul el pronóstico, rojo el plan y amarillo la referencia de El Niño).
  */
 function Part({ title, text, accent }: { title: string; text: string; accent: string }) {
   return (
