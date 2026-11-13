@@ -309,3 +309,44 @@ html .leaflet-tooltip.map-place-label.map-place-card::before {
     transition: none;
   }
 }
+
+/* Nombres de ciudades sobre las capas de colores (ver CityLabels): texto oscuro con borde blanco. */
+.city-label-icon {
+  background: none;
+  border: 0;
+}
+.city-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-3px, -50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font: 600 11px/1 system-ui, sans-serif;
+  color: #0f172a;
+  -webkit-text-stroke: 3px #ffffff;
+  paint-order: stroke fill;
+}
+.city-label.is-left {
+  flex-direction: row-reverse;
+  transform: translate(calc(-100% + 3px), -50%);
+}
+.city-label i {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 9999px;
+  background: #0f172a;
+  box-shadow: 0 0 0 1.5px #ffffff;
+}
+.city-label.is-capital {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.city-label.is-capital i {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}

@@ -32,9 +32,9 @@ const MAX_QUESTIONS = 2;
 const QUESTION_MAX_LENGTH = 300;
 
 interface SituationAnalysisCardProps {
-  /** Nombre normalizado de la provincia elegida; null = todo el país. */
+  /** Nombre normalizado de la provincia elegida, o varias separadas por comas ("loja,manabi"); null = todo el país. */
   provinceKey: string | null;
-  /** Nombre para mostrar: "Manabí", "Ecuador". */
+  /** Nombre para mostrar: "Manabí", "Manabí y Loja", "Ecuador". */
   placeName: string;
 }
 

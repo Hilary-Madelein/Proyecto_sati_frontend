@@ -9,6 +9,7 @@ import { placeName } from "../../action-timeline";
 import { SEMAPHORE_STYLES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../constants";
 import type { ProvinceFeature } from "../../hooks/useProvinceGeometries";
 import { PROVINCE_NAMES } from "../../province-geometry";
+import { joinNames, provinceLabel } from "../../province-filter";
 import { RANK_INDICATORS, type CantonTotals, type HeadlineFigures, type RankIndicator } from "../../province-summary";
 import type { EventSeverity, Semaphore } from "../../types";
 import { FilterSelect } from "./CriticalEventsPanel";
@@ -49,8 +50,9 @@ export type SummaryTarget =
 
 interface ProvinceSummaryPanelProps {
   provinces: readonly ProvinceFeature[] | null;
-  selected: ProvinceFeature | null;
-  onSelect: (province: ProvinceFeature | null) => void;
+  /** Las provincias elegidas; ninguna = todo el país. */
+  selected: readonly ProvinceFeature[];
+  onSelect: (provinces: ProvinceFeature[]) => void;
   summary: ProvinceSummary;
   /** Abre lo de un cuadro (su pestaña o su capa en el mapa), o lo quita si ya estaba. */
   onOpen: (target: SummaryTarget) => void;
@@ -84,34 +86,26 @@ export function ProvinceSummaryPanel({ provinces, selected, onSelect, summary, o
   /** Lo que necesita cada cuadro para ser un interruptor de lo suyo. */
   const toggle = (target: SummaryTarget) => ({ onClick: () => onOpen(target), active: isActive(target), kind: PANEL_TARGETS.has(target) ? ("panel" as const) : ("layer" as const) });
   const alerts = forecast ? LEVELS.reduce((sum, level) => sum + forecast.counts[level], 0) : undefined;
+  // Las elegidas, como las pide el análisis con IA: "manabi" o "loja,manabi" (el orden no cambia el análisis).
+  const provincesKey = selected
+    .map((province) => province.key)
+    .sort()
+    .join(",");
 
   return (
     <div className="space-y-4">
-      <FilterSelect
-        label="Provincia"
-        value={selected?.key ?? ""}
-        onChange={(key) => onSelect(provinces?.find((province) => province.key === key) ?? null)}
-      >
-        <option value="">Todo el país</option>
-        {[...(provinces ?? [])]
-          .sort((a, b) => a.key.localeCompare(b.key))
-          .map((province) => (
-            <option key={province.key} value={province.key}>
-              {placeName(province.name)}
-            </option>
-          ))}
-      </FilterSelect>
+      <ProvincesSelector provinces={provinces} selected={selected} onSelect={onSelect} />
 
       <Headline selected={selected} {...summary.headline} />
 
-      {/* `key`: al cambiar de provincia, el análisis anterior ya no corresponde y se descarta. */}
+      {/* Del país o de las provincias elegidas (juntas). `key`: al cambiarlas, el análisis anterior ya no corresponde y se descarta. */}
       <SituationAnalysisCard
-        key={selected?.key ?? "ec"}
-        provinceKey={selected?.key ?? null}
-        placeName={selected ? (PROVINCE_NAMES[selected.key] ?? placeName(selected.name)) : "Ecuador"}
+        key={provincesKey || "ec"}
+        provinceKey={provincesKey || null}
+        placeName={selected.length ? joinNames(selected.map(provinceLabel)) : "Ecuador"}
       />
 
-      {!selected && <ProvinceRanking {...ranking} onSelect={onSelect} />}
+      {selected.length === 0 && <ProvinceRanking {...ranking} onSelect={(province) => onSelect([province])} />}
 
       <Group title="Amenaza" color="#dc2626">
         <SummaryCard title="Eventos" value={events.total} note={events.period} {...toggle("events")}>
@@ -174,17 +168,76 @@ export function ProvinceSummaryPanel({ provinces, selected, onSelect, summary, o
       </Group>
 
       <p className="text-[11px] leading-relaxed text-slate-500">
-        {selected
-          ? "Las capas y los demás paneles muestran solo esta provincia. Toca un cuadro para verlo en el mapa."
-          : "Toca una provincia en el mapa, en la lista o elígela arriba para ver solo lo de ella. Toca un cuadro para verlo en el mapa."}
+        {selected.length > 1
+          ? "Las capas y los demás paneles muestran solo estas provincias. Toca un cuadro para verlo en el mapa."
+          : selected.length === 1
+            ? "Las capas y los demás paneles muestran solo esta provincia. Puedes agregar otras arriba o con «Agregar» en el mapa. Toca un cuadro para verlo en el mapa."
+            : "Toca una provincia en el mapa, en la lista o elígela arriba para ver solo lo de ella (puedes elegir varias). Toca un cuadro para verlo en el mapa."}
       </p>
     </div>
   );
 }
 
-/** La situación en una frase, con las cifras en negrita; con una provincia, comparada con el país. */
-function Headline({ selected, here, eventsPeriod }: { selected: ProvinceFeature | null } & ProvinceSummary["headline"]) {
-  const place = selected ? (PROVINCE_NAMES[selected.key] ?? placeName(selected.name)) : "Ecuador";
+/**
+ * Elegir una o varias provincias: las elegidas como chips (cada una con su ×) y un
+ * menú para agregar otra; "Todo el país" las quita todas.
+ */
+function ProvincesSelector({
+  provinces,
+  selected,
+  onSelect,
+}: Pick<ProvinceSummaryPanelProps, "provinces" | "selected" | "onSelect">) {
+  const chosen = new Set(selected.map((province) => province.key));
+  const options = [...(provinces ?? [])].filter((province) => !chosen.has(province.key)).sort((a, b) => a.key.localeCompare(b.key));
+  return (
+    <div className="space-y-2">
+      {selected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {selected.map((province) => (
+            <span key={province.key} className="flex items-center gap-0.5 rounded-lg bg-blue-50 py-1 pr-1 pl-2 text-xs font-semibold text-blue-900 ring-1 ring-blue-200">
+              {provinceLabel(province)}
+              <button
+                type="button"
+                onClick={() => onSelect(selected.filter((item) => item.key !== province.key))}
+                aria-label={`Quitar ${provinceLabel(province)}`}
+                className="rounded p-0.5 text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-600"
+              >
+                <CloseIcon className="size-3" />
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => onSelect([])}
+            className="rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-600"
+          >
+            Todo el país
+          </button>
+        </div>
+      )}
+      {/* Siempre en blanco: elegir una la agrega a las de arriba. */}
+      <FilterSelect
+        label={selected.length ? "Agregar otra provincia" : "Provincia"}
+        value=""
+        onChange={(key) => {
+          const picked = provinces?.find((province) => province.key === key);
+          if (picked) onSelect([...selected, picked]);
+        }}
+      >
+        <option value="">{selected.length ? "+ Agregar otra provincia" : "Todo el país (elige una o varias provincias)"}</option>
+        {options.map((province) => (
+          <option key={province.key} value={province.key}>
+            {provinceLabel(province)}
+          </option>
+        ))}
+      </FilterSelect>
+    </div>
+  );
+}
+
+/** La situación en una frase, con las cifras en negrita. */
+function Headline({ selected, here, eventsPeriod }: { selected: readonly ProvinceFeature[] } & ProvinceSummary["headline"]) {
+  const place = selected.length ? joinNames(selected.map(provinceLabel)) : "Ecuador";
   const alerts = here.parishes ? here.parishes.red + here.parishes.orange : null;
 
   const parts: ReactNode[] = [

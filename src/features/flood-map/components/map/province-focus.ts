@@ -101,3 +101,16 @@ export async function focusProvinceOf(map: LeafletMap, point: L.LatLng, declared
   }
   map.fire(PROVINCE_FOCUS_EVENT, { province });
 }
+
+/** Encuadra varias provincias juntas en la zona libre (sin avisar: no hay una sola a la que se acercó). */
+export function focusProvinces(map: LeafletMap, provinces: readonly ProvinceFeature[]) {
+  if (provinces.length === 0) return;
+  const bounds = provinces.reduce((all, province) => all.extend(L.geoJSON(province.geometry).getBounds()), L.latLngBounds([]));
+  const { free, paddingTopLeft, paddingBottomRight } = freePadding(map);
+  const usable = isUsable(free);
+  map.closePopup();
+  map.flyToBounds(bounds, {
+    paddingTopLeft: usable ? paddingTopLeft : L.point(PLAIN_MARGIN_PX, PLAIN_MARGIN_PX),
+    paddingBottomRight: usable ? paddingBottomRight : L.point(PLAIN_MARGIN_PX, PLAIN_MARGIN_PX),
+  });
+}

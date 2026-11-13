@@ -1,4 +1,5 @@
-import { isInProvince } from "./province-geometry";
+import { placeName } from "./action-timeline";
+import { isInProvince, PROVINCE_NAMES } from "./province-geometry";
 import type { ProvinceFeature } from "./hooks/useProvinceGeometries";
 import { normalizeName } from "./parish-filters";
 import { provinceOf } from "./risk-popup";
@@ -30,4 +31,37 @@ export function isFeatureInProvince(feature: RiskFeature, province: ProvinceFeat
 export function layerInProvince(data: RiskLayerData, province: ProvinceFeature | null): RiskLayerData {
   if (!province) return data;
   return { ...data, features: data.features.filter((feature) => isFeatureInProvince(feature, province)), view: `${data.view ?? ""}|prov:${province.key}` };
+}
+
+/** Si el nombre es de alguna de las provincias elegidas; sin ninguna elegida, todo cuenta. */
+export const isInSelectedProvinces = (name: string | null | undefined, provinces: readonly ProvinceFeature[]) =>
+  provinces.length === 0 || provinces.some((province) => isSameProvince(name, province.name));
+
+/** Si el punto cae en alguna de las provincias elegidas; sin ninguna elegida, todo cuenta. */
+export const isPointInProvinces = (provinces: readonly ProvinceFeature[], point: { lat: number; lng: number }) =>
+  provinces.length === 0 || provinces.some((province) => isInProvince(province, point));
+
+/** La capa solo con lo de las provincias elegidas (todas, si no hay ninguna). */
+export function layerInProvinces(data: RiskLayerData, provinces: readonly ProvinceFeature[]): RiskLayerData {
+  if (provinces.length === 0) return data;
+  if (provinces.length === 1) return layerInProvince(data, provinces[0]);
+  return {
+    ...data,
+    features: data.features.filter((feature) => provinces.some((province) => isFeatureInProvince(feature, province))),
+    view: `${data.view ?? ""}|prov:${provinces.map((province) => province.key).join(",")}`,
+  };
+}
+
+/** "Manabí", "Manabí y Guayas", "Manabí, Guayas y El Oro". */
+export function joinNames(names: readonly string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`;
+}
+
+/** Nombre para mostrar de una provincia ("Santo Domingo de los Tsáchilas"). */
+export const provinceLabel = (province: ProvinceFeature) => PROVINCE_NAMES[province.key] ?? placeName(province.name);
+
+/** Lo elegido, para títulos: "Ecuador", "Provincia de Manabí", "Provincias de Manabí y Guayas". */
+export function scopeTitle(provinces: readonly ProvinceFeature[]): string {
+  if (provinces.length === 0) return "Ecuador";
+  return `${provinces.length === 1 ? "Provincia" : "Provincias"} de ${joinNames(provinces.map(provinceLabel))}`;
 }

@@ -35,6 +35,7 @@ import { AccumulatedRainLayer } from "./AccumulatedRainLayer";
 import { CriticalEventsLayer } from "./CriticalEventsLayer";
 import type { ProvinceGeometry } from "../../hooks/useProvinceGeometries";
 import { CanvasZoomGuard } from "./CanvasZoomGuard";
+import { CityLabels } from "./CityLabels";
 import { FeatureHighlight } from "./FeatureHighlight";
 import { GalapagosInset } from "./GalapagosInset";
 import { getHomeBoundsOptions } from "./home-bounds";
@@ -119,10 +120,15 @@ export interface FloodMapProps {
   galapagosSlot: HTMLElement | null;
   /** Descarga una imagen del mapa (botón de los controles); `north`: hacia dónde queda el norte en pantalla, en grados. */
   onCapture: (north: number) => Promise<void>;
-  /** Provincias para elegir una en el mapa (y la elegida). */
+  /** Provincias para elegir en el mapa (y las elegidas: ninguna = todo el país). */
   provinces: readonly ProvinceFeature[] | null;
-  selectedProvince: ProvinceFeature | null;
+  selectedProvinces: readonly ProvinceFeature[];
+  /** Agregando provincias: un clic en el mapa agrega o quita una (botón "Agregar" de la barra). */
+  addingProvinces: boolean;
+  onAddingProvincesChange: (adding: boolean) => void;
   onPickProvince: (province: ProvinceFeature) => void;
+  /** Quita una de las provincias elegidas (su × en la barra). */
+  onRemoveProvince: (province: ProvinceFeature) => void;
   /** Se pidió volver a todo Ecuador: se cierra lo que estaba abierto. */
   onGoHome: () => void;
   /** El mapa se acercó a una provincia (queda elegida) o volvió a todo Ecuador (null). */
@@ -190,7 +196,10 @@ export default function FloodMap({
   galapagosSlot,
   onCapture,
   provinces,
-  selectedProvince,
+  selectedProvinces,
+  addingProvinces,
+  onAddingProvincesChange,
+  onRemoveProvince,
   onPickProvince,
   onGoHome,
   onProvinceFocus,
@@ -199,9 +208,15 @@ export default function FloodMap({
   provinceShading,
 }: FloodMapProps) {
   const [boundsOptions] = useState(getHomeBoundsOptions);
+  const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
   // Sin provincia elegida, un clic en el mapa la elige (también con lluvia, mar o ríos);
   // ya dentro de ella, el clic muestra el valor de la lluvia o el río, como siempre.
-  const pickingProvince = !selectedProvince && !!provinces?.length;
+  const pickingProvince = (selectedProvinces.length === 0 || addingProvinces) && !!provinces?.length;
+  // Sobre una capa de colores los nombres grises del mapa base se pierden: se cambian por los
+  // de CityLabels (más legibles). Solo uno de los dos a la vez, para que no salgan dobles.
+  // "Calles" trae los nombres dentro de sus teselas: ahí no se agregan.
+  const colorLayerOn = Boolean(rainForecast || observedRain || seaTemperature || showImerg);
+  const ownCityLabels = colorLayerOn && Boolean(BASEMAPS[basemap].labelsUrl);
   const valueLabel = rainForecast || observedRain ? "la lluvia" : seaTemperature ? "la temperatura del mar" : layers.riverNetwork ? "el río" : null;
   const overlays: OverlayProps = {
     data,
@@ -237,7 +252,6 @@ export default function FloodMap({
     layerOpacity,
     provincialRoads,
   };
-  const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
 
   return (
     <MapContainer
@@ -266,22 +280,39 @@ export default function FloodMap({
       />
       {BASEMAPS[basemap].labelsUrl && (
         <Pane name={MAP_PANES.basemapLabels.name} style={{ zIndex: MAP_PANES.basemapLabels.zIndex, pointerEvents: "none" }}>
-          <TileLayer key={basemap} url={BASEMAPS[basemap].labelsUrl} maxNativeZoom={BASEMAPS[basemap].maxNativeZoom} />
+          {/* Se oculta en vez de quitarse: al volver no hay que pedir las teselas otra vez. */}
+          <TileLayer key={basemap} url={BASEMAPS[basemap].labelsUrl} maxNativeZoom={BASEMAPS[basemap].maxNativeZoom} opacity={ownCityLabels ? 0 : 1} />
         </Pane>
       )}
       {BASEMAPS[basemap].provinceLinesMaxZoom !== null && <ProvinceBoundaries maxZoom={BASEMAPS[basemap].provinceLinesMaxZoom} />}
       <MapLimits />
       <CanvasZoomGuard />
-      <ProvinceFocusBar slot={provinceBarSlot} onGoHome={onGoHome} onProvinceChange={onProvinceFocus} onOpenSummary={onOpenSummary} />
+      <ProvinceFocusBar
+        slot={provinceBarSlot}
+        selected={selectedProvinces}
+        adding={addingProvinces}
+        onAddingChange={onAddingProvincesChange}
+        onRemove={onRemoveProvince}
+        onGoHome={onGoHome}
+        onProvinceChange={onProvinceFocus}
+        onOpenSummary={onOpenSummary}
+      />
       <ProvincePicker
         provinces={provinces}
-        selected={selectedProvince}
+        selected={selectedProvinces}
+        adding={addingProvinces}
         onSelect={onPickProvince}
         enabled
-        hint={valueLabel ? `Clic para elegirla; después, toca para ver ${valueLabel}` : "Clic para ver su resumen"}
+        hint={
+          addingProvinces
+            ? "Clic para agregarla o quitarla"
+            : valueLabel
+              ? `Clic para elegirla; después, toca para ver ${valueLabel}`
+              : "Clic para ver su resumen"
+        }
       />
-      {/* Solo con todo Ecuador a la vista: con una provincia elegida, sobra. */}
-      {!selectedProvince && (
+      {/* Solo con todo Ecuador a la vista: con una provincia elegida, sobra (agregando, sirve para ir a Galápagos). */}
+      {(selectedProvinces.length === 0 || addingProvinces) && (
         <GalapagosInset tileUrl={BASEMAPS[basemap].url} slot={galapagosSlot}>
           {/* Las mismas capas y filtros que el mapa principal, solo para ver: el recuadro entero lleva a Galápagos. */}
           <MapOverlays {...overlays} inset />
@@ -294,8 +325,9 @@ export default function FloodMap({
       <MapReady onReady={onMapReady} />
       <MapPopupWatcher />
       <MapScale />
-      {provinceShading && provinces && !selectedProvince && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
+      {provinceShading && provinces && selectedProvinces.length === 0 && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
       <MapOverlays {...overlays} />
+      {ownCityLabels && <CityLabels />}
     </MapContainer>
   );
 }
@@ -306,7 +338,10 @@ type OverlayProps = Omit<
   | "galapagosSlot"
   | "onCapture"
   | "provinces"
-  | "selectedProvince"
+  | "selectedProvinces"
+  | "addingProvinces"
+  | "onAddingProvincesChange"
+  | "onRemoveProvince"
   | "onPickProvince"
   | "onGoHome"
   | "onProvinceFocus"

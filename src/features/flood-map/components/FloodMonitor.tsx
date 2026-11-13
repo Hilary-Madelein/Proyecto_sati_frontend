@@ -36,10 +36,9 @@ import { buildCaptureLegend } from "../capture-legend";
 import { captureMap, captureStamp, downloadGif, northOf, renderMapImageWithLayout, tilesLoaded, type RenderedMapImage } from "../map-capture";
 import type { Map as LeafletMap } from "leaflet";
 import { useProvinces, type ProvinceFeature } from "../hooks/useProvinceGeometries";
-import { isSameProvince, layerInProvince } from "../province-filter";
+import { isInSelectedProvinces, isPointInProvinces, layerInProvinces, scopeTitle } from "../province-filter";
 import { ProvinceSummaryPanel, type ProvinceSummary, type SummaryTarget } from "./panels/ProvinceSummaryPanel";
 import { SummarySidebar } from "./panels/SummarySidebar";
-import { isInProvince, PROVINCE_NAMES } from "../province-geometry";
 import { useFeatureDetail, type VisibleRiskLayer } from "../hooks/useFeatureDetail";
 import { useRiskLayers } from "../hooks/useRiskLayers";
 import { useWeatherStations } from "../hooks/useWeatherStations";
@@ -201,9 +200,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // (lluvia de 3, 6, 12 y 24 h) y cierres viales (reportes de novedad vial del MIT).
   // Al cargar, el mapa muestra los eventos críticos; la alerta de inundación, al abrirla, empieza solo con las de alerta muy alta (ver DEFAULT_LEVELS).
   const [eventsTab, setEventsTab] = useState<"events" | "analysis" | "closures">("events");
-  // Provincia elegida (en el mapa o en el resumen): filtra las capas y los paneles.
+  // Provincias elegidas (en el mapa o en el resumen; una o varias): filtran las capas y los paneles.
   const provinces = useProvinces();
-  const [province, setProvince] = useState<ProvinceFeature | null>(null);
+  const [selectedProvinces, setSelectedProvinces] = useState<ProvinceFeature[]>([]);
+  const anyProvince = selectedProvinces.length > 0;
+  // Agregando provincias: un clic en el mapa agrega (o quita) una, en vez de mostrar la lluvia o el río.
+  const [addingProvinces, setAddingProvinces] = useState(false);
   // Varias capas pueden salir de la misma del backend (p. ej. albergues y campamentos): se pide una vez.
   // Con la línea de tiempo abierta se piden también las dos capas de acciones; con la pestaña de cierres, la de cierres.
   const [desktopPanels, setDesktopPanels] = useState<Record<PanelId, boolean>>(() => ({
@@ -280,7 +282,17 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [selectedParish, setSelectedParish] = useState<ParishAlert | null>(null);
   // Filtros de la alerta: la lista y el mapa muestran las mismas parroquias.
   const [parishFilters, setParishFilters] = useState<ParishFilters>(DEFAULT_PARISH_FILTERS);
-  const alertSnapshot = eventsTab === "analysis" ? cantonAnalysis.snapshot : null;
+  // Solo lo de las provincias elegidas: la lista, el mapa y el resumen.
+  const analysisSnapshot = useMemo(() => {
+    const snapshot = cantonAnalysis.snapshot;
+    if (!snapshot || selectedProvinces.length === 0) return snapshot;
+    return {
+      ...snapshot,
+      parishes: snapshot.parishes?.filter((parish) => isInSelectedProvinces(parish.province, selectedProvinces)),
+      cantons: snapshot.cantons.filter((canton) => isInSelectedProvinces(canton.province, selectedProvinces)),
+    };
+  }, [cantonAnalysis.snapshot, selectedProvinces]);
+  const alertSnapshot = eventsTab === "analysis" ? analysisSnapshot : null;
   const parishAlerts = useMemo(
     () => (alertSnapshot ? filterParishes(alertSnapshot.parishes ?? [], parishFilters) : null),
     [alertSnapshot, parishFilters],
@@ -289,6 +301,10 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   // Cierres viales: los filtros del panel se aplican también a lo que se dibuja en el mapa.
   const [closureFilters, setClosureFilters] = useState<ClosureFilters>(DEFAULT_CLOSURE_FILTERS);
   const closuresState = riskLayerState(ROAD_CLOSURES_LAYER_ID);
+  const closuresData = useMemo(
+    () => (closuresState.data ? layerInProvinces(closuresState.data, selectedProvinces) : null),
+    [closuresState.data, selectedProvinces],
+  );
   // Referencia de "hace X días": la hora de la descarga (no el reloj), para no leerlo en cada render.
   const closuresNow = Date.parse(closuresState.data?.fetchedAt ?? data.eventsFeed.fetchedAt);
   const actionStates = ACTION_LAYER_IDS.map((id) => riskLayerState(id));
@@ -296,7 +312,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
 
   const { events, fetchedAt, error: eventsError } = data.eventsFeed;
   // Los filtros se aplican a la lista y a los marcadores del mapa por igual.
-  const filteredEvents = useMemo(() => filterEvents(events, eventFilters, fetchedAt), [events, eventFilters, fetchedAt]);
+  const scopedEvents = useMemo(
+    () => (selectedProvinces.length ? events.filter((event) => isInSelectedProvinces(event.province, selectedProvinces)) : events),
+    [events, selectedProvinces],
+  );
+  const filteredEvents = useMemo(() => filterEvents(scopedEvents, eventFilters, fetchedAt), [scopedEvents, eventFilters, fetchedAt]);
   const criticalCount = events.filter((event) => event.severity === "critical").length;
   const forecastAvailable = data.rain?.days.some((item) => item.day === forecastDay && item.available) ?? false;
   const forecastDayImage = useRainImage<DailyRainForecast>(
@@ -387,14 +407,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const visibleRiskLayers = RISK_LAYER_STYLES.flatMap((style): (VisibleRiskLayer & { opacity?: number })[] => {
     // Los cierres viales: solo con su pestaña abierta, y los mismos reportes que su lista.
     if (style.id === ROAD_CLOSURES_LAYER_ID) {
-      const data = eventsTab === "closures" && showClosuresOnMap ? closuresState.data : null;
+      const data = eventsTab === "closures" && showClosuresOnMap ? closuresData : null;
       if (!data) return [];
-      const features = closuresForMap(layerInProvince(data, province).features, closureFilters);
+      const features = closuresForMap(data.features, closureFilters);
       return [{ style, data: { ...data, features, view: `closures:${JSON.stringify(closureFilters)}` } }];
     }
     const data = riskLayersOn.has(style.id) ? riskViewState(style).data : null;
     if (!data) return [];
-    const inProvince = layerInProvince(data, province);
+    const inProvince = layerInProvinces(data, selectedProvinces);
     // Sin las clases que se ocultaron desde la leyenda (p. ej. un tipo de central).
     const hidden = hiddenClassesOf(style);
     const shown = hidden.length
@@ -503,25 +523,38 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
     setMobileSheet(null);
   };
 
-  /** Elegir (o quitar) la provincia: también la toman los filtros de cada panel. */
-  const selectProvince = (picked: ProvinceFeature | null) => {
-    setProvince(picked);
-    const name = picked ? placeName(picked.name) : null;
+  /**
+   * Elegir las provincias (ninguna = todo el país). Con una sola, también la toman los
+   * filtros de cada panel; con varias, los paneles ya reciben solo lo de ellas y sus
+   * filtros quedan en "todas" (para elegir una de ellas ahí).
+   */
+  const selectProvinces = (picked: ProvinceFeature[]) => {
+    setSelectedProvinces(picked);
+    if (picked.length === 0) setAddingProvinces(false);
+    const name = picked.length === 1 ? placeName(picked[0].name) : null;
     setEventFilters((current) => ({ ...current, province: name }));
     setClosureFilters((current) => ({ ...current, province: name ?? "" }));
     setParishFilters((current) => ({ ...current, province: name ?? "" }));
   };
-  // Las alertas por caudal de la provincia elegida (las demás capas se filtran en visibleRiskLayers).
-  const mapData = province
+  const selectProvince = (picked: ProvinceFeature | null) => selectProvinces(picked ? [picked] : []);
+  /** Agrega la provincia a las elegidas, o la quita si ya estaba. */
+  const toggleProvince = (picked: ProvinceFeature) =>
+    selectProvinces(
+      selectedProvinces.some((item) => item.key === picked.key)
+        ? selectedProvinces.filter((item) => item.key !== picked.key)
+        : [...selectedProvinces, picked],
+    );
+  // Las alertas por caudal de las provincias elegidas (las demás capas se filtran en visibleRiskLayers).
+  const mapData = anyProvince
     ? {
         ...data,
-        riverAlerts: data.riverAlerts && { ...data.riverAlerts, alerts: data.riverAlerts.alerts.filter((alert) => isSameProvince(alert.province, province.name)) },
+        riverAlerts: data.riverAlerts && { ...data.riverAlerts, alerts: data.riverAlerts.alerts.filter((alert) => isInSelectedProvinces(alert.province, selectedProvinces)) },
         // Una zona de crecidas cuenta si algún vértice cae en la provincia.
         floodHub: data.floodHub && {
           ...data.floodHub,
           flashFloods:
             data.floodHub.flashFloods?.filter((area) =>
-              (area.geometry.coordinates as unknown as number[][][][]).some((polygon) => polygon[0].some(([lng, lat]) => isInProvince(province, { lat, lng }))),
+              (area.geometry.coordinates as unknown as number[][][][]).some((polygon) => polygon[0].some(([lng, lat]) => isPointInProvinces(selectedProvinces, { lat, lng }))),
             ) ?? null,
         },
       }
@@ -530,7 +563,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const layerCount = (id: string) => {
     const style = RISK_LAYER_STYLES.find((item) => item.id === id);
     const layerData = style ? riskViewState(style).data : null;
-    return style && layerData ? { style, features: layerInProvince(layerData, province).features } : null;
+    return style && layerData ? { style, features: layerInProvinces(layerData, selectedProvinces).features } : null;
   };
   const periodNote = (id: string) => {
     const style = RISK_LAYER_STYLES.find((item) => item.id === id);
@@ -540,14 +573,14 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const preventive = layerCount(ACTION_LAYER_IDS[0]);
   const response = layerCount(ACTION_LAYER_IDS[1]);
   const bridges = layerCount(BRIDGES_LAYER_ID);
-  const closureFeatures = closuresState.data ? layerInProvince(closuresState.data, province).features : null;
-  const forecastParishes = cantonAnalysis.snapshot?.parishes?.filter((parish) => !province || isSameProvince(parish.province, province.name)) ?? null;
+  const closureFeatures = closuresData?.features ?? null;
+  const forecastParishes = analysisSnapshot?.parishes ?? null;
   const strongest = forecastParishes?.reduce<ParishAlert | null>((best, parish) => ((parish.forecast.mm24h ?? -1) > (best?.forecast.mm24h ?? -1) ? parish : best), null);
   // Para el ranking de provincias (solo se ve con todo el país: los eventos ya son los de todas).
   const countryClosures = closuresState.data?.features ?? null;
   const isFullClosure = (feature: RiskFeature) => conditionOf(feature)?.label === "Cierre total";
   const riverReaches = mapData.riverAlerts?.alerts.filter((alert) => !alert.persistent && alertLevelForDay(alert, alertDayIndex) > 0) ?? null;
-  const scopeCantons = cantonAnalysis.snapshot?.cantons.filter((canton) => !province || isSameProvince(canton.province, province.name)) ?? null;
+  const scopeCantons = analysisSnapshot?.cantons ?? null;
   const rankValues =
     rankIndicator === "closures" && !countryClosures
       ? null
@@ -709,11 +742,11 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         preparedness: showPreparedness,
         provincialRoads: showProvincialRoads,
         shading:
-          shadeProvinces && !province
+          shadeProvinces && !anyProvince
             ? { label: RANK_INDICATORS.find((item) => item.id === rankIndicator)?.unit ?? "", colors: SHADING_COLORS }
             : null,
       }),
-      title: province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Ecuador",
+      title: scopeTitle(selectedProvinces),
     };
   };
   // Lo último de cada render: la descarga de la animación lo lee entre cuadros (con los datos de esa ventana ya cargados).
@@ -773,12 +806,12 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           expanded={summaryExpanded}
           onExpandedChange={setSummaryOpen}
           title="Resumen"
-          subtitle={province ? `Provincia de ${PROVINCE_NAMES[province.key] ?? placeName(province.name)}` : "Todo el país"}
+          subtitle={anyProvince ? scopeTitle(selectedProvinces) : "Todo el país"}
         >
             <ProvinceSummaryPanel
               provinces={provinces}
-              selected={province}
-              onSelect={selectProvince}
+              selected={selectedProvinces}
+              onSelect={selectProvinces}
               summary={summary}
               onOpen={openSummaryTarget}
               isActive={isSummaryTargetActive}
@@ -796,8 +829,16 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
         <FloodMap
           data={mapData}
           provinces={provinces}
-          selectedProvince={province}
+          selectedProvinces={selectedProvinces}
+          addingProvinces={addingProvinces}
+          onAddingProvincesChange={setAddingProvinces}
+          onRemoveProvince={(removed) => selectProvinces(selectedProvinces.filter((item) => item.key !== removed.key))}
           onPickProvince={(picked) => {
+            // Agregando: se suma (o se quita) sin cambiar lo demás.
+            if (addingProvinces) {
+              toggleProvince(picked);
+              return;
+            }
             selectProvince(picked);
             // Desde tabletas el resumen corre el mapa; en el celular lo taparía: ahí se abre con "Resumen" en la barra de la provincia.
             if (isWide()) setSummaryExpanded(true);
@@ -811,8 +852,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           seaTemperature={showSea ? data.seaTemperature : null}
           weatherStations={
             showStations && stations.snapshot
-              ? province
-                ? { ...stations.snapshot, stations: stations.snapshot.stations.filter((station) => isInProvince(province, station)) }
+              ? anyProvince
+                ? { ...stations.snapshot, stations: stations.snapshot.stations.filter((station) => isPointInProvinces(selectedProvinces, station)) }
                 : stations.snapshot
               : null
           }
@@ -868,20 +909,22 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           onMapReady={(map) => {
             mapRef.current = map;
           }}
-          provinceShading={shadeProvinces && !province ? rankValues : null}
+          provinceShading={shadeProvinces && !anyProvince ? rankValues : null}
           // Acercarse a la provincia de un punto (o del panel) la elige: la barra, el resumen y las capas dicen lo mismo.
           // Volver a todo Ecuador (alejando el mapa) la quita y cierra el resumen, como el botón.
           onProvinceFocus={(focused) => {
+            // Con varias elegidas (o agregando) el mapa se mueve entre ellas: solo "Ver todo Ecuador" las quita.
+            if (addingProvinces) return;
             if (focused) {
-              if (focused.key !== province?.key) selectProvince(focused);
-            } else if (province) {
+              if (!selectedProvinces.some((item) => item.key === focused.key)) selectProvince(focused);
+            } else if (selectedProvinces.length === 1) {
               setSummaryExpanded(false);
               selectProvince(null);
             }
           }}
           onGoHome={() => {
             // De una provincia a todo Ecuador: el resumen se cierra (se vuelve a abrir con su botón).
-            if (province) setSummaryExpanded(false);
+            if (anyProvince) setSummaryExpanded(false);
             selectProvince(null);
             featureDetail.close();
             setSelectedParish(null);
@@ -1118,7 +1161,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           </div>
           {eventsTab === "events" ? (
             <CriticalEventsPanel
-              events={events}
+              events={scopedEvents}
               filteredEvents={filteredEvents}
               filters={eventFilters}
               onFiltersChange={setEventFilters}
@@ -1135,7 +1178,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             />
           ) : eventsTab === "closures" ? (
             <RoadClosuresPanel
-              data={closuresState.data}
+              data={closuresData}
               error={closuresState.error}
               isLoading={closuresState.isLoading}
               filters={closureFilters}
@@ -1148,7 +1191,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
             />
           ) : (
             <ParishAlertPanel
-              snapshot={cantonAnalysis.snapshot}
+              snapshot={analysisSnapshot}
               error={cantonAnalysis.error}
               isLoading={cantonAnalysis.isLoading}
               selectedCode={selectedParish?.code ?? null}
