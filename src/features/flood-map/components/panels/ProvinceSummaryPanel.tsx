@@ -12,6 +12,7 @@ import { PROVINCE_NAMES } from "../../province-geometry";
 import { RANK_INDICATORS, type CantonTotals, type HeadlineFigures, type RankIndicator } from "../../province-summary";
 import type { EventSeverity, Semaphore } from "../../types";
 import { FilterSelect } from "./CriticalEventsPanel";
+import { SituationAnalysisCard } from "./SituationAnalysisCard";
 
 /** Cifras del resumen; null = aún cargando (o sin datos). */
 export interface ProvinceSummary {
@@ -102,6 +103,13 @@ export function ProvinceSummaryPanel({ provinces, selected, onSelect, summary, o
       </FilterSelect>
 
       <Headline selected={selected} {...summary.headline} />
+
+      {/* `key`: al cambiar de provincia, el análisis anterior ya no corresponde y se descarta. */}
+      <SituationAnalysisCard
+        key={selected?.key ?? "ec"}
+        provinceKey={selected?.key ?? null}
+        placeName={selected ? (PROVINCE_NAMES[selected.key] ?? placeName(selected.name)) : "Ecuador"}
+      />
 
       {!selected && <ProvinceRanking {...ranking} onSelect={onSelect} />}
 

@@ -303,6 +303,15 @@ export function UserIcon(props: IconProps) {
   );
 }
 
+export function SparklesIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 3 8.4 8.4 3 10l5.4 1.6L10 17l1.6-5.4L17 10l-5.4-1.6L10 3Z" />
+      <path d="M18 14v6M15 17h6" />
+    </Icon>
+  );
+}
+
 export function RefreshIcon(props: IconProps) {
   return (
     <Icon {...props}>
