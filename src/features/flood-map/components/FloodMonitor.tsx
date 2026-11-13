@@ -757,7 +757,8 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
           <div ref={setProvinceBarSlot} data-map-obstacle className="max-w-full empty:hidden" />
           <div ref={setGalapagosSlot} className="map-float empty:hidden" />
           {(rainLegends.length > 0 || (showSea && data.seaTemperature) || (layers.riverAlerts && data.riverAlerts)) && (
-            <div data-map-obstacle className="flex w-56 max-w-full flex-col gap-2">
+            // Fuera de la imagen descargada: ahí va la leyenda completa abajo (y flotando tapaba los globos).
+            <div data-map-obstacle data-capture-ignore className="flex w-56 max-w-full flex-col gap-2">
               <RainLegend legends={rainLegends} sources={rainSources.map((source) => source.label)} />
               {showSea && data.seaTemperature && <SeaTemperatureLegend legend={data.seaTemperature.legend} />}
               {layers.riverAlerts && mapData.riverAlerts && <RiverAlertLegend snapshot={mapData.riverAlerts} dayIndex={alertDayIndex} />}

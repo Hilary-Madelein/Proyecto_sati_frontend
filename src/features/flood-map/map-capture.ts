@@ -226,7 +226,20 @@ export async function captureMap(
     filter: (node) => !(node instanceof HTMLElement && node.matches(IGNORED)),
   });
 
-  const footer = FOOTER_PX * scale;
+  // Franja de abajo: título y fecha en una línea si caben; si no (celular), la fecha en otra.
+  const brand = "SATI.EC · Sistema de alerta temprana para inundaciones en el Ecuador";
+  const when = `Capturado el ${timeFormat.format(takenAt)} (hora de Ecuador)`;
+  const measure = document.createElement("canvas").getContext("2d");
+  const textWidth = (text: string, font: string) => {
+    if (!measure) return 0;
+    measure.font = font;
+    return measure.measureText(text).width;
+  };
+  const brandFont = `600 ${13 * scale}px system-ui, sans-serif`;
+  const smallFont = `${11 * scale}px system-ui, sans-serif`;
+  const pad = 16 * scale;
+  const oneLine = textWidth(brand, brandFont) + textWidth(when, smallFont) + pad * 3 <= map.width;
+  const footer = (oneLine ? FOOTER_PX : FOOTER_PX + 20) * scale;
   const legendHeight = layoutLegend(legend, map.width / scale).height * scale;
   const canvas = document.createElement("canvas");
   canvas.width = map.width;
@@ -250,18 +263,17 @@ export async function captureMap(
   context.fillStyle = "#0f172a";
   context.fillRect(0, footerTop, canvas.width, footer);
 
-  const pad = 16 * scale;
   context.textBaseline = "middle";
   context.fillStyle = "#ffffff";
-  context.font = `600 ${13 * scale}px system-ui, sans-serif`;
-  context.fillText("SATI.EC · Sistema de alerta temprana para inundaciones en el Ecuador", pad, footerTop + footer * 0.32);
+  context.font = brandFont;
+  const row = (index: number) => footerTop + (14 + index * 20) * scale;
+  context.fillText(fit(context, brand, canvas.width - pad * 2), pad, row(0));
   context.fillStyle = "#cbd5e1";
-  context.font = `${11 * scale}px system-ui, sans-serif`;
-  const when = `Capturado el ${timeFormat.format(takenAt)} (hora de Ecuador)`;
-  const whenWidth = context.measureText(when).width;
-  context.fillText(when, canvas.width - pad - whenWidth, footerTop + footer * 0.32);
+  context.font = smallFont;
+  if (oneLine) context.fillText(when, canvas.width - pad - context.measureText(when).width, row(0));
+  else context.fillText(fit(context, when, canvas.width - pad * 2), pad, row(1));
   const list = layers.length > 0 ? `Capas: ${layers.join(" · ")}` : "Sin capas encendidas";
-  context.fillText(fit(context, list, canvas.width - pad * 2), pad, footerTop + footer * 0.72);
+  context.fillText(fit(context, list, canvas.width - pad * 2), pad, row(oneLine ? 1 : 2));
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("No se pudo generar la imagen");

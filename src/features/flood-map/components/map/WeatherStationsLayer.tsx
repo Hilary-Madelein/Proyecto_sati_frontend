@@ -146,10 +146,10 @@ function HourlyRainBars({ hours }: { hours: WeatherStationHour[] }) {
       role="img"
       aria-label={`Lluvia de cada hora: ${hours.map((hour) => `${formatHour(hour.time)} ${hour.mm === null ? "sin dato" : formatMm(hour.mm)}`).join(", ")}`}
     >
-      <text x={0} y={8} className="fill-slate-400 text-[9px]">
+      <text x={0} y={8} fill="#94a3b8" fontSize={9}>
         {max > 1 ? formatMm(max) : "1 mm"}
       </text>
-      <line x1={0} x2={CHART.width} y1={CHART.top} y2={CHART.top} className="stroke-slate-100" strokeDasharray="2 3" />
+      <line x1={0} x2={CHART.width} y1={CHART.top} y2={CHART.top} stroke="#f1f5f9" strokeDasharray="2 3" />
       {hours.map((hour, index) => {
         const x = index * slot + CHART.gap / 2;
         const start = new Date(Date.parse(hour.time) - 60 * 60 * 1000).toISOString();
@@ -161,7 +161,7 @@ function HourlyRainBars({ hours }: { hours: WeatherStationHour[] }) {
             {/* Zona sensible a toda la altura: más grande que la barra. */}
             <rect x={x} y={CHART.top} width={barWidth} height={plotHeight} fill="transparent" />
             {hour.mm === null ? (
-              <text x={x + barWidth / 2} y={baseline - 2} textAnchor="middle" className="fill-slate-400 text-[8px]">
+              <text x={x + barWidth / 2} y={baseline - 2} textAnchor="middle" fill="#94a3b8" fontSize={8}>
                 –
               </text>
             ) : (
@@ -174,7 +174,7 @@ function HourlyRainBars({ hours }: { hours: WeatherStationHour[] }) {
                 x={x + barWidth / 2}
                 y={CHART.height - 3}
                 textAnchor={index === 0 ? "start" : index === hours.length - 1 ? "end" : "middle"}
-                className="fill-slate-500 text-[9px] tabular-nums"
+                fill="#64748b" fontSize={9} className="tabular-nums"
               >
                 {formatHour(hour.time)}
               </text>
@@ -182,7 +182,7 @@ function HourlyRainBars({ hours }: { hours: WeatherStationHour[] }) {
           </g>
         );
       })}
-      <line x1={0} x2={CHART.width} y1={baseline} y2={baseline} className="stroke-slate-300" />
+      <line x1={0} x2={CHART.width} y1={baseline} y2={baseline} stroke="#cbd5e1" />
     </svg>
   );
 }

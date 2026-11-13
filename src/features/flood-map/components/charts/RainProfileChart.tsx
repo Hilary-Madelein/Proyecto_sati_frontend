@@ -15,6 +15,7 @@ const formatMm = (mm: number) => mm.toLocaleString("es-EC", { maximumFractionDig
  * Lluvia pronosticada acumulada en un punto: cuánto habrá llovido a las 3, 6, 12 y 24 h.
  * Una línea que sube muestra cuándo llega la lluvia; plana, que ya no suma más.
  */
+// Colores como atributos del SVG (no clases): así también salen en la imagen descargada (html-to-image no los toma de las clases).
 export function RainProfileChart({ points, className }: { points: readonly RainProfilePoint[]; className?: string }) {
   const values = points.map(({ mm }) => mm ?? 0);
   const max = Math.max(1, ...values);
@@ -30,15 +31,15 @@ export function RainProfileChart({ points, className }: { points: readonly RainP
       role="img"
       aria-label={`Lluvia pronosticada acumulada: ${points.map((point) => `${point.label} ${point.mm === null ? "sin dato" : `${formatMm(point.mm)} mm`}`).join(", ")}`}
     >
-      <line x1={PAD.left} x2={WIDTH - PAD.right} y1={HEIGHT - PAD.bottom} y2={HEIGHT - PAD.bottom} className="stroke-slate-300" strokeWidth={1} />
-      <polyline points={line} fill="none" className="stroke-blue-600" strokeWidth={2} strokeLinejoin="round" />
+      <line x1={PAD.left} x2={WIDTH - PAD.right} y1={HEIGHT - PAD.bottom} y2={HEIGHT - PAD.bottom} stroke="#cbd5e1" strokeWidth={1} />
+      <polyline points={line} fill="none" stroke="#2563eb" strokeWidth={2} strokeLinejoin="round" />
       {drawn.map((point) => (
         <g key={point.label}>
-          {point.mm !== null && <circle cx={point.x} cy={point.y} r={3.5} className="fill-white stroke-blue-600" strokeWidth={2} />}
-          <text x={point.x} y={point.y - 7} textAnchor="middle" className="fill-slate-800 text-[10px] font-semibold tabular-nums">
+          {point.mm !== null && <circle cx={point.x} cy={point.y} r={3.5} fill="#ffffff" stroke="#2563eb" strokeWidth={2} />}
+          <text x={point.x} y={point.y - 7} textAnchor="middle" fill="#1e293b" fontSize={10} fontWeight={600} className="tabular-nums">
             {point.mm === null ? "—" : formatMm(point.mm)}
           </text>
-          <text x={point.x} y={HEIGHT - 6} textAnchor="middle" className="fill-slate-500 text-[10px]">
+          <text x={point.x} y={HEIGHT - 6} textAnchor="middle" fill="#64748b" fontSize={10}>
             {point.label}
           </text>
         </g>
