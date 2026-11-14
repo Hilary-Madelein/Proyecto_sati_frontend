@@ -59,6 +59,8 @@ interface GalapagosRainSnapshot {
   limits?: GalapagosLimit[];
   /** Umbrales de la alarma de Galápagos. */
   thresholds?: { alarm5hMm: number; alarmBurstMm: number; extreme3hMm: number; extreme6hMm: number };
+  /** Mar alto: desde esta altura (m) sobre su nivel medio. */
+  highSeaM?: number;
 }
 
 const WIDTH = 248;
@@ -126,7 +128,7 @@ export function GalapagosStationDetails({
   return (
     <div className="mt-2 space-y-3">
       <AlarmBanner station={station} thresholds={snapshot.thresholds} />
-      <SeaLine station={station} />
+      <SeaLine station={station} highSeaM={snapshot.highSeaM} />
 
       <div className="grid grid-cols-2 gap-2">
         <Stat label="Hoy" value={day ? `${formatMm(day.total)} mm` : "–"} note={where && <span className={where.className}>{where.text}</span>} />
@@ -231,11 +233,18 @@ const SCENARIO_CLASSES: Record<GalapagosScenario, string> = {
 };
 
 /** El mar ahora y la casilla de la matriz lluvia × mar. Sin dato del mar no se muestra. */
-function SeaLine({ station }: { station: GalapagosStationRain }) {
+function SeaLine({ station, highSeaM = 0.5 }: { station: GalapagosStationRain; highSeaM?: number }) {
   const { sea, scenario } = station;
   if (!sea) return null;
+  // La hora de la lectura, en Galápagos (UTC-6).
+  const read = new Date(Date.parse(sea.time) - 6 * 60 * 60 * 1000);
+  const readTime = `${String(read.getUTCHours()).padStart(2, "0")}:${String(read.getUTCMinutes()).padStart(2, "0")}`;
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 ring-1 ring-slate-200/70">
+    <div tabIndex={0} className="group relative flex cursor-help items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 ring-1 ring-slate-200/70 outline-none focus-visible:ring-blue-500">
+      {/* Qué significa el valor: sale al pasar el ratón (o al tocar la línea). */}
+      <p role="tooltip" className="pointer-events-none absolute inset-x-0 top-full z-10 mt-1 hidden rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] leading-snug text-white shadow-lg group-hover:block group-focus:block">
+        Altura del mar respecto de su nivel medio de los últimos 7 días (mareógrafo de {sea.place}, {readTime} de Galápagos). Mar alto: desde {formatSeaLevel(highSeaM)}.
+      </p>
       <p className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
         <WavesIcon className="size-3.5 shrink-0 text-sky-700" />
         <span>
