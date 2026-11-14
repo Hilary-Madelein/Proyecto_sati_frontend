@@ -123,9 +123,8 @@ function StationPopupContent({
       </p>
       <HourlyRainBars hours={station.hours} />
       {/* Solo las dos estaciones de Galápagos: su lluvia frente a los episodios de esas mismas estaciones. */}
-      {GALAPAGOS_STATION_CODES.includes(station.code) && <GalapagosRainChart code={station.code} />}
-
-      <StationForecast station={station} rain={rain} />
+      {/* El pronóstico WRF del INAMHI no cubre Galápagos: ahí no se muestra. */}
+      {GALAPAGOS_STATION_CODES.includes(station.code) ? <GalapagosRainChart code={station.code} /> : <StationForecast station={station} rain={rain} />}
     </div>
   );
 }
