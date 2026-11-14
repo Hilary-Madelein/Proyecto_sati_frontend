@@ -53,7 +53,19 @@ const FONT = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 /** El registro del INAMHI cuenta los días en hora del continente (UTC-5). */
 const RECORD_OFFSET_MS = 5 * 60 * 60 * 1000;
-const LEVEL_TEXT = { normal: "sin alarma", alarm: "en alarma", extreme: "en alarma extrema" } as const;
+/**
+ * Momentos del episodio del límite superior que se marcan con una línea vertical:
+ * `hour` es la hora (1 a 48) desde las 00:00 de su primer día. En Santa Cruz, la
+ * inundación de La Cascada del 31 de octubre de 2026: empezó a la 01:00 y su nivel
+ * máximo se reportó a las 04:00.
+ */
+const UPPER_EVENTS: Readonly<Record<string, readonly { hour: number; label: string; time: string }[]>> = {
+  M0191: [
+    { hour: 25, label: "Inicio de la inundación en La Cascada", time: "01:00 del 31 oct" },
+    { hour: 28, label: "Nivel máximo de inundación reportado", time: "04:00 del 31 oct" },
+  ],
+};
+const LEVEL_TEXT ={ normal: "sin alarma", alarm: "en alarma", extreme: "en alarma extrema" } as const;
 
 const fmt = (value: number, decimals = 1) => value.toLocaleString("es-EC", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 const esc = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -172,6 +184,8 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
       .join("");
   push(bars(series.upper, 0.92, C.upper, 0.38), bars(series.lower, 0.62, C.lower, 0.45), bars(series.now, 0.32, C.now, 0.88));
   push(`<line x1="${x(24)}" x2="${x(24)}" y1="${top1}" y2="${base1}" stroke="${C.ink3}" stroke-width="1"/>`);
+  const events = UPPER_EVENTS[code] ?? [];
+  const eventLine = (hour: number, top: number, base: number) => `<line x1="${x(hour)}" x2="${x(hour)}" y1="${top}" y2="${base}" stroke="${C.upper}" stroke-width="2" stroke-dasharray="7 5"/>`;
   if (hoursNow > 0 && hoursNow < 48) {
     push(`<line x1="${x(hoursNow)}" x2="${x(hoursNow)}" y1="${top1}" y2="${base1}" stroke="${C.now}" stroke-width="1.4" stroke-dasharray="3 5"/>`);
     // Encima de la gráfica, para no tapar las barras.
@@ -187,9 +201,14 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
       push(text(x(nowPeak + 0.5), y1(series.now[nowPeak]) - 9, `${fmt(series.now[nowPeak])} mm`, { size: 14, fill: C.ink, weight: 700, anchor: "middle", halo: true }));
     }
   }
-  const hourLabels = ["00:00", "06:00", "12:00", "18:00", "00:00", "06:00", "12:00", "18:00", "24:00"];
-  const ticks = (y: number) => hourLabels.map((label, index) => text(x(index * 6), y, label, { size: 14, anchor: "middle" })).join("");
-  push(ticks(base1 + 24), text(x(12), base1 + 52, "primer día", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base1 + 52, "segundo día", { size: 15, fill: C.ink3, anchor: "middle" }));
+  // Abajo de cada gráfica: una marca por hora y la etiqueta cada 3 horas.
+  const ticks = (base: number) =>
+    Array.from({ length: 49 }, (_, hour) => {
+      const labelled = hour % 3 === 0;
+      const mark = `<line x1="${x(hour)}" x2="${x(hour)}" y1="${base}" y2="${base + (labelled ? 8 : 4)}" stroke="${C.ink3}" stroke-width="1"/>`;
+      return labelled ? mark + text(x(hour), base + 26, hour === 48 ? "24:00" : `${pad(hour % 24)}:00`, { size: 13.5, anchor: "middle" }) : mark;
+    }).join("");
+  push(ticks(base1), text(x(12), base1 + 54, "primer día", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base1 + 54, "segundo día", { size: 15, fill: C.ink3, anchor: "middle" }));
   push(`<text transform="translate(${left - 50} ${(top1 + base1) / 2}) rotate(-90)" font-size="15" fill="${C.ink2}" text-anchor="middle">mm en cada hora</text>`);
 
   // ── Abajo: el acumulado de ayer y hoy, como en el popup ──
@@ -214,6 +233,15 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
     const labelY = limit === lower ? Math.min(endY, base2 - 28) : Math.max(endY, top2 + 18);
     push(text(right + 16, labelY - 13, name, { size: 14.5, fill: C.ink }), text(right + 16, labelY + 6, detail, { size: 14.5, fill: C.ink }), text(right + 16, labelY + 25, `${fmt(limit.totalMm, 0)} mm`, { size: 14.5, fill: C.ink }));
   }
+  // Los momentos del episodio del límite superior: la línea, el punto sobre su curva y qué pasó, arriba.
+  events.forEach((event, index) => {
+    const mm = upper.accumulatedMm[event.hour - 1] ?? 0;
+    const side = index % 2 === 0 ? -1 : 1;
+    const anchor = side < 0 ? "end" : "start";
+    push(eventLine(event.hour, top2, base2), `<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="5.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2"/>`);
+    push(text(x(event.hour) + side * 9, top2 + 19, event.label, { size: 14.5, fill: C.ink, anchor, halo: true }));
+    push(text(x(event.hour) + side * 9, top2 + 38, `${event.time} · con ${fmt(mm, 0)} mm acumulados`, { size: 14.5, fill: C.ink, anchor, halo: true }));
+  });
   if (current) {
     const nowX = x(hoursNow);
     const nowY = y2(total);
@@ -226,7 +254,7 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
     push(`<line x1="${nowX + side * 9}" y1="${nowY - 7}" x2="${labelX - side * 62}" y2="${labelY + 30}" stroke="${C.now}" stroke-width="1.3"/>`);
     push(text(labelX, labelY, "Aquí estamos", { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }), text(labelX, labelY + 22, `${fmt(total)} mm desde ayer`, { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }));
   }
-  push(ticks(base2 + 24), text(x(12), base2 + 62, "ayer", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base2 + 62, "hoy", { size: 15, fill: C.ink3, anchor: "middle" }));
+  push(ticks(base2), text(x(12), base2 + 62, "ayer", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base2 + 62, "hoy", { size: 15, fill: C.ink3, anchor: "middle" }));
   push(`<text transform="translate(${left - 58} ${(top2 + base2) / 2}) rotate(-90)" font-size="15" fill="${C.ink2}" text-anchor="middle">mm acumulados</text>`);
 
   // ── Lectura y fuente ──
