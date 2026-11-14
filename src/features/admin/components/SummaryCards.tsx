@@ -6,13 +6,23 @@ import type { NotificationsSummary } from "../types";
 
 /** Indicadores de la cabecera: suscriptores, envíos recientes y estado del correo. */
 export function SummaryCards({ summary }: { summary: NotificationsSummary }) {
-  const { subscribers, deliveries, emailConfigured } = summary;
+  const { subscribers, deliveries, emailConfigured, telegram } = summary;
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className={cn("grid gap-3", telegram ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3")}>
       <Stat icon={<UsersIcon className="size-5" />} tone="blue" label="Reciben alertas">
         <span className="text-2xl font-semibold text-slate-900">{subscribers.active}</span>
         <span className="text-sm text-slate-500"> de {subscribers.total} suscriptores</span>
       </Stat>
+
+      {telegram && (
+        <Stat icon={<SendIcon className="size-5" />} tone="blue" label="Telegram">
+          <span className="text-2xl font-semibold text-slate-900">{telegram.active}</span>
+          <span className="text-sm text-slate-500"> chats reciben alertas</span>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {telegram.national} todo el país · {telegram.galapagos} Galápagos
+          </p>
+        </Stat>
+      )}
 
       <Stat icon={<SendIcon className="size-5" />} tone={deliveries.failed > 0 ? "red" : "green"} label={`Envíos · últimos ${deliveries.days} días`}>
         <span className="text-2xl font-semibold text-slate-900">{deliveries.sent}</span>

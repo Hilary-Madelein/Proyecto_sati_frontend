@@ -58,6 +58,8 @@ export interface DeliveriesPage {
 export interface NotificationsSummary {
   subscribers: { total: number; active: number };
   deliveries: { days: number; sent: number; failed: number };
+  /** Chats de Telegram que reciben alertas (solo cifras). */
+  telegram?: { active: number; national: number; galapagos: number };
   /** false = el backend no tiene SMTP: los correos solo van a su log. */
   emailConfigured: boolean;
 }
