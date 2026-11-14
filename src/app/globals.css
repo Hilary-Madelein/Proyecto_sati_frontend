@@ -58,6 +58,42 @@ html .leaflet-popup-content {
   line-height: 1.4;
 }
 
+/* Globo más alto que el máximo (ver MapPopupWatcher): barra para subir y bajar, siempre visible. */
+html .leaflet-popup-scrolled {
+  /* Leaflet le da al contenido su ancho exacto: la barra y su aire se suman afuera, no se
+     lo comen (con border-box el contenido quedaba más ancho que la caja y se cortaba). */
+  box-sizing: content-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  /* La barra, pegada al borde del globo: la X va a su izquierda. */
+  margin-right: 4px !important;
+  padding-right: 10px;
+  /* Aire por dentro a la izquierda (con el mismo total): el borde de los recuadros va por
+     fuera de ellos y, con el recorte de la barra, se cortaba. */
+  margin-left: 10px !important;
+  padding-left: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+html .leaflet-popup-scrolled::-webkit-scrollbar {
+  width: 8px;
+}
+html .leaflet-popup-scrolled::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+html .leaflet-popup-scrolled::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+}
+
+/* Con barra, la X de cerrar va a su izquierda (si no, quedaba encima de la barra). */
+html .leaflet-container .leaflet-popup:has(.leaflet-popup-scrolled) a.leaflet-popup-close-button {
+  right: 16px;
+}
+
 html .leaflet-popup-content p {
   margin: 0;
 }

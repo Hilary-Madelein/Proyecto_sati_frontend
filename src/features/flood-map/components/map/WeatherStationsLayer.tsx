@@ -21,7 +21,7 @@ import type {
   WeatherStationsSnapshot,
 } from "../../types";
 import { stationRainLevel, stationsWithRain, type MeasuredStation } from "../../utils";
-import { GALAPAGOS_STATION_CODES, GalapagosRainChart } from "../charts/GalapagosRainChart";
+import { GALAPAGOS_STATION_CODES, GalapagosStationDetails, useGalapagosRain } from "../charts/GalapagosRainChart";
 import { diamondSymbolHtml } from "../map-symbols";
 import { focusProvinceOf } from "./province-focus";
 import { WatershedInfo } from "./WatershedInfo";
@@ -106,6 +106,9 @@ function StationPopupContent({
   windowHours: number;
   rain: RainForecastAvailability | null;
 }) {
+  // Las dos de Galápagos tienen su propio popup: su alarma, la lluvia del día entre sus dos límites y el acumulado de ayer y hoy.
+  const galapagos = useGalapagosRain(GALAPAGOS_STATION_CODES.includes(station.code) ? station.code : null);
+  const ready = galapagos?.status === "ready" ? galapagos : null;
   return (
     <div className="w-62">
       <p className="text-[11px] font-medium text-slate-500">
@@ -115,16 +118,30 @@ function StationPopupContent({
       <h3 className="text-[15px] font-semibold text-slate-900 max-lg:text-sm">{station.name}</h3>
       <WatershedInfo lat={station.lat} lng={station.lng} className="mt-0.5" />
 
-      <p className="mt-2 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia medida · últimas {windowHours} h</p>
-      <p className="text-xl font-semibold text-slate-900 tabular-nums">{formatMm(station.totalMm)}</p>
-      <p className="text-[11px] text-slate-500">
-        {station.hoursWithData} de {station.hours.length} h con dato
-        {station.lastTime && ` · hasta las ${formatHour(station.lastTime)}`}
-      </p>
-      <HourlyRainBars hours={station.hours} />
-      {/* Solo las dos estaciones de Galápagos: su lluvia frente a los episodios de esas mismas estaciones. */}
-      {/* El pronóstico WRF del INAMHI no cubre Galápagos: ahí no se muestra. */}
-      {GALAPAGOS_STATION_CODES.includes(station.code) ? <GalapagosRainChart code={station.code} /> : <StationForecast station={station} rain={rain} />}
+      {ready ? (
+        <GalapagosStationDetails
+          state={ready}
+          hours={station.hours}
+          last24h={{ mm: station.totalMm, hoursWithData: station.hoursWithData, until: station.lastTime && formatHour(station.lastTime) }}
+          fallbackBars={<HourlyRainBars hours={station.hours} />}
+        />
+      ) : (
+        <>
+          <p className="mt-2 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia medida · últimas {windowHours} h</p>
+          <p className="text-xl font-semibold text-slate-900 tabular-nums">{formatMm(station.totalMm)}</p>
+          <p className="text-[11px] text-slate-500">
+            {station.hoursWithData} de {station.hours.length} h con dato
+            {station.lastTime && ` · hasta las ${formatHour(station.lastTime)}`}
+          </p>
+          <HourlyRainBars hours={station.hours} />
+          {/* El pronóstico WRF del INAMHI no cubre Galápagos: ahí no se muestra. */}
+          {galapagos ? (
+            <p className="mt-2 text-xs text-slate-400">{galapagos.status === "loading" ? "Cargando la alarma de Galápagos…" : "No se pudo cargar la alarma de Galápagos."}</p>
+          ) : (
+            <StationForecast station={station} rain={rain} />
+          )}
+        </>
+      )}
     </div>
   );
 }

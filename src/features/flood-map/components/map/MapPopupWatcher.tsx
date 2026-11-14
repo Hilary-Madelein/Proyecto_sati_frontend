@@ -20,6 +20,12 @@ type PannablePopup = L.Popup & { _adjustPan?: () => void };
  *   correr el mapa para que se vea entero: Leaflet solo lo hace al abrirlo, y el
  *   globo crece hacia arriba, así que quedaba cortado arriba.
  */
+/** Alto máximo de un globo: más alto, se desplaza adentro con su barra. */
+const POPUP_MAX_HEIGHT_PX = 520;
+/** Aire entre el globo y los bordes del mapa (controles y barras de arriba). */
+const POPUP_MAP_MARGIN_PX = 120;
+const POPUP_MIN_HEIGHT_PX = 180;
+
 export function MapPopupWatcher() {
   const observer = useRef<ResizeObserver | null>(null);
   const frame = useRef(0);
@@ -32,8 +38,9 @@ export function MapPopupWatcher() {
       open.current.add(event.popup);
       map.getContainer().parentElement?.setAttribute("data-map-popup", "");
       const popup = event.popup as PannablePopup;
-      // Nunca más alto que el mapa (celular acostado): si no cabe, su contenido se desplaza adentro.
-      const maxHeight = Math.max(160, map.getSize().y - 56);
+      // Nunca más alto que el mapa, dejando aire para las barras de arriba: si no cabe, su
+      // contenido se desplaza adentro con una barra.
+      const maxHeight = Math.max(POPUP_MIN_HEIGHT_PX, Math.min(map.getSize().y - POPUP_MAP_MARGIN_PX, POPUP_MAX_HEIGHT_PX));
       if (popup.options.maxHeight !== maxHeight) {
         popup.options.maxHeight = maxHeight;
         popup.update();
@@ -41,10 +48,23 @@ export function MapPopupWatcher() {
       const element = popup.getElement();
       observer.current?.disconnect();
       if (!element) return;
+      const content = element.querySelector<HTMLElement>(".leaflet-popup-content");
+      /**
+       * Leaflet mide el alto (y pone la barra) solo al abrirlo; el contenido puede crecer
+       * después (datos que llegan, una parte que se despliega) o achicarse: se vuelve a
+       * medir cuando cambia de lado del alto máximo.
+       */
+      const fitHeight = () => {
+        if (!content) return;
+        const scrolled = content.classList.contains("leaflet-popup-scrolled");
+        const tall = content.scrollHeight > maxHeight;
+        if (tall !== scrolled) popup.update();
+      };
       observer.current = new ResizeObserver(() => {
         cancelAnimationFrame(frame.current);
         frame.current = requestAnimationFrame(() => {
           if (!map.hasLayer(popup)) return;
+          fitHeight();
           popup._adjustPan?.();
           // Además, que no quede debajo de los controles ni de la barra de la provincia (siempre a la vista).
           const [dx, dy] = offsetToClear(map, element);
@@ -52,6 +72,8 @@ export function MapPopupWatcher() {
         });
       });
       observer.current.observe(element);
+      // Lo de adentro también: con la barra puesta, el globo ya no cambia de alto aunque el contenido sí.
+      if (content?.firstElementChild) observer.current.observe(content.firstElementChild);
     },
     popupclose: (event) => {
       open.current.delete(event.popup);
