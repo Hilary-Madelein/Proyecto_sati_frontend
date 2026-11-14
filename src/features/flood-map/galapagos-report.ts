@@ -59,9 +59,9 @@ const RECORD_OFFSET_MS = 5 * 60 * 60 * 1000;
  * inundación de La Cascada del 31 de octubre de 2026: empezó a la 01:00 y su nivel
  * máximo se reportó a las 04:00.
  */
-const UPPER_EVENTS: Readonly<Record<string, readonly { hour: number; label: string; time: string }[]>> = {
+const UPPER_EVENTS: Readonly<Record<string, readonly { hour: number; label: string; time: string; highlight?: boolean }[]>> = {
   M0191: [
-    { hour: 25, label: "Inicio de la inundación en La Cascada", time: "01:00 del 31 oct" },
+    { hour: 25, label: "Inicio de la inundación en La Cascada", time: "01:00 del 31 oct", highlight: true },
     { hour: 28, label: "Nivel máximo de inundación reportado", time: "04:00 del 31 oct" },
   ],
 };
@@ -146,15 +146,17 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   const push = (...items: string[]) => parts.push(...items);
 
   // ── Cabecera ──
-  push(text(left, 66, `${island} hoy, ${dayName}, frente a sus límites`, { size: 31, fill: C.ink, weight: 700 }));
+  // Tras la fecha, la hora en que se generó (GMT-5, la del registro).
+  const downloaded = input.downloadedAt ? new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS) : null;
+  const updated = downloaded ? `, ${pad(downloaded.getUTCHours())}:${pad(downloaded.getUTCMinutes())} (GMT-5)` : "";
+  push(text(left, 66, `${island} hoy, ${dayName}${updated}, frente a sus límites`, { size: 31, fill: C.ink, weight: 700 }));
   const headline =
     today === null
       ? `Desde ayer: ${fmt(total)} mm hasta las ${hourLabel}.`
       : `Hoy: ${fmt(today)} mm hasta las ${hourLabel}. Con ayer, ${fmt(total)} mm. Sus límites de dos días: ${fmt(lower.totalMm, 0)} mm (inferior) y ${fmt(upper.totalMm, 0)} mm (superior).`;
   push(text(left, 104, headline, { size: 17.5 }));
   // La estación publica cada hora con retraso: se dice cuándo se descargó y hasta qué hora hay dato.
-  const downloaded = input.downloadedAt ? new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS) : null;
-  const asOf = downloaded ? `Descargado a las ${pad(downloaded.getUTCHours())}:${pad(downloaded.getUTCMinutes())} · último dato publicado: ${hourLabel} · ` : "";
+  const asOf = downloaded ? `Último dato publicado: ${hourLabel} · ` : "";
   push(text(left, 132, `${asOf}Estación ${code}, INAMHI · cada episodio se muestra con sus dos días completos, con las horas del registro`, { size: 14.5, fill: C.ink3 }));
 
   // ── Leyenda ──
@@ -238,7 +240,14 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
     const mm = upper.accumulatedMm[event.hour - 1] ?? 0;
     const side = index % 2 === 0 ? -1 : 1;
     const anchor = side < 0 ? "end" : "start";
-    push(eventLine(event.hour, top2, base2), `<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="5.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2"/>`);
+    push(eventLine(event.hour, top2, base2));
+    if (event.highlight) {
+      // Lo acumulado en ese momento, resaltado: una guía hasta el eje, un punto grande con aro y la cifra al lado.
+      push(`<line x1="${left}" x2="${x(event.hour)}" y1="${y2(mm)}" y2="${y2(mm)}" stroke="${C.upper}" stroke-width="1.6" stroke-dasharray="3 5"/>`);
+      push(`<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="15" fill="${C.upper}" fill-opacity="0.18"/>`, `<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="8.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2.5"/>`);
+      push(text(x(event.hour) - 22, y2(mm) - 12, `${fmt(mm, 0)} mm`, { size: 24, fill: C.ink, weight: 700, anchor: "end", halo: true }));
+      push(text(x(event.hour) - 22, y2(mm) + 24, "acumulados al empezar", { size: 14.5, fill: C.ink, anchor: "end", halo: true }));
+    } else push(`<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="5.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2"/>`);
     push(text(x(event.hour) + side * 9, top2 + 19, event.label, { size: 14.5, fill: C.ink, anchor, halo: true }));
     push(text(x(event.hour) + side * 9, top2 + 38, `${event.time} · con ${fmt(mm, 0)} mm acumulados`, { size: 14.5, fill: C.ink, anchor, halo: true }));
   });
