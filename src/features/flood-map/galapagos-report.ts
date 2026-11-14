@@ -41,6 +41,8 @@ export interface GalapagosReportInput {
   lower: ReportLimit;
   sea?: SeaReading | null;
   scenario?: GalapagosScenario;
+  /** Cuándo se descargó: se dice junto a la hora del último dato de la estación. */
+  downloadedAt?: Date;
 }
 
 const W = 1400;
@@ -138,7 +140,10 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
       ? `Desde ayer: ${fmt(total)} mm hasta las ${hourLabel}.`
       : `Hoy: ${fmt(today)} mm hasta las ${hourLabel}. Con ayer, ${fmt(total)} mm. Sus límites de dos días: ${fmt(lower.totalMm, 0)} mm (inferior) y ${fmt(upper.totalMm, 0)} mm (superior).`;
   push(text(left, 104, headline, { size: 17.5 }));
-  push(text(left, 132, `Estación ${code}, INAMHI · cada episodio se muestra con sus dos días completos, con las horas del registro`, { size: 14.5, fill: C.ink3 }));
+  // La estación publica cada hora con retraso: se dice cuándo se descargó y hasta qué hora hay dato.
+  const downloaded = input.downloadedAt ? new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS) : null;
+  const asOf = downloaded ? `Descargado a las ${pad(downloaded.getUTCHours())}:${pad(downloaded.getUTCMinutes())} · último dato publicado: ${hourLabel} · ` : "";
+  push(text(left, 132, `${asOf}Estación ${code}, INAMHI · cada episodio se muestra con sus dos días completos, con las horas del registro`, { size: 14.5, fill: C.ink3 }));
 
   // ── Leyenda ──
   const legend: Array<[string, number, string]> = [
@@ -170,7 +175,7 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   if (hoursNow > 0 && hoursNow < 48) {
     push(`<line x1="${x(hoursNow)}" x2="${x(hoursNow)}" y1="${top1}" y2="${base1}" stroke="${C.now}" stroke-width="1.4" stroke-dasharray="3 5"/>`);
     // Encima de la gráfica, para no tapar las barras.
-    push(text(Math.max(left + 400, x(hoursNow)), top1 - 9, `hoy llega hasta las ${hourLabel}`, { size: 13.5, anchor: "middle" }));
+    push(text(Math.max(left + 400, x(hoursNow)), top1 - 9, `último dato: ${hourLabel}`, { size: 13.5, anchor: "middle" }));
   }
   // La hora más lluviosa del límite superior y la de ahora, con su valor encima.
   const peak = (values: readonly number[]) => values.reduce((best, mm, index) => (mm > values[best] ? index : best), 0);

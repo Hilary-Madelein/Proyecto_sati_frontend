@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type PointerEvent, type ReactNode } from "react";
 import { AlertTriangleIcon, DownloadIcon, WavesIcon } from "@/components/ui/icons";
 import { formatHour } from "@/lib/format";
 import { satiClientGet } from "@/lib/api/sati-client";
@@ -166,7 +166,24 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
 
   const download = () => {
     setStatus("working");
-    downloadGalapagosReport({ code: station.code, island: station.island, level: station.level, reason: station.reason, now, upper, lower, sea: station.sea, scenario: station.scenario })
+    // La estación al momento de descargar; si el servidor no responde, lo que ya muestra el popup.
+    satiClientGet<GalapagosRainSnapshot>("/galapagos-rain", { fresh: 1 })
+      .then((snapshot) => snapshot.stations.find((item) => item.code === station.code) ?? station)
+      .catch(() => station)
+      .then((latest) =>
+        downloadGalapagosReport({
+          code: latest.code,
+          island: latest.island,
+          level: latest.level,
+          reason: latest.reason,
+          now: latest.twoDays?.length ? latest.twoDays : now,
+          upper: latest.limits?.find((item) => item.key === "upper") ?? upper,
+          lower: latest.limits?.find((item) => item.key === "lower") ?? lower,
+          sea: latest.sea,
+          scenario: latest.scenario,
+          downloadedAt: new Date(),
+        }),
+      )
       .then(() => setStatus("idle"))
       .catch(() => setStatus("error"));
   };
@@ -311,11 +328,13 @@ function HourlyLogBars({ hours, limits, island }: { hours: WeatherStationHour[];
   const slot = plotRight / hours.length;
   const barWidth = Math.max(2, slot - gap);
   const labelled = new Set([0, Math.floor((hours.length - 1) / 2), hours.length - 1]);
+  const [active, setActive] = useState<number | null>(null);
+  const hovered = active === null ? undefined : hours[active];
   const summary = `Lluvia de cada hora en ${island}: ${hours.map((hour) => `${formatHour(hour.time)} ${hour.mm === null ? "sin dato" : `${formatMm(hour.mm)} mm`}`).join(", ")}. Límite superior ${formatMm(limits.upper.mm)} mm; inferior ${formatMm(limits.lower.mm)} mm.`;
 
   return (
     <>
-      <svg viewBox={`0 0 ${WIDTH} ${height}`} className="mt-1 w-full" role="img" aria-label={summary}>
+      <svg viewBox={`0 0 ${WIDTH} ${height}`} className="mt-1 w-full touch-pan-y" role="img" aria-label={summary} onPointerLeave={() => setActive(null)}>
         {/* Guías de la escala: 1, 10 y 100 mm, salvo las que caen pegadas a una línea de límite (se encimaban). */}
         {[1, 10, 100].filter((mm) => mm < max && Math.abs(y(mm) - y(limits.upper.mm)) > 9 && Math.abs(y(mm) - y(limits.lower.mm)) > 9).map((mm) => (
           <g key={mm}>
@@ -329,10 +348,10 @@ function HourlyLogBars({ hours, limits, island }: { hours: WeatherStationHour[];
           const x = index * slot + gap / 2;
           const start = new Date(Date.parse(hour.time) - 60 * 60 * 1000).toISOString();
           return (
-            <g key={hour.time}>
+            <g key={hour.time} onPointerEnter={() => setActive(index)} onPointerDown={() => setActive(index)}>
               <title>{`De ${formatHour(start)} a ${formatHour(hour.time)}: ${hour.mm === null ? "sin dato" : `${formatMm(hour.mm)} mm`}`}</title>
-              {/* Zona sensible a toda la altura: más grande que la barra. */}
-              <rect x={x} y={top} width={barWidth} height={baseline - top} fill="transparent" />
+              {/* Zona sensible a toda la altura y todo el ancho de la hora; se sombrea la que está bajo el ratón. */}
+              <rect x={index * slot} y={0} width={slot} height={baseline} fill={active === index ? "#0f172a" : "transparent"} fillOpacity={0.07} />
               {hour.mm === null ? (
                 <text x={x + barWidth / 2} y={baseline - 2} textAnchor="middle" fill="#94a3b8" fontSize={8}>
                   –
@@ -358,6 +377,23 @@ function HourlyLogBars({ hours, limits, island }: { hours: WeatherStationHour[];
             </text>
           </g>
         ))}
+        {/* La hora bajo el ratón: su hora y su lluvia, encima de la barra. */}
+        {hovered && active !== null && (
+          <text
+            x={Math.min(plotRight - 34, Math.max(34, (active + 0.5) * slot))}
+            y={Math.max(top + 2, y(hovered.mm ?? 0) - 4)}
+            textAnchor="middle"
+            fill="#0f172a"
+            fontSize={9.5}
+            fontWeight={700}
+            stroke="#ffffff"
+            strokeWidth={3}
+            paintOrder="stroke"
+            pointerEvents="none"
+          >
+            {formatHour(hovered.time)} · {hovered.mm === null ? "sin dato" : `${formatMm(hovered.mm)} mm`}
+          </text>
+        )}
       </svg>
       <ul className="mt-1 space-y-0.5 text-[11px] text-slate-600">
         <Key color={LOG_CHART.upper} dashed>
@@ -397,11 +433,43 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
   const nowY = y(total);
   // El rótulo va a la derecha del punto mientras quepa; después, a la izquierda.
   const labelLeft = (current?.hour ?? 0) > 30;
+  // La hora bajo el ratón (1 a 48) y lo acumulado a esa hora en cada línea.
+  const [hover, setHover] = useState<number | null>(null);
+  const track = (event: PointerEvent<SVGSVGElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const at = ((event.clientX - box.left) / box.width) * WIDTH;
+    setHover(Math.min(hours, Math.max(1, Math.round(((at - left) / (plotRight - left)) * hours))));
+  };
+  const hoverValues =
+    hover === null
+      ? []
+      : [
+          { key: "now", label: "ahora", color: COLORS.now, mm: now.find((point) => point.hour === hover)?.accumulatedMm },
+          { key: "lower", label: "inf.", color: COLORS.lower, mm: lower.accumulatedMm[hover - 1] },
+          { key: "upper", label: "sup.", color: COLORS.upper, mm: upper.accumulatedMm[hover - 1] },
+        ].filter((item): item is { key: string; label: string; color: string; mm: number } => item.mm !== undefined);
   const summary = `Lluvia acumulada en ${station.island} desde las 00:00 de ayer: ${formatMm(total)} mm. ${lower.label}: ${formatMm(lower.totalMm)} mm. ${upper.label}: ${formatMm(upper.totalMm)} mm.`;
 
   return (
     <>
-      <svg viewBox={`0 0 ${WIDTH} ${height}`} className="mt-1 w-full" role="img" aria-label={summary}>
+      {/* Lo que marca la guía, encima de la gráfica; siempre ocupa su renglón, para que la gráfica no salte. */}
+      <p className="min-h-4 text-[11px] leading-4 whitespace-nowrap text-slate-600 tabular-nums" aria-hidden="true">
+        {hover !== null && (
+          <>
+            <strong className="text-slate-900">
+              {hover <= 24 ? "Ayer" : "Hoy"} {String(hover <= 24 ? hover : hover - 24).padStart(2, "0")}:00
+            </strong>
+            {hoverValues.map((item) => (
+              <span key={item.key}>
+                {" · "}
+                {item.label} <strong style={{ color: item.color }}>{formatMm(item.mm)}</strong>
+                {item.key === "now" && " mm"}
+              </span>
+            ))}
+          </>
+        )}
+      </p>
+      <svg viewBox={`0 0 ${WIDTH} ${height}`} className="touch-pan-y w-full" role="img" aria-label={summary} onPointerMove={track} onPointerDown={track} onPointerLeave={() => setHover(null)}>
         <polygon points={band} fill={COLORS.band} />
         <line x1={left} x2={plotRight} y1={baseline} y2={baseline} stroke={COLORS.grid} />
         <line x1={x(24)} x2={x(24)} y1={top} y2={baseline} stroke={COLORS.grid} />
@@ -429,6 +497,16 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
         <text x={x(36)} y={height - 5} textAnchor="middle" fill={COLORS.text} fontSize={9}>
           hoy
         </text>
+
+        {/* La hora bajo el ratón: una guía y un punto en cada línea. */}
+        {hover !== null && (
+          <g pointerEvents="none">
+            <line x1={x(hover)} x2={x(hover)} y1={top} y2={baseline} stroke={COLORS.text} strokeWidth={0.8} />
+            {hoverValues.map((item) => (
+              <circle key={item.key} cx={x(hover)} cy={y(item.mm)} r={2.8} fill={item.color} stroke="#ffffff" strokeWidth={1} />
+            ))}
+          </g>
+        )}
       </svg>
 
       <ul className="mt-1 space-y-0.5 text-[11px] text-slate-600">
