@@ -130,7 +130,7 @@ export function GalapagosStationDetails({
       {limits && hours.length > 0 ? (
         <div>
           <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia de cada hora</p>
-          <p className="text-[10px] text-slate-500">Escala logarítmica: así se ven las horas de poca lluvia junto a los límites.</p>
+          <p className="text-[10px] text-slate-500">Escala logarítmica</p>
           <HourlyLogBars hours={hours} limits={limits} island={station.island} />
         </div>
       ) : (
