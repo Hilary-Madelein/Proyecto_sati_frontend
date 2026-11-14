@@ -133,6 +133,14 @@ export function CameraIcon(props: IconProps) {
   );
 }
 
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16" />
+    </Icon>
+  );
+}
+
 export function HistoryIcon(props: IconProps) {
   return (
     <Icon {...props}>

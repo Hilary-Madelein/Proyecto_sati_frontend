@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { AlertTriangleIcon } from "@/components/ui/icons";
+import { AlertTriangleIcon, DownloadIcon, WavesIcon } from "@/components/ui/icons";
 import { formatHour } from "@/lib/format";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { STATION_HOURLY_BAR_COLOR } from "../../constants";
+import { SCENARIO_LABELS, downloadGalapagosReport, formatSeaLevel, type GalapagosScenario, type SeaReading } from "../../galapagos-report";
 import type { WeatherStationHour } from "../../types";
 
 /** Códigos del INAMHI de las dos estaciones de Galápagos: tienen su propia gráfica y su propia alarma. */
@@ -23,9 +24,13 @@ interface GalapagosStationRain {
   /** Lo máximo que llovió en 1, 2, 3… horas seguidas dentro de las últimas 24 (mm). */
   maxByDurationMm: number[];
   /** "Aquí estamos": lluvia acumulada desde las 00:00 de ayer; `hour` va de 1 a 48. */
-  twoDays?: { hour: number; accumulatedMm: number }[];
+  twoDays?: { hour: number; accumulatedMm: number; time?: string }[];
   /** Los dos límites de la estación, sacados de su propio registro. */
   limits?: GalapagosLimit[];
+  /** El mar ahora (mareógrafo de Santa Cruz); null si no hay dato reciente. */
+  sea?: SeaReading | null;
+  /** La casilla de la matriz lluvia × mar. */
+  scenario?: GalapagosScenario;
 }
 
 interface GalapagosReference {
@@ -121,6 +126,7 @@ export function GalapagosStationDetails({
   return (
     <div className="mt-2 space-y-3">
       <AlarmBanner station={station} thresholds={snapshot.thresholds} />
+      <SeaLine station={station} />
 
       <div className="grid grid-cols-2 gap-2">
         <Stat label="Hoy" value={day ? `${formatMm(day.total)} mm` : "–"} note={where && <span className={where.className}>{where.text}</span>} />
@@ -144,6 +150,39 @@ export function GalapagosStationDetails({
         <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Acumulado · ayer y hoy</p>
         <TwoDaySection state={state} />
       </div>
+
+      <ReportButton station={station} />
+    </div>
+  );
+}
+
+/** Descarga el reporte del día: la lluvia de ayer y hoy frente a los dos límites, como imagen. */
+function ReportButton({ station }: { station: GalapagosStationRain }) {
+  const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
+  const upper = station.limits?.find((item) => item.key === "upper");
+  const lower = station.limits?.find((item) => item.key === "lower");
+  const now = station.twoDays;
+  if (!upper || !lower || !now || now.length === 0) return null;
+
+  const download = () => {
+    setStatus("working");
+    downloadGalapagosReport({ code: station.code, island: station.island, level: station.level, reason: station.reason, now, upper, lower, sea: station.sea, scenario: station.scenario })
+      .then(() => setStatus("idle"))
+      .catch(() => setStatus("error"));
+  };
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={download}
+        disabled={status === "working"}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+      >
+        <DownloadIcon className="size-3.5" />
+        {status === "working" ? "Generando…" : "Descargar reporte"}
+      </button>
+      {status === "error" && <p className="mt-1 text-[11px] text-red-700">No se pudo generar el reporte.</p>}
     </div>
   );
 }
@@ -163,6 +202,30 @@ function AlarmBanner({ station, thresholds }: { station: GalapagosStationRain; t
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+const SCENARIO_CLASSES: Record<GalapagosScenario, string> = {
+  normal: "bg-emerald-50 text-emerald-900 ring-emerald-200",
+  precaution: "bg-yellow-50 text-yellow-900 ring-yellow-300",
+  alert: "bg-amber-50 text-amber-950 ring-amber-300",
+  emergency: "bg-red-50 text-red-900 ring-red-300",
+};
+
+/** El mar ahora y la casilla de la matriz lluvia × mar. Sin dato del mar no se muestra. */
+function SeaLine({ station }: { station: GalapagosStationRain }) {
+  const { sea, scenario } = station;
+  if (!sea) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 ring-1 ring-slate-200/70">
+      <p className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
+        <WavesIcon className="size-3.5 shrink-0 text-sky-700" />
+        <span>
+          Mar {sea.high ? "alto" : "bajo"}: <strong className="text-slate-900 tabular-nums">{formatSeaLevel(sea.levelM)}</strong>
+        </span>
+      </p>
+      {scenario && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${SCENARIO_CLASSES[scenario]}`}>{SCENARIO_LABELS[scenario]}</span>}
     </div>
   );
 }
