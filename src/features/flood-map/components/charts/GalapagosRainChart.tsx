@@ -5,9 +5,6 @@ import { satiClientGet } from "@/lib/api/sati-client";
 
 /** Códigos del INAMHI de las dos estaciones de Galápagos: tienen su propia gráfica y su propia alarma. */
 export const GALAPAGOS_STATION_CODES: readonly string[] = ["M0191", "M0221"];
-/** Santa Cruz: su gráfica es la del acumulado de dos días frente a sus dos límites. */
-const SANTA_CRUZ_CODE = "M0191";
-
 type GalapagosLevel = "normal" | "alarm" | "extreme";
 
 interface GalapagosStationRain {
@@ -23,6 +20,8 @@ interface GalapagosStationRain {
   maxByDurationMm: number[];
   /** "Aquí estamos": lluvia acumulada desde las 00:00 de ayer; `hour` va de 1 a 48. */
   twoDays?: { hour: number; accumulatedMm: number }[];
+  /** Los dos límites de la estación, sacados de su propio registro. */
+  limits?: GalapagosLimit[];
 }
 
 interface GalapagosReference {
@@ -36,7 +35,7 @@ interface GalapagosReference {
   maxByDurationMm: number[];
 }
 
-/** Uno de los dos límites de Santa Cruz: su lluvia acumulada en cada una de las 48 horas de sus dos días. */
+/** Uno de los dos límites de una estación: su lluvia acumulada en cada una de las 48 horas de sus dos días. */
 interface GalapagosLimit {
   key: "upper" | "lower";
   label: string;
@@ -88,10 +87,11 @@ export function GalapagosRainChart({ code }: { code: string }) {
   if (state.status === "error") return <p className="mt-2 text-xs text-slate-500">No se pudo cargar la comparación.</p>;
 
   const { station, snapshot } = state;
-  const upper = snapshot.limits?.find((item) => item.key === "upper");
-  const lower = snapshot.limits?.find((item) => item.key === "lower");
+  const upper = station.limits?.find((item) => item.key === "upper");
+  const lower = station.limits?.find((item) => item.key === "lower");
   const level = LEVELS[station.level] ?? LEVELS.normal;
-  const twoDays = code === SANTA_CRUZ_CODE && upper && lower && station.twoDays;
+  // Con los límites de la estación, el acumulado de dos días; si el backend aún no los entrega, la comparación por duración.
+  const twoDays = upper && lower && station.twoDays;
 
   return (
     <div className="mt-2">
@@ -108,10 +108,12 @@ export function GalapagosRainChart({ code }: { code: string }) {
 const TWO_DAYS = { height: 150, top: 14, right: 30, bottom: 20, left: 6, hours: 48 };
 
 /**
- * Santa Cruz: la lluvia acumulada desde las 00:00 de ayer ("Aquí estamos") entre sus
- * dos límites. El inferior son el 11 y 12 de noviembre de 2026 (30 mm en dos días,
- * sin daños mayores); el superior, el 30 y 31 de octubre (229 mm, cuando se desbordó
- * La Cascada). Así se ve de un vistazo qué tan lejos está hoy de uno y de otro.
+ * La lluvia acumulada desde las 00:00 de ayer ("Aquí estamos") entre los dos límites
+ * de la estación, sacados de su propio registro. En Santa Cruz, el inferior son el 11
+ * y 12 de noviembre de 2026 (30 mm en dos días, sin daños mayores) y el superior, el
+ * 30 y 31 de octubre (229 mm, cuando se desbordó La Cascada). En San Cristóbal, el
+ * 9 y 10 de noviembre (24 mm) y el 11 y 12 (189 mm, una vía inundada). Así se ve de
+ * un vistazo qué tan lejos está hoy de uno y de otro.
  */
 function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStationRain; now: { hour: number; accumulatedMm: number }[]; upper: GalapagosLimit; lower: GalapagosLimit }) {
   const { height, top, right, bottom, left, hours } = TWO_DAYS;
@@ -180,9 +182,10 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
 const DURATION = { height: 124, top: 8, right: 30, bottom: 18, left: 6, hours: 24, ticks: [3, 6, 12, 24] };
 
 /**
- * San Cristóbal: lo máximo que ha llovido en 3, 6, 12 y 24 horas seguidas dentro de
- * las últimas 24, frente a dos episodios (el desborde de Santa Cruz del 30 y 31 de
- * octubre de 2026 y la lluvia de San Cristóbal del 12 de noviembre).
+ * Respaldo, por si el backend no entrega los límites: lo máximo que ha llovido en 3,
+ * 6, 12 y 24 horas seguidas dentro de las últimas 24, frente a dos episodios (el
+ * desborde de Santa Cruz del 30 y 31 de octubre de 2026 y la lluvia de San Cristóbal
+ * del 12 de noviembre).
  */
 function DurationChart({ station, references }: { station: GalapagosStationRain; references: GalapagosReference[] }) {
   const upper = references.find((item) => item.key === "upper");
