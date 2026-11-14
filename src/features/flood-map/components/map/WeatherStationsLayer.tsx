@@ -21,6 +21,7 @@ import type {
   WeatherStationsSnapshot,
 } from "../../types";
 import { stationRainLevel, stationsWithRain, type MeasuredStation } from "../../utils";
+import { GALAPAGOS_STATION_CODES, GalapagosRainChart } from "../charts/GalapagosRainChart";
 import { diamondSymbolHtml } from "../map-symbols";
 import { focusProvinceOf } from "./province-focus";
 import { WatershedInfo } from "./WatershedInfo";
@@ -121,6 +122,8 @@ function StationPopupContent({
         {station.lastTime && ` · hasta las ${formatHour(station.lastTime)}`}
       </p>
       <HourlyRainBars hours={station.hours} />
+      {/* Solo las dos estaciones de Galápagos: su lluvia frente a los episodios de esas mismas estaciones. */}
+      {GALAPAGOS_STATION_CODES.includes(station.code) && <GalapagosRainChart code={station.code} />}
 
       <StationForecast station={station} rain={rain} />
     </div>
