@@ -31,7 +31,29 @@ interface GalapagosStationRain {
   sea?: SeaReading | null;
   /** La casilla de la matriz lluvia × mar. */
   scenario?: GalapagosScenario;
+  /** La lluvia de las últimas horas según las lecturas de cada 5 minutos; llega antes que el dato de la hora. */
+  recent?: RecentRain | null;
 }
+
+/** Lo más reciente de la lluvia cada 5 minutos, ya sumada por cuartos de hora para la gráfica. */
+interface RecentRain {
+  /** Momento de la última lectura (ISO 8601). */
+  time: string;
+  mm30min: number;
+  mm60min: number;
+  /** Lluvia de cada cuarto de hora (el que termina en `time`); `complete` es false si aún le faltan lecturas. */
+  every15min: { time: string; mm: number; complete: boolean }[];
+  /** Las lecturas de cada 5 minutos. */
+  samples?: { time: string; mm: number | null }[];
+}
+
+/** Cada cuánto se muestra la lluvia en el popup. */
+type Resolution = "hour" | "quarter" | "five";
+const RESOLUTIONS: readonly { key: Resolution; label: string; title: string }[] = [
+  { key: "hour", label: "Por hora", title: "Cada hora · escala logarítmica" },
+  { key: "quarter", label: "15 min", title: "Cada 15 min · últimas 6 horas" },
+  { key: "five", label: "5 min", title: "Cada 5 min · últimas 6 horas" },
+];
 
 interface GalapagosReference {
   key: "upper" | "lower";
@@ -124,6 +146,11 @@ export function GalapagosStationDetails({
   const limits = DAY_LIMITS[station.code];
   const day = todayByHour(hours);
   const where = limits && day ? standing(day.total, limits.upper.mm, limits.lower.mm) : null;
+  // La vista general es por hora; el detalle (15 o 5 minutos) sale de las lecturas de cada 5 minutos de las últimas 6 horas.
+  const [resolution, setResolution] = useState<Resolution>("hour");
+  const recent = station.recent && station.recent.every15min.length > 0 ? station.recent : null;
+  const detail = RESOLUTIONS.find((item) => item.key === resolution)?.title;
+  const fine = !recent || resolution === "hour" ? null : resolution === "quarter" ? recent.every15min : (recent.samples ?? []).map((sample) => ({ time: sample.time, mm: sample.mm ?? 0, complete: true }));
 
   return (
     <div className="mt-2 space-y-3">
@@ -135,18 +162,44 @@ export function GalapagosStationDetails({
         <Stat label="Últimas 24 h" value={`${formatMm(last24h.mm)} mm`} note={last24h.until ? `hasta las ${last24h.until}` : `${last24h.hoursWithData} h con dato`} />
       </div>
 
-      {limits && hours.length > 0 ? (
-        <div>
-          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia de cada hora</p>
-          <p className="text-[10px] text-slate-500">Escala logarítmica</p>
-          <HourlyLogBars hours={hours} limits={limits} island={station.island} />
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia</p>
+          {recent && (
+            <div role="group" aria-label="Cada cuánto se muestra la lluvia" className="flex shrink-0 rounded-full bg-slate-100 p-0.5">
+              {RESOLUTIONS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-pressed={resolution === item.key}
+                  onClick={() => setResolution(item.key)}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${resolution === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        <div>
-          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia de cada hora</p>
-          {fallbackBars}
-        </div>
-      )}
+        {recent && (
+          <p className="text-[10px] text-slate-500">
+            Últimos 60 min: <strong className="text-slate-900 tabular-nums">{formatMm(recent.mm60min)} mm</strong> · hasta las {formatHour(recent.time)}
+          </p>
+        )}
+        {fine ? (
+          <>
+            <p className="text-[10px] text-slate-500">{detail}</p>
+            <FineBars key={resolution} bins={fine} minutes={resolution === "five" ? 5 : 15} island={station.island} />
+          </>
+        ) : limits && hours.length > 0 ? (
+          <>
+            <p className="text-[10px] text-slate-500">{detail}</p>
+            <HourlyLogBars hours={hours} limits={limits} island={station.island} />
+          </>
+        ) : (
+          fallbackBars
+        )}
+      </div>
 
       <div>
         <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Acumulado · ayer y hoy</p>
@@ -155,6 +208,70 @@ export function GalapagosStationDetails({
 
       <ReportButton station={station} />
     </div>
+  );
+}
+
+const FINE = { height: 78, top: 12, right: 30, bottom: 16 };
+
+/**
+ * La lluvia de las últimas 6 horas en barras de 15 o de 5 minutos, de las lecturas de cada
+ * 5 minutos de la estación. El intervalo que aún no tiene todas sus lecturas va más claro.
+ */
+function FineBars({ bins, minutes, island }: { bins: { time: string; mm: number; complete: boolean }[]; minutes: number; island: string }) {
+  const { height, top, right, bottom } = FINE;
+  const [active, setActive] = useState<number | null>(null);
+  const plotRight = WIDTH - right;
+  const baseline = height - bottom;
+  // Con lluvia muy débil, la escala no baja de 1 mm: unas décimas no llenan la gráfica.
+  const max = Math.max(1, ...bins.map((bin) => bin.mm));
+  const y = (mm: number) => baseline - (mm / max) * (baseline - top);
+  const slot = plotRight / Math.max(1, bins.length);
+  const gap = slot > 4 ? 1.5 : 0.6;
+  const barWidth = Math.max(1, slot - gap);
+  const labelled = new Set([0, Math.floor((bins.length - 1) / 2), bins.length - 1]);
+  const start = (time: string) => new Date(Date.parse(time) - minutes * 60 * 1000).toISOString();
+  const hovered = active === null ? undefined : bins[active];
+  const summary = `Lluvia cada ${minutes} minutos en ${island}: ${bins.map((bin) => `${formatHour(bin.time)} ${formatMm(bin.mm)} mm`).join(", ")}.`;
+
+  return (
+    <svg viewBox={`0 0 ${WIDTH} ${height}`} className="mt-1 w-full touch-pan-y" role="img" aria-label={summary} onPointerLeave={() => setActive(null)}>
+      <line x1={0} x2={plotRight} y1={y(max)} y2={y(max)} stroke="#eef2f6" />
+      <text x={plotRight + 3} y={y(max) + 3} fill="#94a3b8" fontSize={9}>
+        {formatMm(max)}
+      </text>
+      {bins.map((bin, index) => (
+        <g key={bin.time} onPointerEnter={() => setActive(index)} onPointerDown={() => setActive(index)}>
+          <title>{`De ${formatHour(start(bin.time))} a ${formatHour(bin.time)}: ${formatMm(bin.mm)} mm`}</title>
+          {/* Zona sensible a toda la altura; se sombrea el intervalo bajo el ratón. */}
+          <rect x={index * slot} y={0} width={slot} height={baseline} fill={active === index ? "#0f172a" : "transparent"} fillOpacity={0.07} />
+          {bin.mm > 0 && (
+            <rect x={index * slot + gap / 2} y={y(bin.mm)} width={barWidth} height={baseline - y(bin.mm)} rx={Math.min(1.5, barWidth / 2)} fill={STATION_HOURLY_BAR_COLOR} fillOpacity={bin.complete ? 1 : 0.45} />
+          )}
+          {labelled.has(index) && (
+            <text x={index * slot + slot / 2} y={height - 3} textAnchor={index === 0 ? "start" : index === bins.length - 1 ? "end" : "middle"} fill="#64748b" fontSize={9}>
+              {formatHour(bin.time)}
+            </text>
+          )}
+        </g>
+      ))}
+      <line x1={0} x2={plotRight} y1={baseline} y2={baseline} stroke="#cbd5e1" />
+      {hovered && active !== null && (
+        <text
+          x={Math.min(plotRight - 46, Math.max(46, (active + 0.5) * slot))}
+          y={Math.max(top - 2, y(hovered.mm) - 4)}
+          textAnchor="middle"
+          fill="#0f172a"
+          fontSize={9.5}
+          fontWeight={700}
+          stroke="#ffffff"
+          strokeWidth={3}
+          paintOrder="stroke"
+          pointerEvents="none"
+        >
+          {formatHour(start(hovered.time))}–{formatHour(hovered.time)} · {formatMm(hovered.mm)} mm
+        </text>
+      )}
+    </svg>
   );
 }
 
