@@ -1,7 +1,8 @@
 /*
  * Reporte descargable de una estación de Galápagos: una imagen con la lluvia de ayer
  * y hoy frente a los dos límites de la estación. Arriba, la lluvia de cada hora en
- * barras translúcidas (una dentro de otra); abajo, el acumulado, como en el popup.
+ * barras translúcidas (una dentro de otra); abajo, el acumulado del evento de lluvia
+ * (vuelve a cero tras 12 horas sin llover), como en el popup.
  * Se dibuja como SVG (sin dependencias) y se pasa a PNG en el navegador.
  */
 
@@ -29,14 +30,41 @@ export const SCENARIO_LABELS: Record<GalapagosScenario, string> = { normal: "Nor
 /** "+0,47 m" o "−0,31 m". */
 export const formatSeaLevel = (levelM: number) => `${levelM > 0 ? "+" : levelM < 0 ? "−" : ""}${Math.abs(levelM).toLocaleString("es-EC", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
 
+/** El evento de lluvia que se acumula: termina tras 12 horas sin lluvia. */
+export interface RainEvent {
+  /** Cuándo empezó a llover (ISO 8601). */
+  start: string;
+  totalMm: number;
+  /** Lo que cayó antes de las 00:00 de ayer: con eso arranca la gráfica. */
+  carriedMm: number;
+  /** Ya pasaron 12 horas sin lluvia. */
+  ended: boolean;
+}
+
+/** "17:00 del 15 nov": una hora del registro (hora del continente). */
+export function recordHourLabel(time: string): string {
+  const date = new Date(Date.parse(time) - 5 * 60 * 60 * 1000);
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${String(date.getUTCHours()).padStart(2, "0")}:00 del ${date.getUTCDate()} ${months[date.getUTCMonth()]}`;
+}
+
+/** Qué se acumula, en pocas palabras: "18,8 mm en este evento". */
+export function eventSummary(totalMm: string, event: RainEvent | null | undefined): string {
+  if (event === undefined) return `${totalMm} mm desde ayer`;
+  if (event === null) return "sin lluvia desde ayer";
+  return event.ended ? `${totalMm} mm, evento terminado` : `${totalMm} mm en este evento`;
+}
+
 export interface GalapagosReportInput {
   code: string;
   island: string;
   level: "normal" | "alarm" | "extreme";
   /** Por qué está en ese nivel; null en normal. */
   reason: string | null;
-  /** "Aquí estamos": acumulado desde las 00:00 de ayer; `hour` va de 1 a 48. */
-  now: { hour: number; accumulatedMm: number; time?: string }[];
+  /** "Aquí estamos": desde las 00:00 de ayer, la lluvia de cada hora y lo acumulado del evento; `hour` va de 1 a 48. */
+  now: { hour: number; accumulatedMm: number; mm?: number; time?: string }[];
+  /** El evento que se acumula; null si no ha llovido desde ayer. */
+  event?: RainEvent | null;
   upper: ReportLimit;
   lower: ReportLimit;
   sea?: SeaReading | null;
@@ -125,16 +153,20 @@ function limitParts(limit: ReportLimit): { name: string; detail: string } {
 
 /** El reporte como SVG (1400 × 1160). */
 export function galapagosReportSvg(input: GalapagosReportInput): string {
-  const { island, code, upper, lower, now } = input;
+  const { island, code, upper, lower, now, event } = input;
+  const carried = event?.carriedMm ?? 0;
   const current = now.at(-1);
   const hoursNow = current?.hour ?? 0;
   const total = current?.accumulatedMm ?? 0;
   const nowCurve = now.map((point) => point.accumulatedMm);
-  const series = { upper: hourly(upper.accumulatedMm), lower: hourly(lower.accumulatedMm), now: hourly(nowCurve) };
+  // La lluvia de cada hora llega aparte: el acumulado es solo del evento.
+  const nowHourly = now.every((point) => point.mm !== undefined) ? now.map((point) => point.mm ?? 0) : hourly(nowCurve);
+  const series = { upper: hourly(upper.accumulatedMm), lower: hourly(lower.accumulatedMm), now: nowHourly };
   const { date, hourLabel } = lastDatum(now);
   const dayName = `${date.getUTCDate()} de ${MONTHS[date.getUTCMonth()]}`;
-  // La lluvia de hoy: lo acumulado después de las 24 horas de ayer.
-  const today = hoursNow > 24 ? Math.round((total - (nowCurve[23] ?? 0)) * 10) / 10 : null;
+  // La lluvia de hoy: la de las horas que siguen a las 24 de ayer.
+  const today = hoursNow > 24 ? Math.round(nowHourly.slice(24).reduce((sum, mm) => sum + mm, 0) * 10) / 10 : null;
+  const since = event ? ` desde las ${recordHourLabel(event.start)}` : "";
   const upperSameHour = upper.accumulatedMm[hoursNow - 1] ?? 0;
   const lowerSameHour = lower.accumulatedMm[hoursNow - 1] ?? 0;
 
@@ -150,10 +182,13 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   const downloaded = input.downloadedAt ? new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS) : null;
   const updated = downloaded ? `, ${pad(downloaded.getUTCHours())}:${pad(downloaded.getUTCMinutes())} (GMT-5)` : "";
   push(text(left, 66, `${island} hoy, ${dayName}${updated}, frente a sus límites`, { size: 31, fill: C.ink, weight: 700 }));
-  const headline =
-    today === null
-      ? `Desde ayer: ${fmt(total)} mm hasta las ${hourLabel}.`
-      : `Hoy: ${fmt(today)} mm hasta las ${hourLabel}. Con ayer, ${fmt(total)} mm. Sus límites de dos días: ${fmt(lower.totalMm, 0)} mm (inferior) y ${fmt(upper.totalMm, 0)} mm (superior).`;
+  const eventText =
+    event === undefined
+      ? `Desde ayer, ${fmt(total)} mm.`
+      : event === null
+        ? "Sin evento de lluvia desde ayer."
+        : `${event.ended ? "Último evento, ya terminado" : "Evento en curso"}: ${fmt(total)} mm${since}${carried > 0 ? ` (${fmt(carried)} mm antes de las 00:00 de ayer)` : ""}.`;
+  const headline = `${today === null ? `Hasta las ${hourLabel}.` : `Hoy: ${fmt(today)} mm hasta las ${hourLabel}.`} ${eventText} Límites de dos días: ${fmt(lower.totalMm, 0)} y ${fmt(upper.totalMm, 0)} mm.`;
   push(text(left, 104, headline, { size: 17.5 }));
   // La estación publica cada hora con retraso: se dice cuándo se descargó y hasta qué hora hay dato.
   const asOf = downloaded ? `Último dato publicado: ${hourLabel} · ` : "";
@@ -216,10 +251,11 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   // ── Abajo: el acumulado de ayer y hoy, como en el popup ──
   const top2 = 628;
   const base2 = 946;
-  const scale2 = axis(Math.max(upper.totalMm, total));
+  const scale2 = axis(Math.max(upper.totalMm, total, carried));
   const y2 = (mm: number) => base2 - (mm / scale2.top) * (base2 - top2);
-  const curve = (values: readonly number[]) => [`${x(0)},${y2(0)}`, ...values.map((mm, index) => `${x(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`)].join(" ");
-  push(text(left, 604, "Acumulado de ayer y hoy (la gráfica de la estación)", { size: 18, fill: C.ink, weight: 700 }));
+  /** `from`: con cuánto arranca a las 00:00 del primer día. */
+  const curve = (values: readonly number[], from = 0) => [`${x(0)},${y2(from).toFixed(1)}`, ...values.map((mm, index) => `${x(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`)].join(" ");
+  push(text(left, 604, event === undefined ? "Acumulado de ayer y hoy" : "Acumulado del evento de lluvia (vuelve a cero tras 12 horas sin llover)", { size: 18, fill: C.ink, weight: 700 }));
   for (let mm = 0; mm <= scale2.top; mm += scale2.step) {
     push(`<line x1="${left}" x2="${right}" y1="${y2(mm)}" y2="${y2(mm)}" stroke="${C.grid}"/>`, text(left - 10, y2(mm) + 5, String(mm), { size: 14, anchor: "end" }));
   }
@@ -254,14 +290,26 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   if (current) {
     const nowX = x(hoursNow);
     const nowY = y2(total);
-    push(`<polyline points="${curve(nowCurve)}" fill="none" stroke="${C.now}" stroke-width="4" stroke-dasharray="14 8" stroke-linejoin="round"/>`);
+    push(`<polyline points="${curve(nowCurve, carried)}" fill="none" stroke="${C.now}" stroke-width="4" stroke-dasharray="14 8" stroke-linejoin="round"/>`);
+    // Dónde empezó el evento: dentro de la gráfica, una marca; si venía de antes, con cuánto arranca.
+    const firstTime = now[0]?.time ? Date.parse(now[0].time) : null;
+    const startHour = event && firstTime !== null ? Math.round((Date.parse(event.start) - firstTime) / 3_600_000) + 1 : null;
+    if (event && carried > 0) {
+      push(`<circle cx="${x(0)}" cy="${y2(carried)}" r="5.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2"/>`);
+      push(text(x(0) + 12, y2(carried) - 12, `Viene de antes: ${fmt(carried)} mm${since}`, { size: 14.5, fill: C.ink, weight: 700, halo: true }));
+    } else if (startHour !== null && startHour > 0 && startHour < hoursNow) {
+      push(`<line x1="${x(startHour)}" x2="${x(startHour)}" y1="${base2 - 26}" y2="${base2}" stroke="${C.now}" stroke-width="1.6"/>`);
+      push(text(x(startHour) - 7, base2 - 12, "empieza el evento", { size: 13.5, fill: C.ink, anchor: "end", halo: true }));
+    }
     push(`<circle cx="${nowX}" cy="${nowY}" r="7.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2.5"/>`);
     // "Aquí estamos": arriba y a la derecha del punto mientras quepa; si no, a la izquierda.
     const side = hoursNow > 38 ? -1 : 1;
     const labelX = nowX + side * 150;
-    const labelY = Math.max(top2 + 40, nowY - 78);
-    push(`<line x1="${nowX + side * 9}" y1="${nowY - 7}" x2="${labelX - side * 62}" y2="${labelY + 30}" stroke="${C.now}" stroke-width="1.3"/>`);
-    push(text(labelX, labelY, "Aquí estamos", { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }), text(labelX, labelY + 22, `${fmt(total)} mm desde ayer`, { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }));
+    // Si el punto queda muy arriba (un evento largo), el rótulo va debajo: arriba están los momentos del límite superior.
+    const below = nowY - 78 < top2 + 60;
+    const labelY = below ? nowY + 62 : nowY - 78;
+    push(`<line x1="${nowX + side * 9}" y1="${nowY + (below ? 7 : -7)}" x2="${labelX - side * 62}" y2="${labelY + (below ? -18 : 30)}" stroke="${C.now}" stroke-width="1.3"/>`);
+    push(text(labelX, labelY, "Aquí estamos", { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }), text(labelX, labelY + 22, eventSummary(fmt(total), event), { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }));
   }
   push(ticks(base2), text(x(12), base2 + 62, "ayer", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base2 + 62, "hoy", { size: 15, fill: C.ink3, anchor: "middle" }));
   push(`<text transform="translate(${left - 58} ${(top2 + base2) / 2}) rotate(-90)" font-size="15" fill="${C.ink2}" text-anchor="middle">mm acumulados</text>`);
@@ -269,13 +317,13 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   // ── Lectura y fuente ──
   const position = total >= upperSameHour ? "va por encima del límite superior" : total >= lowerSameHour ? "va entre sus dos límites" : "va por debajo del límite inferior";
   const reason = input.reason ? ` (${input.reason})` : "";
-  const reading = `Qué dice: la lluvia ${position}. Desde ayer acumula ${fmt(total)} mm, frente a ${fmt(lowerSameHour)} mm del límite inferior y ${fmt(upperSameHour)} mm del límite superior a esa misma hora. En el sistema la estación está ${LEVEL_TEXT[input.level] ?? LEVEL_TEXT.normal}${reason}.`;
+  const reading = `Qué dice: la lluvia ${position}. ${event ? `El evento${since}` : "Desde ayer"} acumula ${fmt(total)} mm, frente a ${fmt(lowerSameHour)} mm del límite inferior y ${fmt(upperSameHour)} mm del límite superior a esa misma hora. En el sistema la estación está ${LEVEL_TEXT[input.level] ?? LEVEL_TEXT.normal}${reason}.`;
   const sea = input.sea
     ? ` El mar está ${input.sea.high ? "alto" : "bajo"} (${formatSeaLevel(input.sea.levelM)} respecto de su nivel medio, mareógrafo de ${input.sea.place})${input.scenario ? `: en la matriz lluvia × mar, ${SCENARIO_LABELS[input.scenario].toUpperCase()}` : ""}.`
     : "";
   wrap(reading + sea, 148).forEach((line, index) => push(text(left, 1050 + index * 25, line, { size: 16 })));
   push(text(left, 1128, "Fuente: INAMHI, lluvia horaria de la estación tomada del sistema SATI (dato en vivo, aún sin validar). Horas del registro (hora del continente; en Galápagos es una hora menos).", { size: 12.5, fill: C.ink3 }));
-  push(text(left, 1146, "Cada barra es la lluvia de la hora que termina en esa marca. Las dos gráficas empiezan a las 00:00 del primer día de cada episodio.", { size: 12.5, fill: C.ink3 }));
+  push(text(left, 1146, "Cada barra es la lluvia de la hora que termina en esa marca. Los límites empiezan a las 00:00 de su primer día; el acumulado de ahora, donde empezó el evento (termina tras 12 horas con menos de 1 mm).", { size: 12.5, fill: C.ink3 }));
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}"><rect width="${W}" height="${H}" fill="${C.surface}"/>${parts.join("")}</svg>`;
 }

@@ -5,7 +5,7 @@ import { AlertTriangleIcon, DownloadIcon, WavesIcon } from "@/components/ui/icon
 import { formatHour } from "@/lib/format";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { STATION_HOURLY_BAR_COLOR } from "../../constants";
-import { SCENARIO_LABELS, downloadGalapagosReport, formatSeaLevel, type GalapagosScenario, type SeaReading } from "../../galapagos-report";
+import { SCENARIO_LABELS, downloadGalapagosReport, eventSummary, formatSeaLevel, recordHourLabel, type GalapagosScenario, type RainEvent, type SeaReading } from "../../galapagos-report";
 import type { WeatherStationHour } from "../../types";
 
 /** Códigos del INAMHI de las dos estaciones de Galápagos: tienen su propia gráfica y su propia alarma. */
@@ -23,8 +23,10 @@ interface GalapagosStationRain {
   reason: string | null;
   /** Lo máximo que llovió en 1, 2, 3… horas seguidas dentro de las últimas 24 (mm). */
   maxByDurationMm: number[];
-  /** "Aquí estamos": lluvia acumulada desde las 00:00 de ayer; `hour` va de 1 a 48. */
-  twoDays?: { hour: number; accumulatedMm: number; time?: string }[];
+  /** "Aquí estamos": desde las 00:00 de ayer, la lluvia de cada hora y lo acumulado del evento; `hour` va de 1 a 48. */
+  twoDays?: { hour: number; accumulatedMm: number; mm?: number; time?: string }[];
+  /** El evento de lluvia que se acumula (termina tras 12 horas sin lluvia); null si no ha llovido desde ayer. */
+  event?: RainEvent | null;
   /** Los dos límites de la estación, sacados de su propio registro. */
   limits?: GalapagosLimit[];
   /** El mar ahora (mareógrafo de Santa Cruz); null si no hay dato reciente. */
@@ -296,6 +298,7 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
           level: latest.level,
           reason: latest.reason,
           now: latest.twoDays?.length ? latest.twoDays : now,
+          event: latest.twoDays?.length ? latest.event : station.event,
           upper: latest.limits?.find((item) => item.key === "upper") ?? upper,
           lower: latest.limits?.find((item) => item.key === "lower") ?? lower,
           sea: latest.sea,
@@ -536,7 +539,8 @@ function HourlyLogBars({ hours, limits, island }: { hours: WeatherStationHour[];
 const TWO_DAYS = { height: 150, top: 14, right: 30, bottom: 20, left: 6, hours: 48 };
 
 /**
- * La lluvia acumulada desde las 00:00 de ayer ("Aquí estamos") entre los dos límites
+ * La lluvia acumulada del evento ("Aquí estamos": vuelve a cero tras 12 horas sin
+ * llover y, si venía lloviendo desde antes de ayer, arranca con eso) entre los dos límites
  * de la estación, sacados de su propio registro. En Santa Cruz, el inferior son el 11
  * y 12 de noviembre de 2026 (30 mm en dos días, sin daños mayores) y el superior, el
  * 30 y 31 de octubre (229 mm, cuando se desbordó La Cascada). En San Cristóbal, el
@@ -547,13 +551,15 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
   const { height, top, right, bottom, left, hours } = TWO_DAYS;
   const current = now.at(-1);
   const total = current?.accumulatedMm ?? 0;
-  const max = Math.max(upper.totalMm, total) * 1.08;
+  const { event } = station;
+  const carried = event?.carriedMm ?? 0;
+  const max = Math.max(upper.totalMm, total, carried) * 1.08;
   const plotRight = WIDTH - right;
   const baseline = height - bottom;
   const x = (hour: number) => left + (hour / hours) * (plotRight - left);
   const y = (mm: number) => top + (1 - mm / max) * (baseline - top);
-  /** Curva desde el cero de las 00:00 de ayer. */
-  const path = (values: readonly number[]) => [`${x(0)},${y(0)}`, ...values.map((mm, index) => `${x(index + 1)},${y(mm)}`)].join(" ");
+  /** Curva desde las 00:00 de ayer; `from` es con cuánto arranca. */
+  const path = (values: readonly number[], from = 0) => [`${x(0)},${y(from)}`, ...values.map((mm, index) => `${x(index + 1)},${y(mm)}`)].join(" ");
   const band = `${path(upper.accumulatedMm)} ${[...lower.accumulatedMm].map((mm, index) => `${x(index + 1)},${y(mm)}`).reverse().join(" ")} ${x(0)},${y(0)}`;
   const nowX = x(current?.hour ?? 0);
   const nowY = y(total);
@@ -574,7 +580,7 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
           { key: "lower", label: "inf.", color: COLORS.lower, mm: lower.accumulatedMm[hover - 1] },
           { key: "upper", label: "sup.", color: COLORS.upper, mm: upper.accumulatedMm[hover - 1] },
         ].filter((item): item is { key: string; label: string; color: string; mm: number } => item.mm !== undefined);
-  const summary = `Lluvia acumulada en ${station.island} desde las 00:00 de ayer: ${formatMm(total)} mm. ${lower.label}: ${formatMm(lower.totalMm)} mm. ${upper.label}: ${formatMm(upper.totalMm)} mm.`;
+  const summary = `Lluvia acumulada en ${station.island}: ${eventSummary(formatMm(total), event)}. ${lower.label}: ${formatMm(lower.totalMm)} mm. ${upper.label}: ${formatMm(upper.totalMm)} mm.`;
 
   return (
     <>
@@ -611,7 +617,7 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
         </text>
 
         {/* Aquí estamos: la línea de ahora, hasta la última hora con dato. */}
-        <polyline points={path(now.map((point) => point.accumulatedMm))} fill="none" stroke={COLORS.now} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={path(now.map((point) => point.accumulatedMm), carried)} fill="none" stroke={COLORS.now} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />
         <circle cx={nowX} cy={nowY} r={3.6} fill={COLORS.now} stroke="#ffffff" strokeWidth={1.2} />
         <text x={nowX + (labelLeft ? -6 : 6)} y={Math.max(top + 2, nowY - 7)} textAnchor={labelLeft ? "end" : "start"} fill={COLORS.now} fontSize={9.5} fontWeight={700}>
           Aquí estamos
@@ -637,7 +643,8 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
 
       <ul className="mt-1 space-y-0.5 text-[11px] text-slate-600">
         <Key color={COLORS.now} height={3}>
-          Aquí estamos: <strong className="text-slate-900 tabular-nums">{formatMm(total)} mm</strong> desde ayer
+          Aquí estamos: <strong className="text-slate-900 tabular-nums">{eventSummary(formatMm(total), event)}</strong>
+          {event && ` (desde las ${recordHourLabel(event.start)})`}
         </Key>
         <Key color={COLORS.upper} dashed>
           {upper.label} ({formatMm(upper.totalMm)} mm)
