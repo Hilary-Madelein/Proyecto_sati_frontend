@@ -279,14 +279,6 @@ export const PREPAREDNESS_INDICATOR_LABELS: Record<PreparednessIndicator, string
   roadProjects: "Proyectos viales en ejecución o terminados",
 };
 
-/** Con qué se divide cada conteo del índice de preparación: el área de la provincia o sus km de Red Vial Estatal. */
-export const PREPAREDNESS_RATES: Record<PreparednessIndicator, { by: "area" | "rve"; unit: string }> = {
-  shelters: { by: "area", unit: "km²" },
-  camps: { by: "rve", unit: "km de vía" },
-  preventiveActions: { by: "rve", unit: "km de vía" },
-  roadProjects: { by: "rve", unit: "km de vía" },
-};
-
 export const SEMAPHORE_STYLES: Record<Semaphore, { label: string; alert: string; color: string; panelClass: string }> = {
   // Se nombra por el nivel de alerta, no por el color (rojo = muy alta, naranja = alta, amarillo = moderada, verde = baja).
   red: { label: "Muy alta", alert: "Alerta muy alta", color: "#dc2626", panelClass: "bg-red-50 text-red-900 ring-1 ring-red-600/20" },

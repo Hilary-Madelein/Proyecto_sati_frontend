@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Toggle } from "@/components/ui/Toggle";
 import { OpacitySlider } from "./OpacitySlider";
 import { cn } from "@/lib/cn";
-import { PREPAREDNESS_INDICATOR_LABELS, PREPAREDNESS_LEVEL_STYLES, PREPAREDNESS_RATES } from "../../constants";
+import { PREPAREDNESS_INDICATOR_LABELS, PREPAREDNESS_LEVEL_STYLES } from "../../constants";
 import type { PreparednessIndicator, PreparednessLevel, ProvincePreparedness } from "../../types";
 import { Notice } from "./RainForecastSection";
 import { SectionHeading } from "./SectionHeading";
@@ -24,17 +24,6 @@ interface PreparednessSectionProps {
 const LEVELS: readonly PreparednessLevel[] = ["very-high", "high", "medium", "low", "very-low"];
 const INDICATORS: readonly PreparednessIndicator[] = ["shelters", "camps", "preventiveActions", "roadProjects"];
 const formatIndex = (value: number) => value.toLocaleString("es-EC", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const formatKm = (value: number) => Math.round(value).toLocaleString("es-EC");
-
-/** Cada cuánto hay uno: "1 cada 32 km²" o "1 cada 172 km de vía"; null si el backend no manda el área ni la red vial. */
-function rateText(province: ProvincePreparedness, indicator: PreparednessIndicator): string | null {
-  const { by, unit } = PREPAREDNESS_RATES[indicator];
-  const size = by === "area" ? province.areaKm2 : province.rveKm;
-  const count = province.counts[indicator];
-  if (size === undefined || count === 0) return null;
-  return `1 cada ${formatKm(size / count)} ${unit}`;
-}
-
 /**
  * Índice Simplificado de Preparación Provincial frente al Fenómeno de El Niño
  * (ISPP-FEN): al encenderlo, las provincias se pintan en el mapa y se ve el
@@ -143,16 +132,10 @@ function ProvinceRow({
               <dd className="order-first text-sm font-semibold text-slate-900 tabular-nums">
                 {province.counts[indicator].toLocaleString("es-EC")}
               </dd>
-              {province.counts[indicator] > 0 && rateText(province, indicator) && (
-                <dd className="text-[10px] text-slate-500 tabular-nums">{rateText(province, indicator)}</dd>
-              )}
             </div>
           ))}
           <p className="col-span-2 text-[10px] text-slate-500">
             Nivel: <strong className="font-semibold text-slate-700">{style.label}</strong> · índice {formatIndex(province.index)} de 100.
-            {province.areaKm2 !== undefined &&
-              province.rveKm !== undefined &&
-              ` Área ${formatKm(province.areaKm2)} km² · Red Vial Estatal ${formatKm(province.rveKm)} km.`}
           </p>
         </dl>
       )}
