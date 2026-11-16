@@ -365,6 +365,10 @@ html .leaflet-tooltip.map-place-label.map-place-card::before {
   -webkit-text-stroke: 3px #ffffff;
   paint-order: stroke fill;
 }
+/* Fuera de las provincias elegidas: atenuado como el resto del país (ver ProvincePicker, el velo). */
+.city-label.is-outside {
+  opacity: 0.3;
+}
 .city-label.is-left {
   flex-direction: row-reverse;
   transform: translate(calc(-100% + 3px), -50%);

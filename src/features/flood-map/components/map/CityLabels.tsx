@@ -3,6 +3,8 @@
 import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { Marker, Pane, useMap, useMapEvents } from "react-leaflet";
+import type { ProvinceFeature } from "../../hooks/useProvinceGeometries";
+import { isInSelectedProvinces } from "../../province-filter";
 
 /** Cabeceras cantonales (public/data/ciudades-ecuador.json, de las parroquias del INEC). */
 interface City {
@@ -39,11 +41,12 @@ const MIN_ZOOM = { capital: 0, large: 7.5, seat: 8.75 } as const;
 type Side = "right" | "left";
 
 const iconCache = new Map<string, L.DivIcon>();
-function labelIcon(city: City, side: Side): L.DivIcon {
-  const key = `${city.name}|${city.capital}|${side}`;
+/** `outside`: fuera de las provincias elegidas, atenuado como el resto del país. */
+function labelIcon(city: City, side: Side, outside: boolean): L.DivIcon {
+  const key = `${city.name}|${city.capital}|${side}|${outside}`;
   let icon = iconCache.get(key);
   if (!icon) {
-    const classes = ["city-label", city.capital && "is-capital", side === "left" && "is-left"].filter(Boolean).join(" ");
+    const classes = ["city-label", city.capital && "is-capital", side === "left" && "is-left", outside && "is-outside"].filter(Boolean).join(" ");
     icon = L.divIcon({
       className: "city-label-icon",
       html: `<span class="${classes}"><i></i>${city.name}</span>`,
@@ -95,9 +98,11 @@ function placeLabels(cities: City[], map: L.Map, zoom: number): { city: City; si
  * colores: los del mapa base son grises y finos, y sobre la lluvia se perdían. Va en
  * lugar de esos (FloodMap oculta los del mapa base mientras se ve esta). Las
  * capitales de provincia siempre; las ciudades grandes desde el zoom de provincia y
- * todas las cabeceras más cerca. Solo para ver: no capturan clics.
+ * todas las cabeceras más cerca. Solo para ver: no capturan clics. Con provincias
+ * elegidas, los de afuera se atenúan como el resto del país (y los de adentro tienen
+ * prioridad si dos chocan).
  */
-export function CityLabels() {
+export function CityLabels({ selectedProvinces }: { selectedProvinces: readonly ProvinceFeature[] }) {
   const map = useMap();
   const [cities, setCities] = useState<City[] | null>(null);
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -116,12 +121,24 @@ export function CityLabels() {
     };
   }, []);
 
-  const shown = useMemo(() => (cities ? placeLabels(cities, map, zoom) : []), [cities, map, zoom]);
+  const isOutside = (city: City) => selectedProvinces.length > 0 && !isInSelectedProvinces(city.province, selectedProvinces);
+  const selectionKey = selectedProvinces.map((province) => province.key).join(",");
+  const shown = useMemo(
+    () => {
+      if (!cities) return [];
+      // Primero los de las provincias elegidas: si chocan con uno de afuera, queda el de adentro.
+      const ordered = selectedProvinces.length ? [...cities].sort((a, b) => Number(isOutside(a)) - Number(isOutside(b))) : cities;
+      return placeLabels(ordered, map, zoom);
+    },
+    // `selectionKey` resume las provincias elegidas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cities, map, zoom, selectionKey],
+  );
 
   return (
     <Pane name={PANE.name} style={{ zIndex: PANE.zIndex, pointerEvents: "none" }}>
       {shown.map(({ city, side }) => (
-        <Marker key={`${city.province}|${city.canton}`} position={[city.lat, city.lng]} icon={labelIcon(city, side)} interactive={false} keyboard={false} pane={PANE.name} />
+        <Marker key={`${city.province}|${city.canton}`} position={[city.lat, city.lng]} icon={labelIcon(city, side, isOutside(city))} interactive={false} keyboard={false} pane={PANE.name} />
       ))}
     </Pane>
   );

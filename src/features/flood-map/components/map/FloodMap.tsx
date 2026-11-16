@@ -327,7 +327,7 @@ export default function FloodMap({
       <MapScale />
       {provinceShading && provinces && selectedProvinces.length === 0 && <ProvinceShadingLayer provinces={provinces} values={provinceShading} />}
       <MapOverlays {...overlays} />
-      {ownCityLabels && <CityLabels />}
+      {ownCityLabels && <CityLabels selectedProvinces={selectedProvinces} />}
     </MapContainer>
   );
 }
