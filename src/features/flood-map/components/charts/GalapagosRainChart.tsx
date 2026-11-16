@@ -38,7 +38,7 @@ interface GalapagosStationRain {
 }
 
 /** Lo más reciente de la lluvia cada 5 minutos, ya sumada por cuartos de hora para la gráfica. */
-interface RecentRain {
+export interface RecentRain {
   /** Momento de la última lectura (ISO 8601). */
   time: string;
   mm30min: number;
@@ -50,7 +50,7 @@ interface RecentRain {
 }
 
 /** Cada cuánto se muestra la lluvia en el popup. */
-type Resolution = "hour" | "quarter" | "five";
+export type Resolution = "hour" | "quarter" | "five";
 const RESOLUTIONS: readonly { key: Resolution; label: string; title: string }[] = [
   { key: "hour", label: "Por hora", title: "Cada hora · escala logarítmica" },
   { key: "quarter", label: "15 min", title: "Cada 15 min · últimas 6 horas" },
@@ -97,6 +97,30 @@ const LEVELS: Record<GalapagosLevel, { label: string; className: string; icon: s
 };
 
 const formatMm = (mm: number) => mm.toLocaleString("es-EC", { maximumFractionDigits: 1 });
+
+/** Los intervalos de 15 o de 5 minutos de las lecturas de una estación, para `FineBars`. */
+export function fineBins(recent: RecentRain, resolution: Exclude<Resolution, "hour">): { time: string; mm: number; complete: boolean }[] {
+  return resolution === "quarter" ? recent.every15min : (recent.samples ?? []).map((sample) => ({ time: sample.time, mm: sample.mm ?? 0, complete: true }));
+}
+
+/** El selector "Por hora · 15 min · 5 min" de una estación que transmite cada 5 minutos. */
+export function ResolutionSwitch({ value, onChange }: { value: Resolution; onChange: (value: Resolution) => void }) {
+  return (
+    <div role="group" aria-label="Cada cuánto se muestra la lluvia" className="flex shrink-0 rounded-full bg-slate-100 p-0.5">
+      {RESOLUTIONS.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          aria-pressed={value === item.key}
+          onClick={() => onChange(item.key)}
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${value === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export type GalapagosRainState = { status: "loading" } | { status: "error" } | { status: "ready"; station: GalapagosStationRain; snapshot: GalapagosRainSnapshot };
 
@@ -152,7 +176,7 @@ export function GalapagosStationDetails({
   const [resolution, setResolution] = useState<Resolution>("hour");
   const recent = station.recent && station.recent.every15min.length > 0 ? station.recent : null;
   const detail = RESOLUTIONS.find((item) => item.key === resolution)?.title;
-  const fine = !recent || resolution === "hour" ? null : resolution === "quarter" ? recent.every15min : (recent.samples ?? []).map((sample) => ({ time: sample.time, mm: sample.mm ?? 0, complete: true }));
+  const fine = !recent || resolution === "hour" ? null : fineBins(recent, resolution);
 
   return (
     <div className="mt-2 space-y-3">
@@ -167,21 +191,7 @@ export function GalapagosStationDetails({
       <div>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia</p>
-          {recent && (
-            <div role="group" aria-label="Cada cuánto se muestra la lluvia" className="flex shrink-0 rounded-full bg-slate-100 p-0.5">
-              {RESOLUTIONS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  aria-pressed={resolution === item.key}
-                  onClick={() => setResolution(item.key)}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${resolution === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {recent && <ResolutionSwitch value={resolution} onChange={setResolution} />}
         </div>
         {recent && (
           <p className="text-[10px] text-slate-500">
@@ -219,7 +229,7 @@ const FINE = { height: 78, top: 12, right: 30, bottom: 16 };
  * La lluvia de las últimas 6 horas en barras de 15 o de 5 minutos, de las lecturas de cada
  * 5 minutos de la estación. El intervalo que aún no tiene todas sus lecturas va más claro.
  */
-function FineBars({ bins, minutes, island }: { bins: { time: string; mm: number; complete: boolean }[]; minutes: number; island: string }) {
+export function FineBars({ bins, minutes, island }: { bins: { time: string; mm: number; complete: boolean }[]; minutes: number; island: string }) {
   const { height, top, right, bottom } = FINE;
   const [active, setActive] = useState<number | null>(null);
   const plotRight = WIDTH - right;

@@ -21,7 +21,16 @@ import type {
   WeatherStationsSnapshot,
 } from "../../types";
 import { stationRainLevel, stationsWithRain, type MeasuredStation } from "../../utils";
-import { GALAPAGOS_STATION_CODES, GalapagosStationDetails, useGalapagosRain } from "../charts/GalapagosRainChart";
+import {
+  FineBars,
+  GALAPAGOS_STATION_CODES,
+  GalapagosStationDetails,
+  ResolutionSwitch,
+  fineBins,
+  useGalapagosRain,
+  type RecentRain,
+  type Resolution,
+} from "../charts/GalapagosRainChart";
 import { diamondSymbolHtml } from "../map-symbols";
 import { focusProvinceOf } from "./province-focus";
 import { WatershedInfo } from "./WatershedInfo";
@@ -133,13 +142,51 @@ function StationPopupContent({
             {station.hoursWithData} de {station.hours.length} h con dato
             {station.lastTime && ` · hasta las ${formatHour(station.lastTime)}`}
           </p>
-          <HourlyRainBars hours={station.hours} />
+          {galapagos ? <HourlyRainBars hours={station.hours} /> : <StationRainBars station={station} />}
           {/* El pronóstico WRF del INAMHI no cubre Galápagos: ahí no se muestra. */}
           {galapagos ? (
             <p className="mt-2 text-xs text-slate-400">{galapagos.status === "loading" ? "Cargando la alarma de Galápagos…" : "No se pudo cargar la alarma de Galápagos."}</p>
           ) : (
             <StationForecast station={station} rain={rain} />
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * La lluvia de la estación: por hora (lo de siempre) y, si transmite cada 5 minutos, también
+ * cada 15 o 5 minutos de las últimas 6 horas. Se consulta al abrir el popup; mientras
+ * llega, o si la estación no lo ofrece, quedan las barras por hora.
+ */
+function StationRainBars({ station }: { station: MeasuredStation }) {
+  const [recent, setRecent] = useState<RecentRain | null>(null);
+  const [resolution, setResolution] = useState<Resolution>("hour");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    satiClientGet<{ recent: RecentRain | null }>(`/weather-stations/${station.id}/recent-rain`, undefined, controller.signal)
+      .then((response) => setRecent(response.recent && response.recent.every15min.length > 0 ? response.recent : null))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [station.id]);
+
+  if (!recent) return <HourlyRainBars hours={station.hours} />;
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] text-slate-500">
+          Últimos 60 min: <strong className="text-slate-900 tabular-nums">{formatMm(recent.mm60min)}</strong> · hasta las {formatHour(recent.time)}
+        </p>
+        <ResolutionSwitch value={resolution} onChange={setResolution} />
+      </div>
+      {resolution === "hour" ? (
+        <HourlyRainBars hours={station.hours} />
+      ) : (
+        <>
+          <p className="mt-1 text-[10px] text-slate-500">Cada {resolution === "five" ? 5 : 15} min · últimas 6 horas</p>
+          <FineBars key={resolution} bins={fineBins(recent, resolution)} minutes={resolution === "five" ? 5 : 15} island={station.name} />
         </>
       )}
     </div>
