@@ -41,7 +41,7 @@ export function WeatherStationsRow({ snapshot, visible, onVisibleChange, error }
               : "Pluviómetros que transmiten en tiempo real"}
           </p>
         </div>
-        <Toggle checked={visible} onChange={onVisibleChange} label="Mostrar la lluvia en las estaciones del INAMHI" />
+        <Toggle checked={visible} onChange={onVisibleChange} label="Mostrar la lluvia en las estaciones" />
       </div>
 
       {visible && (

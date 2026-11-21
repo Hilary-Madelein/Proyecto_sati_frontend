@@ -59,6 +59,9 @@ function stationIcon(level: StationRainLevel): L.DivIcon {
   return icon;
 }
 
+/** El pronóstico WRF del INAMHI llega hasta esta longitud: más al oeste (Galápagos) no hay. */
+const WRF_WEST_LIMIT = -81.2;
+
 const formatMm = (mm: number) => `${mm.toFixed(1).replace(".", ",")} mm`;
 
 interface WeatherStationsLayerProps {
@@ -121,7 +124,7 @@ function StationPopupContent({
   return (
     <div className="w-62">
       <p className="text-[11px] font-medium text-slate-500">
-        Estación {STATION_CATEGORY_LABELS[station.category].toLowerCase()} {station.code}
+        Estación {STATION_CATEGORY_LABELS[station.category].toLowerCase()} {station.network ? `· ${station.network}` : station.code}
         {station.altitude !== null && ` · ${Math.round(station.altitude).toLocaleString("es-EC")} m`}
       </p>
       <h3 className="text-[15px] font-semibold text-slate-900 max-lg:text-sm">{station.name}</h3>
@@ -147,7 +150,7 @@ function StationPopupContent({
           {galapagos ? (
             <p className="mt-2 text-xs text-slate-400">{galapagos.status === "loading" ? "Cargando la alarma de Galápagos…" : "No se pudo cargar la alarma de Galápagos."}</p>
           ) : (
-            <StationForecast station={station} rain={rain} />
+            station.lng >= WRF_WEST_LIMIT && <StationForecast station={station} rain={rain} />
           )}
         </>
       )}

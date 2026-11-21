@@ -118,7 +118,7 @@ export function buildCaptureLegend(input: CaptureLegendInput): CaptureLegendGrou
   if (input.imerg) groups.push({ title: "Lluvia IMERG (NASA), última media hora" });
   if (input.stations) {
     groups.push({
-      title: "Lluvia en estaciones del INAMHI",
+      title: "Lluvia en estaciones",
       items: STATION_RAIN_LEVEL_ORDER.map((level) => ({ label: STATION_RAIN_LEVELS[level].label, color: STATION_RAIN_LEVELS[level].color, symbol: "diamond" as const })),
     });
   }

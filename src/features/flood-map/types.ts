@@ -338,6 +338,8 @@ export interface WeatherStation {
   lng: number;
   altitude: number | null;
   category: WeatherStationCategory;
+  /** Red a la que pertenece, si no es la del INAMHI (p. ej. "Ambient Weather"). */
+  network?: string;
   /** Lluvia de cada hora reciente, de la más antigua a la más reciente. */
   hours: WeatherStationHour[];
   /** Suma de las horas con dato (mm); null si ninguna tiene dato. */
