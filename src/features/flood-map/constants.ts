@@ -46,7 +46,7 @@ const ESRI_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services";
  * propios (ver ProvinceBoundaries); null = nunca, porque el mapa ya los trae.
  */
 export const BASEMAPS: Record<
-  "light" | "streets" | "satellite",
+  "light" | "streets" | "satellite" | "topographic",
   {
     label: string;
     url: string;
@@ -80,6 +80,14 @@ export const BASEMAPS: Record<
     maxNativeZoom: 18,
     attribution: "Esri, Maxar, Earthstar Geographics",
     provinceLinesMaxZoom: 7,
+  },
+  // Relieve con curvas de nivel, quebradas y nombres: se ve por dónde baja el agua. Trae sus propios nombres y límites.
+  topographic: {
+    label: "Topográfico",
+    url: `${ESRI_TILES}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`,
+    maxNativeZoom: 19,
+    attribution: "Esri, HERE, Garmin, USGS, &copy; colaboradores de OpenStreetMap",
+    provinceLinesMaxZoom: null,
   },
 };
 export type BasemapId = keyof typeof BASEMAPS;
