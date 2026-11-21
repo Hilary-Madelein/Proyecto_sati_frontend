@@ -58,6 +58,12 @@ export function eventSummary(totalMm: string, event: RainEvent | null | undefine
 export interface GalapagosReportInput {
   code: string;
   island: string;
+  /** Nombre de la estación (para las que no son del INAMHI). */
+  name?: string | null;
+  /** Red de la estación, si no es la del INAMHI. */
+  network?: string;
+  /** Estación de la que salen los límites, si no son los suyos. */
+  limitsCode?: string;
   level: "normal" | "alarm" | "extreme";
   /** Por qué está en ese nivel; null en normal. */
   reason: string | null;
@@ -181,7 +187,9 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   // Tras la fecha, la hora en que se generó (GMT-5, la del registro).
   const downloaded = input.downloadedAt ? new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS) : null;
   const updated = downloaded ? `, ${pad(downloaded.getUTCHours())}:${pad(downloaded.getUTCMinutes())} (GMT-5)` : "";
-  push(text(left, 66, `${island} hoy, ${dayName}${updated}, frente a sus límites`, { size: 31, fill: C.ink, weight: 700 }));
+  // Una estación de otra red se dice por su nombre; sus límites son los de la estación del INAMHI.
+  const other = input.network ? { name: input.name ?? code, limits: input.limitsCode ?? code } : null;
+  push(text(left, 66, `${island}${other ? ` · ${other.name}` : ""} hoy, ${dayName}${updated}, frente a sus límites`, { size: other ? 28 : 31, fill: C.ink, weight: 700 }));
   const eventText =
     event === undefined
       ? `Desde ayer, ${fmt(total)} mm.`
@@ -192,7 +200,8 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   push(text(left, 104, headline, { size: 17.5 }));
   // La estación publica cada hora con retraso: se dice cuándo se descargó y hasta qué hora hay dato.
   const asOf = downloaded ? `Último dato publicado: ${hourLabel} · ` : "";
-  push(text(left, 132, `${asOf}Estación ${code}, INAMHI · cada episodio se muestra con sus dos días completos, con las horas del registro`, { size: 14.5, fill: C.ink3 }));
+  const stationText = other ? `Estación ${other.name}, ${input.network} · límites de la estación ${other.limits}, INAMHI` : `Estación ${code}, INAMHI`;
+  push(text(left, 132, `${asOf}${stationText} · cada episodio se muestra con sus dos días completos, con las horas del registro`, { size: 14.5, fill: C.ink3 }));
 
   // ── Leyenda ──
   const legend: Array<[string, number, string]> = [
@@ -221,7 +230,7 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
       .join("");
   push(bars(series.upper, 0.92, C.upper, 0.38), bars(series.lower, 0.62, C.lower, 0.45), bars(series.now, 0.32, C.now, 0.88));
   push(`<line x1="${x(24)}" x2="${x(24)}" y1="${top1}" y2="${base1}" stroke="${C.ink3}" stroke-width="1"/>`);
-  const events = UPPER_EVENTS[code] ?? [];
+  const events = UPPER_EVENTS[input.limitsCode ?? code] ?? [];
   const eventLine = (hour: number, top: number, base: number) => `<line x1="${x(hour)}" x2="${x(hour)}" y1="${top}" y2="${base}" stroke="${C.upper}" stroke-width="2" stroke-dasharray="7 5"/>`;
   if (hoursNow > 0 && hoursNow < 48) {
     push(`<line x1="${x(hoursNow)}" x2="${x(hoursNow)}" y1="${top1}" y2="${base1}" stroke="${C.now}" stroke-width="1.4" stroke-dasharray="3 5"/>`);
@@ -322,7 +331,8 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
     ? ` El mar está ${input.sea.high ? "alto" : "bajo"} (${formatSeaLevel(input.sea.levelM)} respecto de su nivel medio, mareógrafo de ${input.sea.place})${input.scenario ? `: en la matriz lluvia × mar, ${SCENARIO_LABELS[input.scenario].toUpperCase()}` : ""}.`
     : "";
   wrap(reading + sea, 148).forEach((line, index) => push(text(left, 1050 + index * 25, line, { size: 16 })));
-  push(text(left, 1128, "Fuente: INAMHI, lluvia horaria de la estación tomada del sistema SATI (dato en vivo, aún sin validar). Horas del registro (hora del continente; en Galápagos es una hora menos).", { size: 12.5, fill: C.ink3 }));
+  const sourceText = other ? `Fuente: ${input.network}, lluvia horaria de la estación; límites de la estación ${other.limits} del INAMHI. Sistema SATI` : "Fuente: INAMHI, lluvia horaria de la estación tomada del sistema SATI";
+  push(text(left, 1128, `${sourceText} (dato en vivo, aún sin validar). Horas del registro (hora del continente; en Galápagos es una hora menos).`, { size: 12.5, fill: C.ink3 }));
   push(text(left, 1146, "Cada barra es la lluvia de la hora que termina en esa marca. Los límites empiezan a las 00:00 de su primer día; el acumulado de ahora, donde empezó el evento (termina tras 12 horas con menos de 1 mm).", { size: 12.5, fill: C.ink3 }));
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}"><rect width="${W}" height="${H}" fill="${C.surface}"/>${parts.join("")}</svg>`;
@@ -331,7 +341,8 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
 /** Nombre del archivo: reporte_santa_cruz_20261114_0900.png. */
 export function galapagosReportFileName(input: GalapagosReportInput): string {
   const { date, hourLabel } = lastDatum(input.now);
-  const island = input.island.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  // Las estaciones de otra red llevan su nombre: en Santa Cruz hay varias.
+  const island = `${input.island}${input.network ? ` ${input.name ?? input.code}` : ""}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/_$/, "");
   return `reporte_${island}_${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}_${hourLabel.replace(":", "")}.png`;
 }
 

@@ -8,13 +8,22 @@ import { STATION_HOURLY_BAR_COLOR } from "../../constants";
 import { SCENARIO_LABELS, downloadGalapagosReport, eventSummary, formatSeaLevel, recordHourLabel, type GalapagosScenario, type RainEvent, type SeaReading } from "../../galapagos-report";
 import type { WeatherStationHour } from "../../types";
 
-/** Códigos del INAMHI de las dos estaciones de Galápagos: tienen su propia gráfica y su propia alarma. */
-export const GALAPAGOS_STATION_CODES: readonly string[] = ["M0191", "M0221"];
+/**
+ * Estaciones de Galápagos con su propia gráfica y reporte: las dos del INAMHI (con su alarma)
+ * y las particulares de Santa Cruz, que se leen con los límites de M0191.
+ */
+export const GALAPAGOS_STATION_CODES: readonly string[] = ["M0191", "M0221", "AW-EPMAPASC", "AW-MICONIA", "AW-MANZANILLO"];
 type GalapagosLevel = "normal" | "alarm" | "extreme";
 
 interface GalapagosStationRain {
   code: string;
   island: string;
+  /** Nombre de la estación; null si hoy no transmite. */
+  name?: string | null;
+  /** Estación de la que toma sus límites, si no tiene los suyos. */
+  limitsCode?: string;
+  /** Red a la que pertenece, si no es la del INAMHI. */
+  network?: string;
   mm3h: number;
   mm6h: number;
   mm24h: number;
@@ -169,7 +178,7 @@ export function GalapagosStationDetails({
   fallbackBars: ReactNode;
 }) {
   const { station, snapshot } = state;
-  const limits = DAY_LIMITS[station.code];
+  const limits = DAY_LIMITS[station.limitsCode ?? station.code];
   const day = todayByHour(hours);
   const where = limits && day ? standing(day.total, limits.upper.mm, limits.lower.mm) : null;
   // La vista general es por hora; el detalle (15 o 5 minutos) sale de las lecturas de cada 5 minutos de las últimas 6 horas.
@@ -305,6 +314,9 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
         downloadGalapagosReport({
           code: latest.code,
           island: latest.island,
+          name: latest.name ?? station.name,
+          network: latest.network,
+          limitsCode: latest.limitsCode,
           level: latest.level,
           reason: latest.reason,
           now: latest.twoDays?.length ? latest.twoDays : now,
