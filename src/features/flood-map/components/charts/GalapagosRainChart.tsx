@@ -275,12 +275,17 @@ function Intensity({ recent, hours }: { recent: RecentRain | null; hours: Weathe
     quarter != null && `15 min ${formatMm(quarter)}`,
     hourMm != null && `1 h ${formatMm(hourMm)} mm`,
   ].filter(Boolean);
+  // Intensidad: lo de cada ventana llevado a mm por hora.
+  const rates = [five != null && formatMm(five * 12), quarter != null && formatMm(quarter * 4), hourMm != null && formatMm(hourMm)].filter(Boolean);
   if (parts.length === 0) return null;
   return (
-    <p className="text-[10px] text-slate-500 tabular-nums">
-      {parts.join(" · ")}
-      {time && ` · ${formatHour(time)}`}
-    </p>
+    <>
+      <p className="text-[10px] text-slate-500 tabular-nums">
+        {parts.join(" · ")}
+        {time && ` · ${formatHour(time)}`}
+      </p>
+      <p className="text-[10px] text-slate-500 tabular-nums">Intensidad: {rates.join(" · ")} mm/h</p>
+    </>
   );
 }
 
