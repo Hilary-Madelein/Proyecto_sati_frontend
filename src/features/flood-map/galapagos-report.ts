@@ -366,6 +366,8 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
       const end = ahead.at(-1)!;
       push(`<polyline points="${ahead.map((point) => `${xb(point.hour).toFixed(1)},${y2(point.mm).toFixed(1)}`).join(" ")}" fill="none" stroke="${C.ink3}" stroke-width="3.5" stroke-dasharray="3 6" stroke-linecap="round"/>`);
       push(`<circle cx="${xb(end.hour)}" cy="${y2(end.mm)}" r="5" fill="${C.surface}" stroke="${C.ink3}" stroke-width="2.5"/>`);
+      // Lo medido más lo pronosticado: aproximado.
+      push(text(xb(end.hour) + 10, y2(end.mm) + 5, `~${fmt(end.mm, 0)} mm`, { size: 14.5, fill: C.ink2, weight: 700, halo: true }));
     }
     push(`<circle cx="${nowX}" cy="${nowY}" r="7.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2.5"/>`);
     // "Aquí estamos": arriba y a la derecha del punto mientras quepa; si no, a la izquierda.
