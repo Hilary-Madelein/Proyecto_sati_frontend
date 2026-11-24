@@ -5,6 +5,7 @@ import { AlertTriangleIcon, DownloadIcon, WavesIcon } from "@/components/ui/icon
 import { formatHour } from "@/lib/format";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { STATION_HOURLY_BAR_COLOR } from "../../constants";
+import { stationForecast } from "../../galapagos-forecast";
 import { SCENARIO_LABELS, downloadGalapagosReport, eventSummary, forecastCurve, forecastHours, formatSeaLevel, recordHourLabel, type GalapagosScenario, type RainEvent, type RainForecast, type SeaReading } from "../../galapagos-report";
 import type { WeatherStationHour } from "../../types";
 
@@ -27,6 +28,10 @@ interface GalapagosStationRain {
   network?: string;
   /** Zona de Santa Cruz: su nivel es el de la alerta por zonas. */
   zone?: "low" | "high";
+  /** Ubicación y último dato: para pedir el pronóstico desde el navegador si el servidor no lo trae. */
+  lat?: number | null;
+  lng?: number | null;
+  lastTime?: string | null;
   mm3h: number;
   mm6h: number;
   mm24h: number;
@@ -154,6 +159,12 @@ export function useGalapagosRain(code: string | null): GalapagosRainState | null
       .then((snapshot) => {
         const station = snapshot.stations.find((item) => item.code === code);
         setState(station ? { status: "ready", station, snapshot } : { status: "error" });
+        // El servidor no siempre consigue el pronóstico (Open-Meteo lo limita): se pide desde aquí.
+        if (station && !station.forecast) {
+          void stationForecast(station).then((forecast) => {
+            if (forecast && !controller.signal.aborted) setState({ status: "ready", station: { ...station, forecast }, snapshot });
+          });
+        }
       })
       .catch((error: Error) => {
         if (error.name !== "AbortError") setState({ status: "error" });
@@ -395,7 +406,8 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
     satiClientGet<GalapagosRainSnapshot>("/galapagos-rain", { fresh: 1 })
       .then((snapshot) => snapshot.stations.find((item) => item.code === station.code) ?? station)
       .catch(() => station)
-      .then((latest) =>
+      .then(async (latest) => ({ latest, forecast: latest.twoDays?.length ? ((await stationForecast(latest)) ?? station.forecast) : station.forecast }))
+      .then(({ latest, forecast }) =>
         downloadGalapagosReport({
           code: latest.code,
           island: latest.island,
@@ -410,7 +422,7 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
           lower: latest.limits?.find((item) => item.key === "lower") ?? lower,
           sea: latest.sea,
           scenario: latest.scenario,
-          forecast: latest.twoDays?.length ? latest.forecast : station.forecast,
+          forecast,
           downloadedAt: new Date(),
         }),
       )
