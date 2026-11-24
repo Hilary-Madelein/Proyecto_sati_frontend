@@ -213,17 +213,12 @@ export function GalapagosStationDetails({
         <Stat label="Hoy" value={day ? `${formatMm(day.total)} mm` : "–"} note={where && <span className={where.className}>{where.text}</span>} />
         <Stat label="Últimas 24 h" value={`${formatMm(last24h.mm)} mm`} note={last24h.until ? `hasta las ${last24h.until}` : `${last24h.hoursWithData} h con dato`} />
       </div>
-
       <div>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia</p>
           {recent && <ResolutionSwitch value={resolution} onChange={setResolution} />}
         </div>
-        {recent && (
-          <p className="text-[10px] text-slate-500">
-            Últimos 60 min: <strong className="text-slate-900 tabular-nums">{formatMm(recent.mm60min)} mm</strong> · hasta las {formatHour(recent.time)}
-          </p>
-        )}
+        <Intensity recent={recent} hours={hours} />
         {fine ? (
           <>
             <p className="text-[10px] text-slate-500">{detail}</p>
@@ -265,6 +260,27 @@ export function GalapagosStationDetails({
 
       <ReportButton station={station} />
     </div>
+  );
+}
+
+/** Una línea pequeña con la intensidad de ahora: 5 min · 15 min · 1 h (sin lecturas de 5 min, solo la hora). */
+function Intensity({ recent, hours }: { recent: RecentRain | null; hours: WeatherStationHour[] }) {
+  const five = recent?.samples?.filter((sample) => sample.mm !== null).at(-1)?.mm;
+  const quarter = recent?.every15min.at(-1)?.mm;
+  const lastHour = hours.filter((hour) => hour.mm !== null).at(-1);
+  const hourMm = recent ? recent.mm60min : lastHour?.mm;
+  const time = recent ? recent.time : lastHour?.time;
+  const parts = [
+    five != null && `5 min ${formatMm(five)}`,
+    quarter != null && `15 min ${formatMm(quarter)}`,
+    hourMm != null && `1 h ${formatMm(hourMm)} mm`,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return (
+    <p className="text-[10px] text-slate-500 tabular-nums">
+      {parts.join(" · ")}
+      {time && ` · ${formatHour(time)}`}
+    </p>
   );
 }
 
@@ -455,14 +471,10 @@ function AlarmBanner({ station, thresholds }: { station: GalapagosStationRain; t
       <div className="min-w-0">
         <p className="text-[13px] leading-tight font-semibold">{level.label}</p>
         {station.reason && <p className="text-[11px] leading-snug">{station.reason.charAt(0).toUpperCase() + station.reason.slice(1)}.</p>}
-        {station.zone ? (
-          <p className="mt-0.5 text-[10px] leading-snug opacity-75">Santa Cruz por zonas. Aviso arriba: 35 mm en 3 h, 50 en 6 h u 80 en el evento. Alarma: 100 en 6 h arriba o {thresholds ? formatMm(thresholds.alarm5hMm) : 25} en 5 h abajo.</p>
-        ) : (
-          thresholds && (
-            <p className="mt-0.5 text-[10px] leading-snug opacity-75">
-              Salta con {formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de {formatMm(thresholds.alarmBurstMm)} mm.
-            </p>
-          )
+        {!station.zone && thresholds && (
+          <p className="mt-0.5 text-[10px] leading-snug opacity-75">
+            Salta con {formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de {formatMm(thresholds.alarmBurstMm)} mm.
+          </p>
         )}
       </div>
     </div>
