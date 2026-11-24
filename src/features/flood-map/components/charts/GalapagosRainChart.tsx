@@ -313,7 +313,7 @@ function Intensity({ recent, hours }: { recent: RecentRain | null; hours: Weathe
         {parts.join(" · ")}
         {time && ` · ${formatHour(time)}`}
       </p>
-      <p className="text-[11px] font-semibold text-slate-900 tabular-nums">Intensidad: {rates.join(" · ")} mm/h</p>
+      <p className="text-[10px] text-sky-700 tabular-nums">Intensidad: {rates.join(" · ")} mm/h</p>
     </>
   );
 }
