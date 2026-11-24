@@ -24,8 +24,9 @@ export interface SeaReading {
 }
 
 /** La casilla de la matriz lluvia × mar. */
-export type GalapagosScenario = "normal" | "precaution" | "alert" | "emergency";
-export const SCENARIO_LABELS: Record<GalapagosScenario, string> = { normal: "Normal", precaution: "Precaución", alert: "Alerta", emergency: "Emergencia" };
+/** «notice» (aviso): el nivel de Santa Cruz por zonas, en sus estaciones. */
+export type GalapagosScenario = "normal" | "precaution" | "notice" | "alert" | "emergency";
+export const SCENARIO_LABELS: Record<GalapagosScenario, string> = { normal: "Normal", precaution: "Precaución", notice: "Aviso", alert: "Alerta", emergency: "Emergencia" };
 
 /** "+0,47 m" o "−0,31 m". */
 export const formatSeaLevel = (levelM: number) => `${levelM > 0 ? "+" : levelM < 0 ? "−" : ""}${Math.abs(levelM).toLocaleString("es-EC", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
@@ -39,6 +40,48 @@ export interface RainEvent {
   carriedMm: number;
   /** Ya pasaron 12 horas sin lluvia. */
   ended: boolean;
+}
+
+/** Las 24 horas siguientes según tres modelos globales (Open-Meteo): mediana y rango. Solo tendencia. */
+export interface RainForecast {
+  /** Cada hora por la hora en que termina (ISO 8601): mediana de los modelos y el mayor y menor (mm). */
+  hours: { time: string; mm: number; lowMm: number; highMm: number }[];
+  totalMm: number;
+  lowMm: number;
+  highMm: number;
+  source?: string;
+  /**
+   * El pronóstico ajustado con lo que midió la estación cuando los modelos daban algo parecido
+   * (manda el pronóstico; el registro pesa poco): total, rango y cada hora. null sin registro suficiente.
+   */
+  expected?: { mm: number; lowMm: number; highMm: number; cases: number; modelWeight?: number; hours: { time: string; mm: number }[] } | null;
+}
+
+/** Las horas que se dibujan: lo esperado (corregido) si lo hay; si no, la mediana de los modelos. */
+export function forecastHours(forecast: RainForecast): { time: string; mm: number; lowMm: number; highMm: number }[] {
+  return forecast.expected ? forecast.expected.hours.map((hour) => ({ ...hour, lowMm: hour.mm, highMm: hour.mm })) : forecast.hours;
+}
+
+/**
+ * El acumulado pronosticado a continuación de lo medido: arranca en el último dato (`hour`, `mm`)
+ * y suma la mediana de cada hora pronosticada, hasta `lastHour` (72: las 24:00 de mañana; el acumulado
+ * se alarga un día cuando hay pronóstico, para que se vea entero aunque se consulte a las 23:50).
+ * `firstTime` es la hora 1 de la gráfica (ISO 8601).
+ */
+export function forecastCurve(forecast: RainForecast | null | undefined, firstTime: string | undefined, from: { hour: number; mm: number }, lastHour = 72): { hour: number; mm: number }[] {
+  if (!forecast || !firstTime || forecast.hours.length === 0) return [];
+  const hours = forecastHours(forecast);
+  const first = Date.parse(firstTime);
+  const points = [from];
+  let total = from.mm;
+  for (const hour of hours) {
+    const at = Math.round((Date.parse(hour.time) - first) / 3_600_000) + 1;
+    if (at <= from.hour) continue;
+    if (at > lastHour) break;
+    total += hour.mm;
+    points.push({ hour: at, mm: Math.round(total * 10) / 10 });
+  }
+  return points.length > 1 ? points : [];
 }
 
 /** "17:00 del 15 nov": una hora del registro (hora del continente). */
@@ -64,7 +107,7 @@ export interface GalapagosReportInput {
   network?: string;
   /** Estación de la que salen los límites, si no son los suyos. */
   limitsCode?: string;
-  level: "normal" | "alarm" | "extreme";
+  level: "normal" | "notice" | "alarm" | "extreme";
   /** Por qué está en ese nivel; null en normal. */
   reason: string | null;
   /** "Aquí estamos": desde las 00:00 de ayer, la lluvia de cada hora y lo acumulado del evento; `hour` va de 1 a 48. */
@@ -77,11 +120,15 @@ export interface GalapagosReportInput {
   scenario?: GalapagosScenario;
   /** Cuándo se descargó: se dice junto a la hora del último dato de la estación. */
   downloadedAt?: Date;
+  /** Las 24 horas siguientes según los modelos; sin él, el reporte no lleva ese panel. */
+  forecast?: RainForecast | null;
 }
 
 const W = 1400;
 const H = 1160;
 const SCALE = 2;
+/** Alto que suma el panel del pronóstico de 24 horas. */
+const FORECAST_PANEL = 280;
 const C = { upper: "#e34948", lower: "#2a78d6", now: "#111111", ink: "#0b0b0b", ink2: "#52514e", ink3: "#8a8983", grid: "#e6e5e1", surface: "#fcfcfb" };
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -99,7 +146,7 @@ const UPPER_EVENTS: Readonly<Record<string, readonly { hour: number; label: stri
     { hour: 28, label: "Nivel máximo de inundación reportado", time: "04:00 del 31 oct" },
   ],
 };
-const LEVEL_TEXT ={ normal: "sin alarma", alarm: "en alarma", extreme: "en alarma extrema" } as const;
+const LEVEL_TEXT ={ normal: "sin alarma", notice: "en aviso", alarm: "en alarma", extreme: "en alarma extrema" } as const;
 
 const fmt = (value: number, decimals = 1) => value.toLocaleString("es-EC", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 const esc = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -231,7 +278,7 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   push(bars(series.upper, 0.92, C.upper, 0.38), bars(series.lower, 0.62, C.lower, 0.45), bars(series.now, 0.32, C.now, 0.88));
   push(`<line x1="${x(24)}" x2="${x(24)}" y1="${top1}" y2="${base1}" stroke="${C.ink3}" stroke-width="1"/>`);
   const events = UPPER_EVENTS[input.limitsCode ?? code] ?? [];
-  const eventLine = (hour: number, top: number, base: number) => `<line x1="${x(hour)}" x2="${x(hour)}" y1="${top}" y2="${base}" stroke="${C.upper}" stroke-width="2" stroke-dasharray="7 5"/>`;
+  const eventLine = (hour: number, top: number, base: number, xf = x) => `<line x1="${xf(hour)}" x2="${xf(hour)}" y1="${top}" y2="${base}" stroke="${C.upper}" stroke-width="2" stroke-dasharray="7 5"/>`;
   if (hoursNow > 0 && hoursNow < 48) {
     push(`<line x1="${x(hoursNow)}" x2="${x(hoursNow)}" y1="${top1}" y2="${base1}" stroke="${C.now}" stroke-width="1.4" stroke-dasharray="3 5"/>`);
     // Encima de la gráfica, para no tapar las barras.
@@ -248,79 +295,91 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
     }
   }
   // Abajo de cada gráfica: una marca por hora y la etiqueta cada 3 horas.
-  const ticks = (base: number) =>
-    Array.from({ length: 49 }, (_, hour) => {
-      const labelled = hour % 3 === 0;
-      const mark = `<line x1="${x(hour)}" x2="${x(hour)}" y1="${base}" y2="${base + (labelled ? 8 : 4)}" stroke="${C.ink3}" stroke-width="1"/>`;
-      return labelled ? mark + text(x(hour), base + 26, hour === 48 ? "24:00" : `${pad(hour % 24)}:00`, { size: 13.5, anchor: "middle" }) : mark;
+  const ticks = (base: number, xf = x, span = 48) =>
+    Array.from({ length: span + 1 }, (_, hour) => {
+      const labelled = hour % (span > 48 ? 6 : 3) === 0;
+      const mark = `<line x1="${xf(hour)}" x2="${xf(hour)}" y1="${base}" y2="${base + (labelled ? 8 : 4)}" stroke="${C.ink3}" stroke-width="1"/>`;
+      return labelled ? mark + text(xf(hour), base + 26, hour === span ? "24:00" : `${pad(hour % 24)}:00`, { size: 13.5, anchor: "middle" }) : mark;
     }).join("");
   push(ticks(base1), text(x(12), base1 + 54, "primer día", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base1 + 54, "segundo día", { size: 15, fill: C.ink3, anchor: "middle" }));
   push(`<text transform="translate(${left - 50} ${(top1 + base1) / 2}) rotate(-90)" font-size="15" fill="${C.ink2}" text-anchor="middle">mm en cada hora</text>`);
 
-  // ── Abajo: el acumulado de ayer y hoy, como en el popup ──
+  // ── Abajo: el acumulado de ayer y hoy, como en el popup; con pronóstico, se alarga hasta mañana ──
+  const ahead = forecastCurve(input.forecast, now[0]?.time, { hour: hoursNow, mm: total });
+  const span2 = ahead.length > 1 ? 72 : 48;
+  const xb = (hour: number) => left + (hour / span2) * (right - left);
   const top2 = 628;
   const base2 = 946;
-  const scale2 = axis(Math.max(upper.totalMm, total, carried));
+
+  const scale2 = axis(Math.max(upper.totalMm, total, carried, ahead.at(-1)?.mm ?? 0));
   const y2 = (mm: number) => base2 - (mm / scale2.top) * (base2 - top2);
   /** `from`: con cuánto arranca a las 00:00 del primer día. */
-  const curve = (values: readonly number[], from = 0) => [`${x(0)},${y2(from).toFixed(1)}`, ...values.map((mm, index) => `${x(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`)].join(" ");
+  const curve = (values: readonly number[], from = 0) => [`${xb(0)},${y2(from).toFixed(1)}`, ...values.map((mm, index) => `${xb(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`)].join(" ");
   push(text(left, 604, event === undefined ? "Acumulado de ayer y hoy" : "Acumulado del evento de lluvia (vuelve a cero tras 12 horas sin llover)", { size: 18, fill: C.ink, weight: 700 }));
   for (let mm = 0; mm <= scale2.top; mm += scale2.step) {
     push(`<line x1="${left}" x2="${right}" y1="${y2(mm)}" y2="${y2(mm)}" stroke="${C.grid}"/>`, text(left - 10, y2(mm) + 5, String(mm), { size: 14, anchor: "end" }));
   }
-  const band = `${curve(upper.accumulatedMm)} ${lower.accumulatedMm.map((mm, index) => `${x(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`).reverse().join(" ")} ${x(0)},${y2(0)}`;
+  const band = `${curve(upper.accumulatedMm)} ${lower.accumulatedMm.map((mm, index) => `${xb(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`).reverse().join(" ")} ${xb(0)},${y2(0)}`;
   push(`<polygon points="${band}" fill="${C.upper}" fill-opacity="0.10"/>`);
-  push(`<line x1="${x(24)}" x2="${x(24)}" y1="${top2}" y2="${base2}" stroke="${C.ink3}" stroke-width="1"/>`);
+  push(`<line x1="${xb(24)}" x2="${xb(24)}" y1="${top2}" y2="${base2}" stroke="${C.ink3}" stroke-width="1"/>`);
   for (const [limit, color] of [[upper, C.upper], [lower, C.lower]] as const) {
     const { name, detail } = limitParts(limit);
     const endY = y2(limit.totalMm);
     push(`<polyline points="${curve(limit.accumulatedMm)}" fill="none" stroke="${color}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>`);
-    push(`<circle cx="${right}" cy="${endY}" r="5.5" fill="${color}" stroke="${C.surface}" stroke-width="2"/>`);
+    push(`<circle cx="${xb(48)}" cy="${endY}" r="5.5" fill="${color}" stroke="${C.surface}" stroke-width="2"/>`);
     // El rótulo del límite, a la derecha de donde termina su curva.
     const labelY = limit === lower ? Math.min(endY, base2 - 28) : Math.max(endY, top2 + 18);
-    push(text(right + 16, labelY - 13, name, { size: 14.5, fill: C.ink }), text(right + 16, labelY + 6, detail, { size: 14.5, fill: C.ink }), text(right + 16, labelY + 25, `${fmt(limit.totalMm, 0)} mm`, { size: 14.5, fill: C.ink }));
+    push(text((span2 > 48 ? xb(48) : right) + 16, labelY - 13, name, { size: 14.5, fill: C.ink }), text((span2 > 48 ? xb(48) : right) + 16, labelY + 6, detail, { size: 14.5, fill: C.ink }), text((span2 > 48 ? xb(48) : right) + 16, labelY + 25, `${fmt(limit.totalMm, 0)} mm`, { size: 14.5, fill: C.ink }));
   }
   // Los momentos del episodio del límite superior: la línea, el punto sobre su curva y qué pasó, arriba.
   events.forEach((event, index) => {
     const mm = upper.accumulatedMm[event.hour - 1] ?? 0;
     const side = index % 2 === 0 ? -1 : 1;
     const anchor = side < 0 ? "end" : "start";
-    push(eventLine(event.hour, top2, base2));
+    push(eventLine(event.hour, top2, base2, xb));
     if (event.highlight) {
       // Lo acumulado en ese momento, resaltado: una guía hasta el eje, un punto grande con aro y la cifra al lado.
-      push(`<line x1="${left}" x2="${x(event.hour)}" y1="${y2(mm)}" y2="${y2(mm)}" stroke="${C.upper}" stroke-width="1.6" stroke-dasharray="3 5"/>`);
-      push(`<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="15" fill="${C.upper}" fill-opacity="0.18"/>`, `<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="8.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2.5"/>`);
-      push(text(x(event.hour) - 22, y2(mm) - 12, `${fmt(mm, 0)} mm`, { size: 24, fill: C.ink, weight: 700, anchor: "end", halo: true }));
-      push(text(x(event.hour) - 22, y2(mm) + 24, "acumulados al empezar", { size: 14.5, fill: C.ink, anchor: "end", halo: true }));
-    } else push(`<circle cx="${x(event.hour)}" cy="${y2(mm)}" r="5.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2"/>`);
-    push(text(x(event.hour) + side * 9, top2 + 19, event.label, { size: 14.5, fill: C.ink, anchor, halo: true }));
-    push(text(x(event.hour) + side * 9, top2 + 38, `${event.time} · con ${fmt(mm, 0)} mm acumulados`, { size: 14.5, fill: C.ink, anchor, halo: true }));
+      push(`<line x1="${left}" x2="${xb(event.hour)}" y1="${y2(mm)}" y2="${y2(mm)}" stroke="${C.upper}" stroke-width="1.6" stroke-dasharray="3 5"/>`);
+      push(`<circle cx="${xb(event.hour)}" cy="${y2(mm)}" r="15" fill="${C.upper}" fill-opacity="0.18"/>`, `<circle cx="${xb(event.hour)}" cy="${y2(mm)}" r="8.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2.5"/>`);
+      push(text(xb(event.hour) - 22, y2(mm) - 12, `${fmt(mm, 0)} mm`, { size: 24, fill: C.ink, weight: 700, anchor: "end", halo: true }));
+      push(text(xb(event.hour) - 22, y2(mm) + 24, "acumulados al empezar", { size: 14.5, fill: C.ink, anchor: "end", halo: true }));
+    } else push(`<circle cx="${xb(event.hour)}" cy="${y2(mm)}" r="5.5" fill="${C.upper}" stroke="${C.surface}" stroke-width="2"/>`);
+    push(text(xb(event.hour) + side * 9, top2 + 19, event.label, { size: 14.5, fill: C.ink, anchor, halo: true }));
+    push(text(xb(event.hour) + side * 9, top2 + 38, `${event.time} · con ${fmt(mm, 0)} mm acumulados`, { size: 14.5, fill: C.ink, anchor, halo: true }));
   });
   if (current) {
-    const nowX = x(hoursNow);
+    const nowX = xb(hoursNow);
     const nowY = y2(total);
     push(`<polyline points="${curve(nowCurve, carried)}" fill="none" stroke="${C.now}" stroke-width="4" stroke-dasharray="14 8" stroke-linejoin="round"/>`);
     // Dónde empezó el evento: dentro de la gráfica, una marca; si venía de antes, con cuánto arranca.
     const firstTime = now[0]?.time ? Date.parse(now[0].time) : null;
     const startHour = event && firstTime !== null ? Math.round((Date.parse(event.start) - firstTime) / 3_600_000) + 1 : null;
     if (event && carried > 0) {
-      push(`<circle cx="${x(0)}" cy="${y2(carried)}" r="5.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2"/>`);
-      push(text(x(0) + 12, y2(carried) - 12, `Viene de antes: ${fmt(carried)} mm${since}`, { size: 14.5, fill: C.ink, weight: 700, halo: true }));
+      push(`<circle cx="${xb(0)}" cy="${y2(carried)}" r="5.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2"/>`);
+      push(text(xb(0) + 12, y2(carried) - 12, `Viene de antes: ${fmt(carried)} mm${since}`, { size: 14.5, fill: C.ink, weight: 700, halo: true }));
     } else if (startHour !== null && startHour > 0 && startHour < hoursNow) {
-      push(`<line x1="${x(startHour)}" x2="${x(startHour)}" y1="${base2 - 26}" y2="${base2}" stroke="${C.now}" stroke-width="1.6"/>`);
-      push(text(x(startHour) - 7, base2 - 12, "empieza el evento", { size: 13.5, fill: C.ink, anchor: "end", halo: true }));
+      push(`<line x1="${xb(startHour)}" x2="${xb(startHour)}" y1="${base2 - 26}" y2="${base2}" stroke="${C.now}" stroke-width="1.6"/>`);
+      push(text(xb(startHour) - 7, base2 - 12, "empieza el evento", { size: 13.5, fill: C.ink, anchor: "end", halo: true }));
+    }
+    // Lo pronosticado, a continuación de lo medido: gris y punteado, hasta las 24:00 de hoy.
+    if (ahead.length > 1) {
+      const end = ahead.at(-1)!;
+      push(`<polyline points="${ahead.map((point) => `${xb(point.hour).toFixed(1)},${y2(point.mm).toFixed(1)}`).join(" ")}" fill="none" stroke="${C.ink3}" stroke-width="3.5" stroke-dasharray="3 6" stroke-linecap="round"/>`);
+      push(`<circle cx="${xb(end.hour)}" cy="${y2(end.mm)}" r="5" fill="${C.surface}" stroke="${C.ink3}" stroke-width="2.5"/>`);
+      push(text(xb(end.hour) - 8, y2(end.mm) - 14, `pronóstico: ${fmt(end.mm)} mm a las ${pad(end.hour % 24 || 24)}:00${end.hour > 48 ? " de mañana" : ""}`, { size: 14, fill: C.ink2, anchor: "end", halo: true }));
     }
     push(`<circle cx="${nowX}" cy="${nowY}" r="7.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2.5"/>`);
     // "Aquí estamos": arriba y a la derecha del punto mientras quepa; si no, a la izquierda.
-    const side = hoursNow > 38 ? -1 : 1;
+    const side = hoursNow > span2 - 10 ? -1 : 1;
     const labelX = nowX + side * 150;
     // Si el punto queda muy arriba (un evento largo), el rótulo va debajo: arriba están los momentos del límite superior.
-    const below = nowY - 78 < top2 + 60;
+    // Con pronóstico, debajo: arriba a la derecha va la línea de lo esperado.
+    const below = ahead.length > 1 || nowY - 78 < top2 + 60;
     const labelY = below ? nowY + 62 : nowY - 78;
     push(`<line x1="${nowX + side * 9}" y1="${nowY + (below ? 7 : -7)}" x2="${labelX - side * 62}" y2="${labelY + (below ? -18 : 30)}" stroke="${C.now}" stroke-width="1.3"/>`);
     push(text(labelX, labelY, "Aquí estamos", { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }), text(labelX, labelY + 22, eventSummary(fmt(total), event), { size: 17, fill: C.ink, weight: 700, anchor: "middle", halo: true }));
   }
-  push(ticks(base2), text(x(12), base2 + 62, "ayer", { size: 15, fill: C.ink3, anchor: "middle" }), text(x(36), base2 + 62, "hoy", { size: 15, fill: C.ink3, anchor: "middle" }));
+  push(ticks(base2, xb, span2), ...(span2 > 48 ? [text(xb(60), base2 + 62, "mañana (pronóstico)", { size: 15, fill: C.ink3, anchor: "middle" })] : []), text(xb(12), base2 + 62, "ayer", { size: 15, fill: C.ink3, anchor: "middle" }), text(xb(36), base2 + 62, "hoy", { size: 15, fill: C.ink3, anchor: "middle" }));
   push(`<text transform="translate(${left - 58} ${(top2 + base2) / 2}) rotate(-90)" font-size="15" fill="${C.ink2}" text-anchor="middle">mm acumulados</text>`);
 
   // ── Lectura y fuente ──
@@ -335,7 +394,42 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   push(text(left, 1128, `${sourceText} (dato en vivo, aún sin validar). Horas del registro (hora del continente; en Galápagos es una hora menos).`, { size: 12.5, fill: C.ink3 }));
   push(text(left, 1146, "Cada barra es la lluvia de la hora que termina en esa marca. Los límites empiezan a las 00:00 de su primer día; el acumulado de ahora, donde empezó el evento (termina tras 12 horas con menos de 1 mm).", { size: 12.5, fill: C.ink3 }));
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}"><rect width="${W}" height="${H}" fill="${C.surface}"/>${parts.join("")}</svg>`;
+  // ── Próximas 24 horas: pronóstico de los modelos globales, solo como tendencia ──
+  const forecast = input.forecast && input.forecast.hours.length > 0 ? input.forecast : null;
+  const height = forecast ? H + FORECAST_PANEL : H;
+  if (forecast) {
+    const top3 = H + 70;
+    const base3 = H + 200;
+    const hours = forecastHours(forecast);
+    const xf = (index: number) => left + (index / hours.length) * (right - left);
+    const slotF = (right - left) / hours.length;
+    const scale3 = axis(Math.max(1, ...hours.map((hour) => hour.highMm)));
+    const y3 = (mm: number) => base3 - (mm / scale3.top) * (base3 - top3);
+    push(`<line x1="${left}" x2="${right}" y1="${H + 6}" y2="${H + 6}" stroke="${C.grid}" stroke-width="2"/>`);
+    push(text(left, H + 42, "Próximas 24 horas · pronóstico", { size: 18, fill: C.ink, weight: 700 }));
+    const summary = forecast.expected
+      ? `Esperado: ${fmt(forecast.expected.mm, 0)} mm (de ${fmt(forecast.expected.lowMm, 0)} a ${fmt(forecast.expected.highMm, 0)}) · modelos ${fmt(forecast.totalMm)} mm, ajustados ${Math.round((1 - (forecast.expected.modelWeight ?? 0.8)) * 100)} % con lo medido en ${forecast.expected.cases} casos parecidos`
+      : `${fmt(forecast.totalMm)} mm (de ${fmt(forecast.lowMm)} a ${fmt(forecast.highMm)} según el modelo) · modelos globales sin corregir: solo tendencia`;
+    push(text(left + 290, H + 42, summary, { size: 15.5 }));
+    for (let mm = 0; mm <= scale3.top; mm += scale3.step) {
+      push(`<line x1="${left}" x2="${right}" y1="${y3(mm)}" y2="${y3(mm)}" stroke="${C.grid}"/>`, text(left - 10, y3(mm) + 5, String(mm), { size: 14, anchor: "end" }));
+    }
+    hours.forEach((hour, index) => {
+      const center = xf(index + 0.5);
+      if (hour.highMm > hour.mm) push(`<line x1="${center}" x2="${center}" y1="${y3(hour.highMm)}" y2="${y3(hour.mm)}" stroke="${C.ink3}" stroke-width="1.5" stroke-dasharray="3 3"/>`);
+      if (hour.mm > 0) push(`<rect x="${(center - slotF * 0.3).toFixed(1)}" y="${y3(hour.mm).toFixed(1)}" width="${(slotF * 0.6).toFixed(1)}" height="${(base3 - y3(hour.mm)).toFixed(1)}" fill="${C.ink3}" fill-opacity="0.6"/>`);
+      const end = new Date(Date.parse(hour.time) - RECORD_OFFSET_MS);
+      if (end.getUTCHours() % 3 === 0) push(text(xf(index + 1), base3 + 24, `${pad(end.getUTCHours())}:00`, { size: 13.5, anchor: "middle" }));
+    });
+    push(`<line x1="${left}" x2="${right}" y1="${base3}" y2="${base3}" stroke="${C.ink3}"/>`);
+    push(`<text transform="translate(${left - 50} ${(top3 + base3) / 2}) rotate(-90)" font-size="15" fill="${C.ink2}" text-anchor="middle">mm por hora</text>`);
+    const note = forecast.expected
+      ? "Barras: pronóstico de Open-Meteo (ECMWF, GFS e ICON) ajustado con lo que midió la estación cuando los modelos daban algo parecido. Solos, en Galápagos se quedan cortos."
+      : `Barras: mediana de los modelos ${forecast.source ? `de ${forecast.source}` : "ECMWF, GFS e ICON"}; línea punteada: hasta dónde llega el más lluvioso. Malla de ~25 km: no ve bien la lluvia sobre el relieve de la isla.`;
+    push(text(left, base3 + 52, note, { size: 12.5, fill: C.ink3 }));
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${height}" viewBox="0 0 ${W} ${height}" font-family="${FONT}"><rect width="${W}" height="${height}" fill="${C.surface}"/>${parts.join("")}</svg>`;
 }
 
 /** Nombre del archivo: reporte_santa_cruz_20261114_0900.png. */
@@ -346,7 +440,7 @@ export function galapagosReportFileName(input: GalapagosReportInput): string {
   return `reporte_${island}_${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}_${hourLabel.replace(":", "")}.png`;
 }
 
-/** Dibuja el reporte y lo descarga como PNG (2800 × 2320). */
+/** Dibuja el reporte y lo descarga como PNG (2800 × 2320; con el pronóstico, 2800 × 2880). */
 export async function downloadGalapagosReport(input: GalapagosReportInput): Promise<void> {
   const url = URL.createObjectURL(new Blob([galapagosReportSvg(input)], { type: "image/svg+xml;charset=utf-8" }));
   try {
@@ -358,7 +452,7 @@ export async function downloadGalapagosReport(input: GalapagosReportInput): Prom
     });
     const canvas = document.createElement("canvas");
     canvas.width = W * SCALE;
-    canvas.height = H * SCALE;
+    canvas.height = (input.forecast?.hours.length ? H + FORECAST_PANEL : H) * SCALE;
     canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) throw new Error("No se pudo generar la imagen");

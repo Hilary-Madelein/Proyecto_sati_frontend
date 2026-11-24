@@ -5,7 +5,7 @@ import { AlertTriangleIcon, DownloadIcon, WavesIcon } from "@/components/ui/icon
 import { formatHour } from "@/lib/format";
 import { satiClientGet } from "@/lib/api/sati-client";
 import { STATION_HOURLY_BAR_COLOR } from "../../constants";
-import { SCENARIO_LABELS, downloadGalapagosReport, eventSummary, formatSeaLevel, recordHourLabel, type GalapagosScenario, type RainEvent, type SeaReading } from "../../galapagos-report";
+import { SCENARIO_LABELS, downloadGalapagosReport, eventSummary, forecastCurve, forecastHours, formatSeaLevel, recordHourLabel, type GalapagosScenario, type RainEvent, type RainForecast, type SeaReading } from "../../galapagos-report";
 import type { WeatherStationHour } from "../../types";
 
 /**
@@ -13,7 +13,8 @@ import type { WeatherStationHour } from "../../types";
  * y las particulares de Santa Cruz, que se leen con los límites de M0191.
  */
 export const GALAPAGOS_STATION_CODES: readonly string[] = ["M0191", "M0221", "AW-EPMAPASC", "AW-MICONIA", "AW-MANZANILLO"];
-type GalapagosLevel = "normal" | "alarm" | "extreme";
+/** En Santa Cruz, el nivel de la alerta por zonas (el mismo que se avisa por Telegram), que puede ser «aviso». */
+type GalapagosLevel = "normal" | "notice" | "alarm" | "extreme";
 
 interface GalapagosStationRain {
   code: string;
@@ -24,6 +25,8 @@ interface GalapagosStationRain {
   limitsCode?: string;
   /** Red a la que pertenece, si no es la del INAMHI. */
   network?: string;
+  /** Zona de Santa Cruz: su nivel es el de la alerta por zonas. */
+  zone?: "low" | "high";
   mm3h: number;
   mm6h: number;
   mm24h: number;
@@ -44,6 +47,8 @@ interface GalapagosStationRain {
   scenario?: GalapagosScenario;
   /** La lluvia de las últimas horas según las lecturas de cada 5 minutos; llega antes que el dato de la hora. */
   recent?: RecentRain | null;
+  /** Las 24 horas siguientes según los modelos globales (tendencia); null si no hay. */
+  forecast?: RainForecast | null;
 }
 
 /** Lo más reciente de la lluvia cada 5 minutos, ya sumada por cuartos de hora para la gráfica. */
@@ -98,9 +103,10 @@ interface GalapagosRainSnapshot {
 
 const WIDTH = 248;
 // Colores como atributos del SVG (no clases): así también salen en la imagen descargada.
-const COLORS = { upper: "#dc2626", lower: "#2a78d6", band: "#f1f5f9", now: "#0f172a", duration: "#1d4ed8", durationLower: "#d97706", durationBand: "#fee2e2", grid: "#e2e8f0", text: "#64748b" };
+const COLORS = { forecast: "#94a3b8", upper: "#dc2626", lower: "#2a78d6", band: "#f1f5f9", now: "#0f172a", duration: "#1d4ed8", durationLower: "#d97706", durationBand: "#fee2e2", grid: "#e2e8f0", text: "#64748b" };
 const LEVELS: Record<GalapagosLevel, { label: string; className: string; icon: string }> = {
   normal: { label: "Sin alarma", className: "bg-emerald-50 text-emerald-900 ring-emerald-200", icon: "text-emerald-600" },
+  notice: { label: "Aviso", className: "bg-yellow-50 text-yellow-900 ring-yellow-300", icon: "text-yellow-600" },
   alarm: { label: "Alarma", className: "bg-amber-50 text-amber-950 ring-amber-300", icon: "text-amber-600" },
   extreme: { label: "Alarma extrema", className: "bg-red-50 text-red-900 ring-red-300", icon: "text-red-600" },
 };
@@ -227,8 +233,87 @@ export function GalapagosStationDetails({
         <TwoDaySection state={state} />
       </div>
 
+      {station.forecast && station.forecast.hours.length > 0 && (
+        <div>
+          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Próximas 24 h · pronóstico</p>
+          <p className="text-[10px] text-slate-500">
+            {station.forecast.expected ? (
+              <>
+                Esperado <strong className="text-slate-900 tabular-nums">{formatMm(station.forecast.expected.mm)} mm</strong> ({formatMm(station.forecast.expected.lowMm)}–{formatMm(station.forecast.expected.highMm)}) · modelos {formatMm(station.forecast.totalMm)} mm, ajustados con lo medido
+              </>
+            ) : (
+              <>
+                <strong className="text-slate-900 tabular-nums">{formatMm(station.forecast.totalMm)} mm</strong> ({formatMm(station.forecast.lowMm)}–{formatMm(station.forecast.highMm)}) · modelos sin corregir, solo tendencia
+              </>
+            )}
+          </p>
+          <ForecastFigures forecast={station.forecast} />
+          <ForecastBars forecast={station.forecast} island={station.island} />
+        </div>
+      )}
+
       <ReportButton station={station} />
     </div>
+  );
+}
+
+const FORECAST_COLOR = "#64748b";
+
+/** Las cifras del pronóstico: lo de las próximas 3 y 6 horas y la hora más lluviosa (mediana de los modelos). */
+function ForecastFigures({ forecast }: { forecast: RainForecast }) {
+  const hours = forecastHours(forecast);
+  const sum = (count: number) => hours.slice(0, count).reduce((total, hour) => total + hour.mm, 0);
+  const peak = hours.reduce((best, hour) => (hour.mm > best.mm ? hour : best), hours[0]);
+  const start = (time: string) => new Date(Date.parse(time) - 60 * 60 * 1000).toISOString();
+  return (
+    <div className="mt-1 grid grid-cols-3 gap-2">
+      <Stat label="Próx. 3 h" value={`${formatMm(sum(3))} mm`} />
+      <Stat label="Próx. 6 h" value={`${formatMm(sum(6))} mm`} />
+      <Stat label="Hora más lluviosa" value={peak.mm > 0 ? `${formatMm(peak.mm)} mm` : "–"} note={peak.mm > 0 ? `${formatHour(start(peak.time))}–${formatHour(peak.time)}` : "sin lluvia"} />
+    </div>
+  );
+}
+
+/** Las 24 horas pronosticadas: la mediana de los modelos en barras y, encima, hasta dónde llega el modelo más lluvioso. */
+function ForecastBars({ forecast, island }: { forecast: RainForecast; island: string }) {
+  const { height, top, right, bottom } = FINE;
+  const [active, setActive] = useState<number | null>(null);
+  const hours = forecastHours(forecast);
+  const plotRight = WIDTH - right;
+  const baseline = height - bottom;
+  const max = Math.max(1, ...hours.map((hour) => hour.highMm));
+  const y = (mm: number) => baseline - (mm / max) * (baseline - top);
+  const slot = plotRight / Math.max(1, hours.length);
+  const barWidth = Math.max(1, slot - 1.5);
+  const labelled = new Set([0, Math.floor((hours.length - 1) / 2), hours.length - 1]);
+  const hovered = active === null ? undefined : hours[active];
+  const summary = `Pronóstico de lluvia en ${island} para las próximas 24 horas: ${formatMm(forecast.totalMm)} mm.`;
+
+  return (
+    <svg viewBox={`0 0 ${WIDTH} ${height}`} className="mt-1 w-full touch-pan-y" role="img" aria-label={summary} onPointerLeave={() => setActive(null)}>
+      <line x1={0} x2={plotRight} y1={y(max)} y2={y(max)} stroke="#eef2f6" />
+      <text x={plotRight + 3} y={y(max) + 3} fill="#94a3b8" fontSize={9}>
+        {formatMm(max)}
+      </text>
+      {hours.map((hour, index) => (
+        <g key={hour.time} onPointerEnter={() => setActive(index)} onPointerDown={() => setActive(index)}>
+          <rect x={index * slot} y={0} width={slot} height={baseline} fill={active === index ? "#0f172a" : "transparent"} fillOpacity={0.07} />
+          {hour.highMm > hour.mm && <line x1={index * slot + slot / 2} x2={index * slot + slot / 2} y1={y(hour.highMm)} y2={y(hour.mm)} stroke={FORECAST_COLOR} strokeWidth={1} strokeDasharray="2 2" />}
+          {hour.mm > 0 && <rect x={index * slot + 0.75} y={y(hour.mm)} width={barWidth} height={baseline - y(hour.mm)} rx={1} fill={FORECAST_COLOR} fillOpacity={0.55} />}
+          {labelled.has(index) && (
+            <text x={index * slot + slot / 2} y={height - 3} textAnchor={index === 0 ? "start" : index === hours.length - 1 ? "end" : "middle"} fill="#64748b" fontSize={9}>
+              {formatHour(hour.time)}
+            </text>
+          )}
+        </g>
+      ))}
+      <line x1={0} x2={plotRight} y1={baseline} y2={baseline} stroke="#cbd5e1" />
+      {hovered && active !== null && (
+        <text x={Math.min(plotRight - 50, Math.max(50, (active + 0.5) * slot))} y={top - 2} textAnchor="middle" fill="#0f172a" fontSize={9.5} fontWeight={700} stroke="#ffffff" strokeWidth={3} paintOrder="stroke" pointerEvents="none">
+          {formatHour(hovered.time)} · {formatMm(hovered.mm)} mm (hasta {formatMm(hovered.highMm)})
+        </text>
+      )}
+    </svg>
   );
 }
 
@@ -325,6 +410,7 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
           lower: latest.limits?.find((item) => item.key === "lower") ?? lower,
           sea: latest.sea,
           scenario: latest.scenario,
+          forecast: latest.twoDays?.length ? latest.forecast : station.forecast,
           downloadedAt: new Date(),
         }),
       )
@@ -357,10 +443,14 @@ function AlarmBanner({ station, thresholds }: { station: GalapagosStationRain; t
       <div className="min-w-0">
         <p className="text-[13px] leading-tight font-semibold">{level.label}</p>
         {station.reason && <p className="text-[11px] leading-snug">{station.reason.charAt(0).toUpperCase() + station.reason.slice(1)}.</p>}
-        {thresholds && (
-          <p className="mt-0.5 text-[10px] leading-snug opacity-75">
-            Salta con {formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de {formatMm(thresholds.alarmBurstMm)} mm.
-          </p>
+        {station.zone ? (
+          <p className="mt-0.5 text-[10px] leading-snug opacity-75">Santa Cruz por zonas. Aviso arriba: 35 mm en 3 h, 50 en 6 h u 80 en el evento. Alarma: 100 en 6 h arriba o {thresholds ? formatMm(thresholds.alarm5hMm) : 25} en 5 h abajo.</p>
+        ) : (
+          thresholds && (
+            <p className="mt-0.5 text-[10px] leading-snug opacity-75">
+              Salta con {formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de {formatMm(thresholds.alarmBurstMm)} mm.
+            </p>
+          )
         )}
       </div>
     </div>
@@ -370,6 +460,7 @@ function AlarmBanner({ station, thresholds }: { station: GalapagosStationRain; t
 const SCENARIO_CLASSES: Record<GalapagosScenario, string> = {
   normal: "bg-emerald-50 text-emerald-900 ring-emerald-200",
   precaution: "bg-yellow-50 text-yellow-900 ring-yellow-300",
+  notice: "bg-yellow-50 text-yellow-900 ring-yellow-300",
   alert: "bg-amber-50 text-amber-950 ring-amber-300",
   emergency: "bg-red-50 text-red-900 ring-red-300",
 };
@@ -570,12 +661,17 @@ const TWO_DAYS = { height: 150, top: 14, right: 30, bottom: 20, left: 6, hours: 
  * un vistazo qué tan lejos está hoy de uno y de otro.
  */
 function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStationRain; now: { hour: number; accumulatedMm: number }[]; upper: GalapagosLimit; lower: GalapagosLimit }) {
-  const { height, top, right, bottom, left, hours } = TWO_DAYS;
+  const { height, top, right, bottom, left } = TWO_DAYS;
   const current = now.at(-1);
   const total = current?.accumulatedMm ?? 0;
   const { event } = station;
   const carried = event?.carriedMm ?? 0;
-  const max = Math.max(upper.totalMm, total, carried) * 1.08;
+  // Lo pronosticado a continuación de lo medido, hasta las 24:00 de hoy.
+  const ahead = forecastCurve(station.forecast, station.twoDays?.[0]?.time, { hour: current?.hour ?? 0, mm: total });
+  const max = Math.max(upper.totalMm, total, carried, ahead.at(-1)?.mm ?? 0) * 1.08;
+  // Con pronóstico, la gráfica se alarga hasta las 24:00 de mañana: se ve entero aunque se consulte a las 23:50.
+  const hours = ahead.length > 1 ? 72 : TWO_DAYS.hours;
+  const limitsEnd = hours > 48 ? left + (48 / hours) * (WIDTH - right - left) : WIDTH - right;
   const plotRight = WIDTH - right;
   const baseline = height - bottom;
   const x = (hour: number) => left + (hour / hours) * (plotRight - left);
@@ -599,6 +695,7 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
       ? []
       : [
           { key: "now", label: "ahora", color: COLORS.now, mm: now.find((point) => point.hour === hover)?.accumulatedMm },
+          { key: "forecast", label: "pron.", color: COLORS.forecast, mm: hover > (current?.hour ?? 0) ? ahead.find((point) => point.hour === hover)?.mm : undefined },
           { key: "lower", label: "inf.", color: COLORS.lower, mm: lower.accumulatedMm[hover - 1] },
           { key: "upper", label: "sup.", color: COLORS.upper, mm: upper.accumulatedMm[hover - 1] },
         ].filter((item): item is { key: string; label: string; color: string; mm: number } => item.mm !== undefined);
@@ -611,7 +708,7 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
         {hover !== null && (
           <>
             <strong className="text-slate-900">
-              {hover <= 24 ? "Ayer" : "Hoy"} {String(hover <= 24 ? hover : hover - 24).padStart(2, "0")}:00
+              {hover <= 24 ? "Ayer" : hover <= 48 ? "Hoy" : "Mañana"} {String(hover - Math.floor((hover - 1) / 24) * 24).padStart(2, "0")}:00
             </strong>
             {hoverValues.map((item) => (
               <span key={item.key}>
@@ -630,16 +727,17 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
 
         {/* Los dos límites, entrecortados; la lluvia de ahora, continua y más gruesa. */}
         <polyline points={path(upper.accumulatedMm)} fill="none" stroke={COLORS.upper} strokeWidth={1.6} strokeDasharray="5 3" strokeLinejoin="round" />
-        <text x={plotRight + 3} y={y(upper.totalMm) + 3} fill={COLORS.upper} fontSize={9} fontWeight={600}>
+        <text x={limitsEnd + 3} y={y(upper.totalMm) + 3} fill={COLORS.upper} fontSize={9} fontWeight={600}>
           {Math.round(upper.totalMm)}
         </text>
         <polyline points={path(lower.accumulatedMm)} fill="none" stroke={COLORS.lower} strokeWidth={1.6} strokeDasharray="5 3" strokeLinejoin="round" />
-        <text x={plotRight + 3} y={y(lower.totalMm) + 3} fill={COLORS.lower} fontSize={9} fontWeight={600}>
+        <text x={limitsEnd + 3} y={y(lower.totalMm) + 3} fill={COLORS.lower} fontSize={9} fontWeight={600}>
           {Math.round(lower.totalMm)}
         </text>
 
         {/* Aquí estamos: la línea de ahora, hasta la última hora con dato. */}
         <polyline points={path(now.map((point) => point.accumulatedMm), carried)} fill="none" stroke={COLORS.now} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />
+        {ahead.length > 1 && <polyline points={ahead.map((point) => `${x(point.hour)},${y(point.mm)}`).join(" ")} fill="none" stroke={COLORS.forecast} strokeWidth={2.2} strokeDasharray="2 3" strokeLinecap="round" />}
         <circle cx={nowX} cy={nowY} r={3.6} fill={COLORS.now} stroke="#ffffff" strokeWidth={1.2} />
         <text x={nowX + (labelLeft ? -6 : 6)} y={Math.max(top + 2, nowY - 7)} textAnchor={labelLeft ? "end" : "start"} fill={COLORS.now} fontSize={9.5} fontWeight={700}>
           Aquí estamos
@@ -651,6 +749,14 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
         <text x={x(36)} y={height - 5} textAnchor="middle" fill={COLORS.text} fontSize={9}>
           hoy
         </text>
+        {hours > 48 && (
+          <>
+            <line x1={x(48)} x2={x(48)} y1={top} y2={baseline} stroke={COLORS.grid} />
+            <text x={x(60)} y={height - 5} textAnchor="middle" fill={COLORS.text} fontSize={9}>
+              mañana
+            </text>
+          </>
+        )}
 
         {/* La hora bajo el ratón: una guía y un punto en cada línea. */}
         {hover !== null && (
@@ -668,6 +774,11 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
           Aquí estamos: <strong className="text-slate-900 tabular-nums">{eventSummary(formatMm(total), event)}</strong>
           {event && ` (desde las ${recordHourLabel(event.start)})`}
         </Key>
+        {ahead.length > 1 && (
+          <Key color={COLORS.forecast} dashed>
+            Pronóstico: <strong className="text-slate-900 tabular-nums">{formatMm(ahead.at(-1)!.mm)} mm</strong> a las {String(ahead.at(-1)!.hour % 24 || 24).padStart(2, "0")}:00{ahead.at(-1)!.hour > 48 ? " de mañana" : ""}
+          </Key>
+        )}
         <Key color={COLORS.upper} dashed>
           {upper.label} ({formatMm(upper.totalMm)} mm)
         </Key>
