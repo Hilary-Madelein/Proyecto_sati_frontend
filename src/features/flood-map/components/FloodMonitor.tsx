@@ -171,7 +171,7 @@ export function FloodMonitor({ data }: { data: FloodMapData }) {
   const [observedHours, setObservedHours] = useState<RainWindowHours>(24);
   const [observedRainLoading, setObservedRainLoading] = useState(false);
   // Lluvia medida en las estaciones del INAMHI. Apagada al inicio; se pide al encenderla.
-  const [showStations, setShowStations] = useState(false);
+  const [showStations, setShowStations] = useState(true);
   const stations = useWeatherStations(showStations);
   // Lluvia IMERG (NASA) de la última media hora. Apagada al inicio.
   const [showImerg, setShowImerg] = useState(false);

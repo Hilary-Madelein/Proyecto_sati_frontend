@@ -102,7 +102,7 @@ export function WeatherStationsLayer({ snapshot, rain }: WeatherStationsLayerPro
           <span className="text-slate-500">Clic para ver cada hora y el pronóstico</span>
         </span>
       </Tooltip>
-      <Popup minWidth={248} autoPanPadding={[16, 16]}>
+      <Popup minWidth={248} maxWidth={340} autoPanPadding={[16, 16]}>
         <StationPopupContent station={station} windowHours={snapshot.windowHours} rain={rain} />
       </Popup>
     </Marker>
@@ -122,7 +122,7 @@ function StationPopupContent({
   const galapagos = useGalapagosRain(GALAPAGOS_STATION_CODES.includes(station.code) ? station.code : null);
   const ready = galapagos?.status === "ready" ? galapagos : null;
   return (
-    <div className="w-62">
+    <div className="w-62 lg:w-80">
       <p className="text-[11px] font-medium text-slate-500">
         Estación {STATION_CATEGORY_LABELS[station.category].toLowerCase()} {station.network ? `· ${station.network}` : station.code}
         {station.altitude !== null && ` · ${Math.round(station.altitude).toLocaleString("es-EC")} m`}
