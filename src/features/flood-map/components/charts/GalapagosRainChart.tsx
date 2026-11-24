@@ -776,7 +776,7 @@ function TwoDayChart({ station, now, upper, lower }: { station: GalapagosStation
         </Key>
         {ahead.length > 1 && (
           <Key color={COLORS.forecast} dashed>
-            Pronóstico: <strong className="text-slate-900 tabular-nums">{formatMm(ahead.at(-1)!.mm)} mm</strong> a las {String(ahead.at(-1)!.hour % 24 || 24).padStart(2, "0")}:00{ahead.at(-1)!.hour > 48 ? " de mañana" : ""}
+            Pronóstico
           </Key>
         )}
         <Key color={COLORS.upper} dashed>

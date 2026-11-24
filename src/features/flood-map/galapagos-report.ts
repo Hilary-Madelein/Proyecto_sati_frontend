@@ -315,7 +315,7 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   const y2 = (mm: number) => base2 - (mm / scale2.top) * (base2 - top2);
   /** `from`: con cuánto arranca a las 00:00 del primer día. */
   const curve = (values: readonly number[], from = 0) => [`${xb(0)},${y2(from).toFixed(1)}`, ...values.map((mm, index) => `${xb(index + 1).toFixed(1)},${y2(mm).toFixed(1)}`)].join(" ");
-  push(text(left, 604, event === undefined ? "Acumulado de ayer y hoy" : "Acumulado del evento de lluvia (vuelve a cero tras 12 horas sin llover)", { size: 18, fill: C.ink, weight: 700 }));
+  push(text(left, 604, event === undefined ? "Acumulado de ayer y hoy" : "Acumulado del evento de lluvia", { size: 18, fill: C.ink, weight: 700 }));
   for (let mm = 0; mm <= scale2.top; mm += scale2.step) {
     push(`<line x1="${left}" x2="${right}" y1="${y2(mm)}" y2="${y2(mm)}" stroke="${C.grid}"/>`, text(left - 10, y2(mm) + 5, String(mm), { size: 14, anchor: "end" }));
   }
@@ -366,7 +366,6 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
       const end = ahead.at(-1)!;
       push(`<polyline points="${ahead.map((point) => `${xb(point.hour).toFixed(1)},${y2(point.mm).toFixed(1)}`).join(" ")}" fill="none" stroke="${C.ink3}" stroke-width="3.5" stroke-dasharray="3 6" stroke-linecap="round"/>`);
       push(`<circle cx="${xb(end.hour)}" cy="${y2(end.mm)}" r="5" fill="${C.surface}" stroke="${C.ink3}" stroke-width="2.5"/>`);
-      push(text(xb(end.hour) - 8, y2(end.mm) - 14, `pronóstico: ${fmt(end.mm)} mm a las ${pad(end.hour % 24 || 24)}:00${end.hour > 48 ? " de mañana" : ""}`, { size: 14, fill: C.ink2, anchor: "end", halo: true }));
     }
     push(`<circle cx="${nowX}" cy="${nowY}" r="7.5" fill="${C.now}" stroke="${C.surface}" stroke-width="2.5"/>`);
     // "Aquí estamos": arriba y a la derecha del punto mientras quepa; si no, a la izquierda.
@@ -392,7 +391,7 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   wrap(reading + sea, 148).forEach((line, index) => push(text(left, 1050 + index * 25, line, { size: 16 })));
   const sourceText = other ? `Fuente: ${input.network}, lluvia horaria de la estación; límites de la estación ${other.limits} del INAMHI. Sistema SATI` : "Fuente: INAMHI, lluvia horaria de la estación tomada del sistema SATI";
   push(text(left, 1128, `${sourceText} (dato en vivo, aún sin validar). Horas del registro (hora del continente; en Galápagos es una hora menos).`, { size: 12.5, fill: C.ink3 }));
-  push(text(left, 1146, "Cada barra es la lluvia de la hora que termina en esa marca. Los límites empiezan a las 00:00 de su primer día; el acumulado de ahora, donde empezó el evento (termina tras 12 horas con menos de 1 mm).", { size: 12.5, fill: C.ink3 }));
+  push(text(left, 1146, "Cada barra es la lluvia de la hora que termina en esa marca. Los límites empiezan a las 00:00 de su primer día; el acumulado de ahora, donde empezó el evento.", { size: 12.5, fill: C.ink3 }));
 
   // ── Próximas 24 horas: pronóstico de los modelos globales, solo como tendencia ──
   const forecast = input.forecast && input.forecast.hours.length > 0 ? input.forecast : null;
