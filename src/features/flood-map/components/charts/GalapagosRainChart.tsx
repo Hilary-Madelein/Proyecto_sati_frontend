@@ -116,6 +116,14 @@ const LEVELS: Record<GalapagosLevel, { label: string; className: string; icon: s
   extreme: { label: "Alarma extrema", className: "bg-red-50 text-red-900 ring-red-300", icon: "text-red-600" },
 };
 
+/** Santa Cruz por zonas: los colores de la tabla SAT. */
+const SAT_LEVELS: Record<GalapagosLevel, { label: string; className: string; icon: string }> = {
+  normal: { label: "Verde", className: "bg-emerald-50 text-emerald-900 ring-emerald-200", icon: "text-emerald-600" },
+  notice: { label: "Alerta amarilla", className: "bg-yellow-100 text-yellow-950 ring-yellow-400", icon: "text-yellow-600" },
+  alarm: { label: "Alerta naranja", className: "bg-orange-100 text-orange-950 ring-orange-400", icon: "text-orange-600" },
+  extreme: { label: "Alerta roja", className: "bg-red-600 text-white ring-red-700", icon: "text-white" },
+};
+
 const formatMm = (mm: number) => mm.toLocaleString("es-EC", { maximumFractionDigits: 1 });
 
 /** Los intervalos de 15 o de 5 minutos de las lecturas de una estación, para `FineBars`. */
@@ -490,7 +498,7 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
 
 /** Lo primero que se lee: el nivel. El porqué y cuándo salta, al pasar el mouse. */
 function AlarmBanner({ station, thresholds }: { station: GalapagosStationRain; thresholds?: GalapagosRainSnapshot["thresholds"] }) {
-  const level = LEVELS[station.level] ?? LEVELS.normal;
+  const level = (station.zone ? SAT_LEVELS : LEVELS)[station.level] ?? LEVELS.normal;
   const detail = [
     station.reason && `${station.reason.charAt(0).toUpperCase() + station.reason.slice(1)}.`,
     !station.zone && thresholds && `Salta con ${formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de ${formatMm(thresholds.alarmBurstMm)} mm.`,
