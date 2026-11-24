@@ -203,6 +203,9 @@ export function GalapagosStationDetails({
   const recent = station.recent && station.recent.every15min.length > 0 ? station.recent : null;
   const detail = RESOLUTIONS.find((item) => item.key === resolution)?.title;
   const fine = !recent || resolution === "hour" ? null : fineBins(recent, resolution);
+  // Intensidad: la de la última hora y la mayor hora de las últimas 24 (mm/h).
+  const nowRate = recent ? recent.mm60min : hours.filter((hour) => hour.mm !== null).at(-1)?.mm;
+  const maxRate = station.maxByDurationMm[0];
 
   return (
     <div className="mt-2 space-y-3">
@@ -210,8 +213,26 @@ export function GalapagosStationDetails({
       <SeaLine station={station} highSeaM={snapshot.highSeaM} />
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Hoy" value={day ? `${formatMm(day.total)} mm` : "–"} note={where && <span className={where.className}>{where.text}</span>} />
-        <Stat label="Últimas 24 h" value={`${formatMm(last24h.mm)} mm`} note={last24h.until ? `hasta las ${last24h.until}` : `${last24h.hoursWithData} h con dato`} />
+        <Stat
+          label="Hoy"
+          value={day ? `${formatMm(day.total)} mm` : "–"}
+          note={
+            <>
+              {where && <span className={where.className}>{where.text}</span>}
+              {nowRate != null && <span className="block">ahora {formatMm(nowRate)} mm/h</span>}
+            </>
+          }
+        />
+        <Stat
+          label="Últimas 24 h"
+          value={`${formatMm(last24h.mm)} mm`}
+          note={
+            <>
+              {last24h.until ? `hasta las ${last24h.until}` : `${last24h.hoursWithData} h con dato`}
+              {maxRate != null && <span className="block">máx. {formatMm(maxRate)} mm/h</span>}
+            </>
+          }
+        />
       </div>
       <div>
         <div className="flex items-center justify-between gap-2">
@@ -276,7 +297,7 @@ function Intensity({ recent, hours }: { recent: RecentRain | null; hours: Weathe
     hourMm != null && `1 h ${formatMm(hourMm)} mm`,
   ].filter(Boolean);
   // Intensidad: lo de cada ventana llevado a mm por hora.
-  const rates = [five != null && formatMm(five * 12), quarter != null && formatMm(quarter * 4), hourMm != null && formatMm(hourMm)].filter(Boolean);
+  const rates = [five != null && `5 min ${formatMm(five * 12)}`, quarter != null && `15 min ${formatMm(quarter * 4)}`, hourMm != null && `1 h ${formatMm(hourMm)}`].filter(Boolean);
   if (parts.length === 0) return null;
   return (
     <>
@@ -284,7 +305,7 @@ function Intensity({ recent, hours }: { recent: RecentRain | null; hours: Weathe
         {parts.join(" · ")}
         {time && ` · ${formatHour(time)}`}
       </p>
-      <p className="text-[10px] text-slate-500 tabular-nums">Intensidad: {rates.join(" · ")} mm/h</p>
+      <p className="text-[11px] font-semibold text-slate-900 tabular-nums">Intensidad: {rates.join(" · ")} mm/h</p>
     </>
   );
 }
