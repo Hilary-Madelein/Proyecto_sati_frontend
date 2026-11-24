@@ -462,21 +462,19 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
   );
 }
 
-/** Lo primero que se lee: si hay alarma, por qué y cuándo salta. */
+/** Lo primero que se lee: el nivel. El porqué y cuándo salta, al pasar el mouse. */
 function AlarmBanner({ station, thresholds }: { station: GalapagosStationRain; thresholds?: GalapagosRainSnapshot["thresholds"] }) {
   const level = LEVELS[station.level] ?? LEVELS.normal;
+  const detail = [
+    station.reason && `${station.reason.charAt(0).toUpperCase() + station.reason.slice(1)}.`,
+    !station.zone && thresholds && `Salta con ${formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de ${formatMm(thresholds.alarmBurstMm)} mm.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div role="status" className={`flex gap-2 rounded-lg px-2.5 py-2 ring-1 ${level.className}`}>
-      <AlertTriangleIcon className={`mt-0.5 size-4 shrink-0 ${level.icon}`} />
-      <div className="min-w-0">
-        <p className="text-[13px] leading-tight font-semibold">{level.label}</p>
-        {station.reason && <p className="text-[11px] leading-snug">{station.reason.charAt(0).toUpperCase() + station.reason.slice(1)}.</p>}
-        {!station.zone && thresholds && (
-          <p className="mt-0.5 text-[10px] leading-snug opacity-75">
-            Salta con {formatMm(thresholds.alarm5hMm)} mm en 5 h, o dos tandas de {formatMm(thresholds.alarmBurstMm)} mm.
-          </p>
-        )}
-      </div>
+    <div role="status" title={detail || undefined} aria-label={detail ? `${level.label}. ${detail}` : undefined} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ring-1 ${detail ? "cursor-help" : ""} ${level.className}`}>
+      <AlertTriangleIcon className={`size-4 shrink-0 ${level.icon}`} />
+      <p className="text-[13px] leading-tight font-semibold">{level.label}</p>
     </div>
   );
 }
