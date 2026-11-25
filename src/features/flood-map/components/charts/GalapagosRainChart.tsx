@@ -587,6 +587,9 @@ function ReportButton({ station }: { station: GalapagosStationRain }) {
           scenario: latest.scenario,
           forecast,
           downloadedAt: new Date(),
+          zone: latest.zone,
+          mm3h: latest.mm3h,
+          prev24hMm: latest.prev24hMm,
         }),
       )
       .then(() => setStatus("idle"))

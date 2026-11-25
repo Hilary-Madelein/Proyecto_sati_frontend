@@ -122,6 +122,11 @@ export interface GalapagosReportInput {
   downloadedAt?: Date;
   /** Las 24 horas siguientes según los modelos; sin él, el reporte no lleva ese panel. */
   forecast?: RainForecast | null;
+  /** Zona de Santa Cruz: con ella, el reporte es el de la lluvia en 3 horas (sin límites). */
+  zone?: "low" | "high";
+  mm3h?: number;
+  /** Lluvia de las 24 horas antes de las últimas 3 (mm). */
+  prev24hMm?: number;
 }
 
 const W = 1400;
@@ -433,6 +438,122 @@ export function galapagosReportSvg(input: GalapagosReportInput): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${height}" viewBox="0 0 ${W} ${height}" font-family="${FONT}"><rect width="${W}" height="${height}" fill="${C.surface}"/>${parts.join("")}</svg>`;
 }
 
+/** Alto del reporte de Santa Cruz (sin límites de M0191: la lluvia en 3 horas y el evento). */
+const SC_H = 1000;
+/** Los cortes de la lluvia en 3 horas que deciden el nivel (como en el backend). */
+const SC_LINES: Record<"low" | "high", { mm: number; label: string; color: string }[]> = {
+  high: [
+    { mm: 25, label: "amarilla", color: "#ca8a04" },
+    { mm: 45, label: "naranja", color: "#ea580c" },
+    { mm: 90, label: "roja", color: "#dc2626" },
+  ],
+  low: [{ mm: 70, label: "roja", color: "#dc2626" }],
+};
+const SC_LEVELS = {
+  normal: { label: "Verde", color: "#2e7d32" },
+  notice: { label: "Alerta amarilla", color: "#ca8a04" },
+  alarm: { label: "Alerta naranja", color: "#ea580c" },
+  extreme: { label: "Alerta roja", color: "#dc2626" },
+} as const;
+/** Parte alta: suelo mojado desde esta lluvia en las 24 horas previas (mm). */
+const SC_WET_MM = 80;
+
+/** La hora del continente de un instante ISO: "14:00". */
+function hourOf(time: string): string {
+  const date = new Date(Date.parse(time) - RECORD_OFFSET_MS);
+  return `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
+function dayOf(time: string): string {
+  const date = new Date(Date.parse(time) - RECORD_OFFSET_MS);
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}`;
+}
+
+/**
+ * El reporte de una estación de Santa Cruz, como su popup: el nivel y la lluvia en 3 horas
+ * que lo decide, las 24 horas previas, la lluvia de cada hora con la de 3 horas y sus cortes,
+ * y el evento de lluvia en curso.
+ */
+export function santaCruzReportSvg(input: GalapagosReportInput): string {
+  const zone = input.zone ?? "low";
+  const points = input.now.filter((point): point is { hour: number; accumulatedMm: number; mm: number; time: string } => point.mm != null && Boolean(point.time));
+  const sums = points.map((_, index) => points.slice(Math.max(0, index - 2), index + 1).reduce((total, point) => total + point.mm, 0));
+  const shown = points.slice(-36);
+  const shownSums = sums.slice(-36);
+  const level = SC_LEVELS[input.level] ?? SC_LEVELS.normal;
+  const mm3h = input.mm3h ?? shownSums.at(-1) ?? 0;
+  const prev = input.prev24hMm;
+  const wet = zone === "high" && (prev ?? 0) > SC_WET_MM;
+  const last = shown.at(-1);
+  const parts: string[] = [];
+  const push = (part: string) => parts.push(part);
+  const left = 70;
+  const right = W - 150;
+
+  // Cabecera
+  push(`<rect x="0" y="0" width="${W}" height="12" fill="${level.color}"/>`);
+  push(text(left, 62, `${input.island.toUpperCase()} · ${(input.name ?? input.code).toUpperCase()}`, { size: 17, fill: C.ink3, weight: 700 }));
+  push(text(left, 122, `${level.label} · ${fmt(mm3h)} mm en 3 horas`, { size: 46, fill: level.color, weight: 800 }));
+  const downloaded = input.downloadedAt ? ` · descargado a las ${pad(new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS).getUTCHours())}:${pad(new Date(input.downloadedAt.getTime() - RECORD_OFFSET_MS).getUTCMinutes())}` : "";
+  push(text(left, 160, last ? `Dato de las ${hourOf(last.time)} del ${dayOf(last.time)} (hora del continente)${downloaded}` : "Sin dato", { size: 17, fill: C.ink2 }));
+
+  // Cifras
+  const box = (x: number, label: string, value: string, note: string | null, noteColor: string) => {
+    push(`<rect x="${x}" y="195" width="400" height="120" rx="14" fill="#f1f0ec"/>`);
+    push(text(x + 24, 232, label, { size: 16, fill: C.ink3, weight: 700 }));
+    push(text(x + 24, 285, value, { size: 40, fill: C.ink, weight: 800 }));
+    if (note) push(text(x + 24, 306, note, { size: 15, fill: noteColor, weight: 700 }));
+  };
+  box(left, "ÚLTIMAS 3 HORAS", `${fmt(mm3h)} mm`, null, C.ink2);
+  box(left + 430, "24 HORAS PREVIAS", prev != null ? `${fmt(prev)} mm` : "–", wet ? "suelo mojado" : null, "#dc2626");
+  const event = input.event;
+  box(left + 860, "ESTE EVENTO", event ? `${fmt(event.totalMm)} mm` : "sin lluvia", null, C.ink2);
+  if (event) push(text(left + 884, 306, `desde ${hourOf(event.start)} del ${dayOf(event.start)} · ${event.ended ? "terminó" : "sigue"}`, { size: 14, fill: C.ink2 }));
+
+  // Lluvia de cada hora y en 3 horas
+  const top = 400;
+  const base = 760;
+  push(text(left, 370, "Lluvia de cada hora (barras) y en 3 horas (línea)", { size: 22, fill: C.ink, weight: 700 }));
+  const lines = SC_LINES[zone];
+  const max = Math.max(lines[0].mm, ...shownSums, ...shown.map((point) => point.mm)) * 1.12;
+  const y = (mm: number) => base - (Math.min(mm, max) / max) * (base - top);
+  const slot = (right - left) / Math.max(1, shown.length);
+  const { step } = axis(max / 1.12);
+  for (let mm = 0; mm <= max; mm += step) {
+    push(`<line x1="${left}" x2="${right}" y1="${y(mm)}" y2="${y(mm)}" stroke="${C.grid}"/>`);
+    push(text(left - 10, y(mm) + 5, fmt(mm, 0), { size: 13, fill: C.ink3, anchor: "end" }));
+  }
+  for (const line of lines.filter((item) => item.mm <= max)) {
+    push(`<line x1="${left}" x2="${right}" y1="${y(line.mm)}" y2="${y(line.mm)}" stroke="${line.color}" stroke-width="2" stroke-dasharray="9 6"/>`);
+    push(text(right + 10, y(line.mm) + 6, `${line.mm} mm ${line.label}`, { size: 15, fill: line.color, weight: 700 }));
+  }
+  shown.forEach((point, index) => {
+    if (point.mm > 0) push(`<rect x="${(left + index * slot + 2).toFixed(1)}" y="${y(point.mm).toFixed(1)}" width="${(slot - 4).toFixed(1)}" height="${(base - y(point.mm)).toFixed(1)}" rx="2" fill="#93c5fd"/>`);
+    const date = new Date(Date.parse(point.time) - RECORD_OFFSET_MS);
+    if (date.getUTCHours() % 3 === 0) {
+      push(text(left + (index + 0.5) * slot, base + 24, hourOf(point.time), { size: 13.5, fill: C.ink2, anchor: "middle" }));
+      if (date.getUTCHours() === 0 || index < 3) push(text(left + (index + 0.5) * slot, base + 44, dayOf(point.time), { size: 13, fill: C.ink3, anchor: "middle", weight: 700 }));
+    }
+  });
+  const path = shownSums.map((mm, index) => `${index === 0 ? "M" : "L"}${(left + (index + 0.5) * slot).toFixed(1)},${y(mm).toFixed(1)}`).join(" ");
+  push(`<path d="${path}" fill="none" stroke="${C.now}" stroke-width="4" stroke-linejoin="round"/>`);
+  push(`<line x1="${left}" x2="${right}" y1="${base}" y2="${base}" stroke="#bdbcb6"/>`);
+  if (last) {
+    const lx = left + (shown.length - 0.5) * slot;
+    push(`<circle cx="${lx}" cy="${y(mm3h)}" r="7" fill="${C.now}" stroke="${C.surface}" stroke-width="2.5"/>`);
+    push(text(lx, y(mm3h) + 30, `${fmt(mm3h)} mm`, { size: 16, fill: C.ink, weight: 800, anchor: "middle", halo: true }));
+  }
+
+  // Pie
+  const foot: string[] = [];
+  if (input.sea) foot.push(`Mar: ${formatSeaLevel(input.sea.levelM)} respecto de su nivel medio (dato; no cambia la alerta).`);
+  if (input.forecast?.hours.length) foot.push(`Pronóstico próximas 24 h: ${fmt(input.forecast.expected?.mm ?? input.forecast.totalMm)} mm.`);
+  push(text(left, 850, foot.join("   "), { size: 16, fill: C.ink2 }));
+  push(text(left, 900, `Fuente: ${input.network ?? "INAMHI"} · SATI. Horas de Ecuador continental (en Galápagos, una hora menos).`, { size: 13.5, fill: C.ink3 }));
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${SC_H}" viewBox="0 0 ${W} ${SC_H}" font-family="${FONT}"><rect width="${W}" height="${SC_H}" fill="${C.surface}"/>${parts.join("")}</svg>`;
+}
+
 /** Nombre del archivo: reporte_santa_cruz_20261114_0900.png. */
 export function galapagosReportFileName(input: GalapagosReportInput): string {
   const { date, hourLabel } = lastDatum(input.now);
@@ -443,7 +564,8 @@ export function galapagosReportFileName(input: GalapagosReportInput): string {
 
 /** Dibuja el reporte y lo descarga como PNG (2800 × 2320; con el pronóstico, 2800 × 2880). */
 export async function downloadGalapagosReport(input: GalapagosReportInput): Promise<void> {
-  const url = URL.createObjectURL(new Blob([galapagosReportSvg(input)], { type: "image/svg+xml;charset=utf-8" }));
+  const svg = input.zone ? santaCruzReportSvg(input) : galapagosReportSvg(input);
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
   try {
     const image = new Image();
     await new Promise<void>((resolve, reject) => {
@@ -453,7 +575,7 @@ export async function downloadGalapagosReport(input: GalapagosReportInput): Prom
     });
     const canvas = document.createElement("canvas");
     canvas.width = W * SCALE;
-    canvas.height = (input.forecast?.hours.length ? H + FORECAST_PANEL : H) * SCALE;
+    canvas.height = (input.zone ? SC_H : input.forecast?.hours.length ? H + FORECAST_PANEL : H) * SCALE;
     canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) throw new Error("No se pudo generar la imagen");
