@@ -5,7 +5,7 @@ import type { RainForecast } from "./galapagos-report";
  *
  * Open-Meteo responde 429 (límite de consultas) al servidor de Render, que comparte su IP con
  * muchos otros; desde el navegador de quien abre el visor sí responde. Si el backend ya trae el
- * pronóstico, se usa ese; si no, se arma aquí igual que allá: la mediana de ECMWF, GFS e ICON y lo
+ * pronóstico, se usa ese; si no, se arma aquí igual que allá: la mediana de ECMWF AIFS, NOAA AIGFS y Météo-France y lo
  * esperado con el registro de la estación.
  *
  * Copia de proyecto_sati_backend/src/integrations/open-meteo/open-meteo-forecast.client.ts y
@@ -13,7 +13,7 @@ import type { RainForecast } from "./galapagos-report";
  */
 
 const URL_BASE = "https://api.open-meteo.com/v1/forecast";
-const MODELS = ["ecmwf_ifs025", "gfs_seamless", "icon_seamless"] as const;
+const MODELS = ["ecmwf_aifs025_single", "ncep_aigfs025", "meteofrance_seamless"] as const;
 const HOUR_MS = 3_600_000;
 const HOURS = 24;
 /** El último dato sirve de punto de partida si tiene menos de esto; si no, la hora actual. */
