@@ -33,6 +33,8 @@ interface GalapagosStationRain {
   lng?: number | null;
   lastTime?: string | null;
   mm3h: number;
+  /** Lluvia de las 24 horas antes de las últimas 3 (mm): el suelo mojado de la parte alta. */
+  prev24hMm?: number;
   mm6h: number;
   mm24h: number;
   level: GalapagosLevel;
@@ -214,12 +216,25 @@ export function GalapagosStationDetails({
   // Intensidad: la de la última hora y la mayor hora de las últimas 24 (mm/h).
   const nowRate = recent ? recent.mm60min : hours.filter((hour) => hour.mm !== null).at(-1)?.mm;
   const maxRate = station.maxByDurationMm[0];
+  // Santa Cruz: decide la lluvia en 3 horas (y, arriba, el suelo mojado de las 24 previas).
+  const santaCruz = Boolean(station.zone) && Boolean(station.twoDays?.length);
+  const wet = station.zone === "high" && (station.prev24hMm ?? 0) > WET_PREV_MM;
 
   return (
     <div className="mt-2 space-y-3">
       <AlarmBanner station={station} thresholds={snapshot.thresholds} />
       <SeaLine station={station} highSeaM={snapshot.highSeaM} />
 
+      {santaCruz ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Stat label="Últimas 3 h" value={`${formatMm(station.mm3h)} mm`} note={nowRate != null ? `ahora ${formatMm(nowRate)} mm/h` : undefined} />
+          <Stat
+            label="24 h previas"
+            value={station.prev24hMm != null ? `${formatMm(station.prev24hMm)} mm` : "–"}
+            note={wet ? <span className="font-semibold text-red-700">suelo mojado</span> : undefined}
+          />
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-2">
         <Stat
           label="Hoy"
@@ -242,6 +257,7 @@ export function GalapagosStationDetails({
           }
         />
       </div>
+      )}
       <div>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Lluvia</p>
@@ -253,6 +269,11 @@ export function GalapagosStationDetails({
             <p className="text-[10px] text-slate-500">{detail}</p>
             <FineBars key={resolution} bins={fine} minutes={resolution === "five" ? 5 : 15} island={station.island} />
           </>
+        ) : santaCruz ? (
+          <>
+            <p className="text-[10px] text-slate-500">Cada hora (barras) y en 3 horas (línea)</p>
+            <ThreeHourBars station={station} />
+          </>
         ) : limits && hours.length > 0 ? (
           <>
             <p className="text-[10px] text-slate-500">{detail}</p>
@@ -263,10 +284,14 @@ export function GalapagosStationDetails({
         )}
       </div>
 
-      <div>
-        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Acumulado · ayer y hoy</p>
-        <TwoDaySection state={state} />
-      </div>
+      {santaCruz ? (
+        <EventStat event={station.event ?? null} />
+      ) : (
+        <div>
+          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">Acumulado · ayer y hoy</p>
+          <TwoDaySection state={state} />
+        </div>
+      )}
 
       {station.forecast && station.forecast.hours.length > 0 && (
         <div>
@@ -316,6 +341,94 @@ function Intensity({ recent, hours }: { recent: RecentRain | null; hours: Weathe
       <p className="text-[10px] text-sky-700 tabular-nums">Intensidad: {rates.join(" · ")} mm/h</p>
     </>
   );
+}
+
+/** Parte alta de Santa Cruz: suelo mojado desde esta lluvia en las 24 horas previas (mm). */
+const WET_PREV_MM = 80;
+/** Los cortes de la lluvia en 3 horas que deciden el nivel (como en el backend). */
+const THREE_HOUR_LINES: Record<"low" | "high", { mm: number; label: string; color: string }[]> = {
+  high: [
+    { mm: 25, label: "amarilla", color: "#ca8a04" },
+    { mm: 45, label: "naranja", color: "#ea580c" },
+    { mm: 90, label: "roja", color: "#dc2626" },
+  ],
+  low: [{ mm: 70, label: "roja", color: "#dc2626" }],
+};
+const THREE = { height: 118, top: 8, right: 52, bottom: 16 };
+
+/** La lluvia de cada hora de las últimas 24 (barras) y la de 3 horas (línea), con los cortes del nivel. */
+function ThreeHourBars({ station }: { station: GalapagosStationRain }) {
+  const { height, top, right, bottom } = THREE;
+  const [active, setActive] = useState<number | null>(null);
+  const points = (station.twoDays ?? []).filter((point): point is { hour: number; accumulatedMm: number; mm: number; time: string } => point.mm != null && Boolean(point.time));
+  const sums = points.map((_, index) => points.slice(Math.max(0, index - 2), index + 1).reduce((total, point) => total + point.mm, 0));
+  const from = Math.max(0, points.length - 24);
+  const shown = points.slice(from);
+  const shownSums = sums.slice(from);
+  if (shown.length === 0) return null;
+  const lines = THREE_HOUR_LINES[station.zone ?? "low"];
+  const plotRight = WIDTH - right;
+  const baseline = height - bottom;
+  const max = Math.max(lines[0].mm, ...shownSums) * 1.1;
+  const y = (mm: number) => baseline - (Math.min(mm, max) / max) * (baseline - top);
+  const slot = plotRight / shown.length;
+  const gap = slot > 4 ? 1.5 : 0.6;
+  const path = shownSums.map((mm, index) => `${index === 0 ? "M" : "L"}${(index + 0.5) * slot},${y(mm)}`).join(" ");
+  const hovered = active === null ? undefined : shown[active];
+  const start = (time: string) => new Date(Date.parse(time) - 60 * 60 * 1000).toISOString();
+  const summary = `Lluvia en ${station.island}, últimas ${shown.length} horas: ${shown.map((point, index) => `${formatHour(point.time)} ${formatMm(point.mm)} mm (3 h: ${formatMm(shownSums[index])})`).join(", ")}.`;
+  return (
+    <svg viewBox={`0 0 ${WIDTH} ${height}`} className="mt-1 w-full touch-pan-y" role="img" aria-label={summary} onPointerLeave={() => setActive(null)}>
+      {lines
+        .filter((line) => line.mm <= max)
+        .map((line) => (
+          <g key={line.mm}>
+            <line x1={0} x2={plotRight} y1={y(line.mm)} y2={y(line.mm)} stroke={line.color} strokeDasharray="4 3" strokeWidth={1} />
+            <text x={plotRight + 3} y={y(line.mm) + 3} fill={line.color} fontSize={9}>
+              {line.mm} {line.label}
+            </text>
+          </g>
+        ))}
+      {shown.map((point, index) => (
+        <g key={point.time} onPointerEnter={() => setActive(index)} onPointerDown={() => setActive(index)}>
+          <title>{`De ${formatHour(start(point.time))} a ${formatHour(point.time)}: ${formatMm(point.mm)} mm · en 3 h: ${formatMm(shownSums[index])} mm`}</title>
+          <rect x={index * slot} y={0} width={slot} height={baseline} fill={active === index ? "#0f172a" : "transparent"} fillOpacity={0.07} />
+          {point.mm > 0 && <rect x={index * slot + gap / 2} y={y(point.mm)} width={Math.max(1, slot - gap)} height={baseline - y(point.mm)} rx={1} fill={STATION_HOURLY_BAR_COLOR} fillOpacity={0.55} />}
+          {(index % 6 === 0 || index === shown.length - 1) && (
+            <text x={index * slot + slot / 2} y={height - 3} textAnchor={index === 0 ? "start" : index === shown.length - 1 ? "end" : "middle"} fill="#64748b" fontSize={9}>
+              {formatHour(point.time)}
+            </text>
+          )}
+        </g>
+      ))}
+      <path d={path} fill="none" stroke="#0f172a" strokeWidth={1.8} strokeLinejoin="round" pointerEvents="none" />
+      <line x1={0} x2={plotRight} y1={baseline} y2={baseline} stroke="#cbd5e1" />
+      {hovered && active !== null && (
+        <text
+          x={Math.min(plotRight - 50, Math.max(50, (active + 0.5) * slot))}
+          y={top + 6}
+          textAnchor="middle"
+          fill="#0f172a"
+          fontSize={9.5}
+          fontWeight={700}
+          stroke="#ffffff"
+          strokeWidth={3}
+          paintOrder="stroke"
+          pointerEvents="none"
+        >
+          {formatHour(hovered.time)} · {formatMm(hovered.mm)} mm · 3 h {formatMm(shownSums[active])} mm
+        </text>
+      )}
+    </svg>
+  );
+}
+
+/** El evento de lluvia en curso (o el último): cuánto lleva y desde cuándo. */
+function EventStat({ event }: { event: RainEvent | null }) {
+  if (!event) return <Stat label="Este evento" value="sin lluvia" />;
+  const since = new Date(Date.parse(event.start) - RECORD_OFFSET_MS);
+  const day = `${String(since.getUTCDate()).padStart(2, "0")}/${String(since.getUTCMonth() + 1).padStart(2, "0")}`;
+  return <Stat label="Este evento" value={`${formatMm(event.totalMm)} mm`} note={`desde el ${day} a las ${formatHour(event.start)} · ${event.ended ? "terminó" : "sigue"}`} />;
 }
 
 const FORECAST_COLOR = "#64748b";
